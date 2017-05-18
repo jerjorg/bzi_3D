@@ -35,8 +35,7 @@ setup(name='BZI',
           "numpy",
           "matplotlib",
           "phenum",
-          "pytest",
-          "six"
+          "pytest"
       ],
       packages=['BZI'],
 #       scripts=['/solve.py'],

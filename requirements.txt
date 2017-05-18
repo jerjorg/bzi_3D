@@ -3,4 +3,3 @@ numpy
 phenum
 sympy
 pytest
-six
