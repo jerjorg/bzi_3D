@@ -378,49 +378,47 @@ def make_grid(cell_vecs, grid_vecs, offset):
                 grid.append(np.dot(cell_vecs, gpt) - offset)
     return grid
 
-def make_new_grid(L, cell_vecs, grid_vecs, offset):
-    """Sample within a parallelepiped using any regular grid.
-
-    Args:
-        L (numpy.ndarray): a lower-triangular, integer, 3x3 matrix.
-        grid_vecs (numpy.ndarray): the vectors that generate the grid as 
-            columns of the matrix..
-        offset: a grid offset in mesh coordinates
-
-    Returns:
-        grid (numpy.ndarray): an array of sampling-point coordinates.
-
-    Examples:
-        >>> lattice_type = "fcc"
-        >>> samplings = [10, 10, 10]
-        >>> offset = [0.5, 0.5, 0.5]
-        >>> grid = regular_grid(lattice_type, samplings, offset)
+def make_large_grid(cell_vectors, grid_type, grid_vectors, offset):
+    """This function is identical to make_grid except it samples a volume
+    that is larger and saves the points that are thrown away in make_grid.
     """
     
-    a = L[0,0]
-    b = L[1,0]
-    c = L[1,1]
-    d = L[2,0]
-    e = L[2,1]
-    f = L[2,2]
-
-    # B = np.dot(grid_vecs, L)
-    offset = offset*np.sum(grid_vecs,1)
-    
     grid = []
-    z1pl = 0
-    z1pu = int(a)
-    for z1p in range(z1pl, z1pu):
-        z2pl = int(b*z1p/a) # lower and upper limits
-        z2pu = int(z2pl + c)
-        for z2p in range(z2pl, z2pu):
-            z3pl = int((d - b*e/c)*z1p/a + e/c*z2p)
-            z3pu = int(z1pl + f)
-            for z3p in range(z3pl, z3pu):
-                pt = np.dot(grid_vecs, [z1p,z2p,z3p])
-                pt = np.dot(np.linalg.inv(cell_vecs), pt)%1
-                grid.append(np.dot(cell_vecs,pt) - offset)
-    return grid
+    null_grid = []
+    cell_lengths = np.array([np.linalg.norm(cv) for cv in cell_vectors])
+    cell_directions = [c/np.linalg.norm(c) for c in cell_vectors]
+    # G is a matrix of lattice vector components along the cell vector
+    # directions.
+    G = np.asarray([[abs(np.dot(g, c)) for c in cell_directions] for g in grid_vectors])
+
+    # Find the optimum integer values for creating the grid.
+    n = [0,0,0]
+    if grid_type == "fcc":    
+        for i in range(len(n)):
+            index = np.where(np.asarray(G) == np.max(G))
+            # The factor 5./4 makes the sampling volume larger.
+            n[index[1][0]] = int(cell_lengths[index[1][0]]/np.max(G)*5./4)
+            G[index[0][0],:] = 0.
+            G[:,index[1][0]] = 0.
+    else:
+        for i in range(len(n)):
+            index = np.where(np.asarray(G) == np.max(G))
+            # The factor 4./5 makes the sampling volume larger.
+            n[index[1][0]] = int(cell_lengths[index[1][0]]/np.max(G)*(4./5))
+            G[index[0][0],:] = 0.
+            G[:,index[1][0]] = 0.
+
+    for nv in product(range(-n[0], n[0]+1), range(-n[1], n[1]+1),
+                      range(-n[2], n[2]+1)):
+        # Sum across columns since we're adding up components of each vector.
+        grid_pt = np.sum(grid_vectors*nv, 1) - offset
+        projections = [np.dot(grid_pt,c) for c in cell_directions]
+        projection_test = np.alltrue([abs(p) <= cl/2 for (p,cl) in zip(projections, cell_lengths)])
+        if projection_test == True:
+            grid.append(grid_pt)
+        else:
+            null_grid.append(grid_pt)
+    return (np.asarray(grid), np.asarray(null_grid))
 
 def sphere_pts(A,r2,offset):
     """ Calculate all the points within a sphere that are 
@@ -459,6 +457,45 @@ def sphere_pts(A,r2,offset):
     for i,j,k in product(range(-n[0] + oi[0], n[0] + oi[0]),
                          range(-n[1] + oi[1], n[1] + oi[1]),
                          range(-n[2] + oi[2], n[2] + oi[2])):
+        pt = np.dot(A,[i,j,k])
+        if np.dot(pt-offset,pt-offset) <= r2 + eps:
+            grid.append(pt)
+        else:
+            continue                
+    return grid
+
+def large_sphere_pts(A,r2,offset):
+    """ Calculate all the points within a sphere that are 
+    given by an integer linear combination of the columns of 
+    A.
+    
+    Args:
+        A (numpy.ndarray): the grid basis with the columns 
+            representing basis vectors.
+        r2 (float): the squared radius of the sphere.
+        offset(list or numpy.ndarray): a vector that points to the center
+            of the sphere.
+        
+    Returns:
+        grid (list): an array of grid coordinates in cartesian
+            coordinates.
+    """
+    
+    # This is a parameter that should help deal with rounding error.
+    eps = 1e-9
+    offset = np.asarray(offset)
+    # Put the offset in lattice coordinates
+    oi= np.round(np.dot(np.linalg.inv(A),offset))
+    # Find a lattice point close to the offset
+    oi = oi.astype(int)
+    # scale the integers by about 100% to ensure all points are enclosed.
+    scale = 2.
+    imax,jmax,kmax = map(int,np.ceil(scale*np.sqrt(r2/np.sum(np.dot(A,A),0))))
+    
+    grid = []
+    for i,j,k in product(range(-imax + oi[0],imax + oi[0]),
+                         range(-jmax + oi[1],jmax + oi[1]),
+                         range(-kmax + oi[2],kmax + oi[2])):
         pt = np.dot(A,[i,j,k])
         if np.dot(pt-offset,pt-offset) <= r2 + eps:
             grid.append(pt)

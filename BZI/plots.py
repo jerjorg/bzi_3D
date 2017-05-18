@@ -309,10 +309,62 @@ def PlotBandStructure(materials_list, PPlist, PPargs_list, lat_type, lat_const,
     if save:
         plt.savefig("%s_band_struct.pdf" %materials_list[0],
                     bbox_extra_artists=(lgd,), bbox_inches='tight')
-    elif show:
+    if show:
         plt.show()
-    else:
-        return None
+    return None
+
+def PlotSphereMesh(mesh_points,r2, offset = np.asarray([0.,0.,0.]),
+                   save=False, show=True):
+    """Create a 3D scatter plot of a set of points inside a sphere.
+    
+    Args:
+        mesh_points (list or np.ndarray): a list of mesh points.
+        r2 (float): the squared radius of the sphere
+        cell_vecs (list or np.ndarray): a list vectors that define a cell.
+        save (bool): if true, the plot is saved as sphere_mesh.png.
+        show (bool): if true, the plot is displayed.
+        
+    Returns:
+        None
+    Example:
+        >>> from BZI.sampling import sphere_pts
+        >>> from BZI.symmetry import make_rptvecs
+        >>> from BZI.plots import PlotSphereMesh
+        >>> import numpy as np
+        >>> lat_type = "fcc"
+        >>> lat_const = 10.26
+        >>> lat_vecs = make_rptvecs(lat_type, lat_const)
+        >>> r2 = 3.*(2*np.pi/lat_const)**2
+        >>> offset = [0.,0.,0.]
+        >>> grid = sphere_pts(lat_vecs,r2,offset)
+        >>> PlotSphereMesh(grid,r2,offset)
+    """
+    
+    # Plot the points within the sphere.
+    ngpts = len(mesh_points)
+    kxlist = [mesh_points[i][0] for i in range(ngpts)]
+    kylist = [mesh_points[i][1] for i in range(ngpts)]
+    kzlist = [mesh_points[i][2] for i in range(ngpts)]
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_aspect('equal')
+    ax.scatter(kxlist, kylist, kzlist, c="black",s=1)
+    
+    # Plot the sphere
+    u = np.linspace(0, 2 * np.pi, 100)
+    v = np.linspace(0, np.pi, 100)
+    r = np.sqrt(r2)
+    x = r * np.outer(np.cos(u), np.sin(v)) + offset[0]
+    y = r * np.outer(np.sin(u), np.sin(v)) + offset[1]
+    z = r * np.outer(np.ones(np.size(u)), np.cos(v)) + offset[2]
+    
+    ax.scatter(x,y,z,s=0.001)
+    if save:
+        plt.savefig("sphere_mesh.png")
+    if show:
+        plt.show()
+    return None
 
 def PlotVaspBandStructure(file_loc, material, lat_type, energy_shift=0.0,
                           fermi_level=False, elimits=False, save=False,

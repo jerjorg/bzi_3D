@@ -8,52 +8,12 @@ import csv
 
 from BZI.sampling import (make_grid, get_minmax_indices,
                           swap_column, HermiteNormalForm, swap_row,
-                          LowerHermiteNormalForm)
+                          LowerHermiteNormalForm, make_large_grid,
+                          sphere_pts, large_sphere_pts)
 
-from BZI.symmetry import make_ptvecs
+
+from BZI.symmetry import make_ptvecs, make_rptvecs
 from BZI.plots import PlotMesh
-
-def large_mesh(cell_vectors, mesh_type, mesh_vectors, offset):
-    """This function is identical to make_grid except it samples a volume
-    that is larger and saves the points that are thrown away in make_grid.
-    """
-    
-    mesh = []
-    null_mesh = []
-    cell_lengths = np.array([np.linalg.norm(cv) for cv in cell_vectors])
-    cell_directions = [c/np.linalg.norm(c) for c in cell_vectors]
-    # G is a matrix of lattice vector components along the cell vector
-    # directions.
-    G = np.asarray([[abs(np.dot(g, c)) for c in cell_directions] for g in mesh_vectors])
-
-    # Find the optimum integer values for creating the mesh.
-    n = [0,0,0]
-    if mesh_type == "fcc":    
-        for i in range(len(n)):
-            index = np.where(np.asarray(G) == np.max(G))
-            # The factor 5./4 makes the sampling volume larger.
-            n[index[1][0]] = int(cell_lengths[index[1][0]]/np.max(G)*5./4)
-            G[index[0][0],:] = 0.
-            G[:,index[1][0]] = 0.
-    else:
-        for i in range(len(n)):
-            index = np.where(np.asarray(G) == np.max(G))
-            # The factor 4./5 makes the sampling volume larger.
-            n[index[1][0]] = int(cell_lengths[index[1][0]]/np.max(G)*(4./5))
-            G[index[0][0],:] = 0.
-            G[:,index[1][0]] = 0.
-
-    for nv in product(range(-n[0], n[0]+1), range(-n[1], n[1]+1),
-                      range(-n[2], n[2]+1)):
-        # Sum across columns since we're adding up components of each vector.
-        mesh_pt = np.sum(mesh_vectors*nv, 1) - offset
-        projections = [np.dot(mesh_pt,c) for c in cell_directions]
-        projection_test = np.alltrue([abs(p) <= cl/2 for (p,cl) in zip(projections, cell_lengths)])
-        if projection_test == True:
-            mesh.append(mesh_pt)
-        else:
-            null_mesh.append(mesh_pt)
-    return (np.asarray(mesh), np.asarray(null_mesh))
 
 def test_make_grid():
     """Verify the mesh satisfies various properties, such as verifying
@@ -101,9 +61,6 @@ def test_get_minmax_indices():
     mins = []
     maxs = []
     for n in range(1,ntests+1):
-        # vec_filename = "./sampling_testfiles/get_minmax_indices_invec.in.%s" %n
-        # max_filename = "./sampling_testfiles/get_minmax_indices_max.out.%s" %n
-        # min_filename = "./sampling_testfiles/get_minmax_indices_min.out.%s" %n
         vec_filename = os.path.join(os.path.dirname(__file__), "sampling_testfiles/get_minmax_indices_invec.in.%s" %n)
         max_filename = os.path.join(os.path.dirname(__file__), "./sampling_testfiles/get_minmax_indices_max.out.%s" %n)
         min_filename = os.path.join(os.path.dirname(__file__), "./sampling_testfiles/get_minmax_indices_min.out.%s" %n)
@@ -112,17 +69,14 @@ def test_get_minmax_indices():
         
         with open(vec_filename,'r') as f:
             next(f) # skip headings
-            # vecs.append(np.asarray([int(elem) for elem in next(f).strip().split()]))
             vec = np.asarray([int(elem) for elem in next(f).strip().split()])
         
         with open(max_filename,'r') as f:
             next(f) # skip headings
-            # maxs.append(int(next(f).strip()))
             max = int(next(f).strip())
 
         with open(min_filename,'r') as f:
             next(f) # skip headings
-            # mins.append(int(next(f).strip()))
             min = int(next(f).strip())
 
         assert np.allclose(get_minmax_indices(np.array(vec)), np.asarray([min-1, max-1])) == True
@@ -136,12 +90,6 @@ def test_swap_columns():
     mins = []
     maxs = []
     for n in range(1,ntests+1):
-        # Bin_file = open("./sampling_testfiles/swap_column_B.in.%s" %n)
-        # Bout_file = open("./sampling_testfiles/swap_column_B.out.%s" %n)
-        # Min_file = open("./sampling_testfiles/swap_column_M.in.%s" %n)
-        # Mout_file = open("./sampling_testfiles/swap_column_M.out.%s" %n)
-        # kin_file = open("./sampling_testfiles/swap_column_k.in.%s" %n)
-
         Bin_file = open(os.path.join(os.path.dirname(__file__),
                         "sampling_testfiles/swap_column_B.in.%s" %n))
         Bout_file = open(os.path.join(os.path.dirname(__file__),
@@ -191,12 +139,6 @@ def test_swap_rows():
     mins = []
     maxs = []
     for n in range(1,ntests+1):
-        # Bin_file = open("./sampling_testfiles/swap_column_B.in.%s" %n)
-        # Bout_file = open("./sampling_testfiles/swap_column_B.out.%s" %n)
-        # Min_file = open("./sampling_testfiles/swap_column_M.in.%s" %n)
-        # Mout_file = open("./sampling_testfiles/swap_column_M.out.%s" %n)
-        # kin_file = open("./sampling_testfiles/swap_column_k.in.%s" %n)
-
         Bin_file = open(os.path.join(os.path.dirname(__file__),
                         "sampling_testfiles/swap_column_B.in.%s" %n))
         Bout_file = open(os.path.join(os.path.dirname(__file__),
@@ -253,10 +195,6 @@ def test_LowerHermiteNormalForm():
     mins = []
     maxs = []
     for n in range(1,ntests+1):
-        # Sin_file = open("./sampling_testfiles/HermiteNormalForm_S.in.%s" %n)
-        # Bout_file = open("./sampling_testfiles/HermiteNormalForm_B.out.%s" %n)
-        # Hout_file = open("./sampling_testfiles/HermiteNormalForm_H.out.%s" %n)
-
         Sin_file = open(os.path.join(os.path.dirname(__file__),
                         "sampling_testfiles/HermiteNormalForm_S.in.%s" %n))
         Bout_file = open(os.path.join(os.path.dirname(__file__),
@@ -342,26 +280,25 @@ def test_make_grid():
             if np.allclose(g1,g2) == True:
                 check = True
         assert check == True
-        
-# # Plot the meshes to visually verify that they are correct.
-# from BZI.plot import PlotMesh
-# cell_type = "sc"
-# cell_const = 2*np.sqrt(2)
-# cell_vecs = make_ptvecs(cell_type, cell_const)
+    
+    lat_type_list = ["fcc","bcc", "sc"]
+    lat_const_list = [10,10.1, 3*np.pi]
+    offset_list = [[1.3, 1.1,1.7],[11,9,8],[np.pi,np.pi,np.pi]]
+    r_list = [1, 2.3, np.pi]
 
-# mesh_type = "bcc"
-# mesh_const = .7
-# mesh_vecs = make_ptvecs(mesh_type, mesh_const)
-# offset = [0.,0.,0.]
-
-# spts = make_large_mesh(cell_vecs, mesh_type, mesh_vecs, offset)
-
-# allpts = []
-# for pt in spts[0]:
-#     allpts.append(pt)
-# for pt in spts[1]:
-#     allpts.append(pt)
-# allpts = np.asarray(allpts)
-
-# PlotMesh(spts[0], cell_vecs)
-# PlotMesh(allpts, cell_vecs)
+    for lat_type in lat_type_list:
+        for lat_const in lat_const_list:
+            lat_vecs = make_rptvecs(lat_type,lat_const)
+            for offset in offset_list:
+                offset = np.asarray(offset)
+                for r in r_list:
+                    total_grid = large_sphere_pts(lat_vecs,r,offset)
+                    grid = sphere_pts(lat_vecs,r,offset)
+                    contained = False
+                    for tg in total_grid:
+                        if np.dot(tg-offset,tg-offset) <= r:
+                            contained = False
+                            for g in grid:
+                                if np.allclose(g,tg):
+                                    contained = True
+                            assert contained == True
