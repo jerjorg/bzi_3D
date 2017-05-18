@@ -29,7 +29,7 @@ setup(name='BZI',
       license='MIT',
       setup_requires=['pytest-runner',],
       tests_require=['pytest', 'python-coveralls'],
-      install_requiresh=[
+      install_requires=[
           "argparse",
           "termcolor",
           "numpy",
