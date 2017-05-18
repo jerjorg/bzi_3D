@@ -1,0 +1,127 @@
+\documentclass[preprint, amsmath, amssymb]{revtex4-1}
+
+\usepackage{amsmath}
+
+\begin{document}
+
+\title{Fourier Quadrature}
+\author{Jeremy Jorgensen}
+% \date
+\maketitle
+
+\section{Introduction}
+This write-up was motivated by special points methods found in the literature of Brillouin zone integration. In plane-wave DFT codes, such as VASP \cite{kresse1993ab, kresse1994ab, kresse1996efficiency, kresse1996efficient} the band energy is calculated by numerical integration. Since evaluating the electron energy states, the multivalued function being integrated, is computationally expensive, one typically wants the greatest accuracy with the lowest number of sampling points possible. For this purpose were special point methods created, such as the mean value point\cite{baldereschi1973mean}, Chadi and Cohen points\cite{chadi1973special}, and Monkhorst-Pack points\cite{monkhorst1976special}.
+
+As Froyen points out, all of these methods for calculating sampling points fall under the umbrella of Fourier quadrature\cite{froyen1989brillouin}. In fact, each method generates a uniform grid. Today sampling points generated from the Monkhorst-Pack scheme are among the most popular in DFT calculations.
+
+The purpose of this write-up is to gain insight into Fourier quadrature, Fourier expansions and the rectangular integration method. We should find that Fourier quadrature points are equivalent to a uniform mesh, rectangular integration is identical to Fourier quadrature, and the leading coefficient in a Fourier expansion of a function has the exact same value as the integral of the function obtained with rectangular integration or Fourier quadrature.
+
+\section{Fourier Quadrature Points and Rectangular Integration}
+In order to gain a better understanding of special point methods or Fourier quadrature, we'll first show that Fourier quadrature is the same as rectangular integration. Derivations will be performed in 1D but the results should generalize to higher dimensions.
+
+We begin by expanding a function $f(x)$
+\begin{equation} \label{eq:expansion}
+  f(x) \approx \sum_{i = 0}^{N - 1} a_i b_i(x)
+\end{equation}
+where $N$ is the number of basis functions kept in the expansion, $a_i$ are expansion coefficients, and $b_i(x)$ are the basis functions. Next we sample our function on a mesh $\{x_0, x_1, \dots, x_{N-1}\}$ to obtain the system of equations
+\begin{equation} \label{eq:sample_expansion}
+  f(x_j) \approx \sum_{i=0}^{N-1} a_i b_i(x_j), \hspace{8pt} \mathrm{for} \hspace{4pt} j = 0, 1, 2, \dots, N-1.
+\end{equation}
+These can be written in matrix form as $\mathbf{f} = B \mathbf{A}$ where
+\begin{equation}
+  \mathbf{f} =
+  \begin{pmatrix}
+    f(x_0) \\
+    f(x_1) \\
+    \vdots \\
+    f(x_{N-1})
+  \end{pmatrix},
+  \hspace{12pt}
+  B =
+  \begin{pmatrix}
+    b_0(x_0) & b_1(x_0) & \cdots & b_{N-1}(x_0) \\
+    b_0(x_1) & b_1(x_1) & \cdots & b_{N-1}(x_1) \\
+             &   \vdots & & \\
+    b_0(x_{N-1}) & b_1(x_{N-1}) & \cdots & b_{N-1}(x_{N-1}) \\
+  \end{pmatrix},
+  \hspace{12pt}
+  \mathbf{a} =
+  \begin{pmatrix}
+    a_0 \\
+    a_1 \\
+    \vdots \\
+    a_{N-1}
+  \end{pmatrix}.
+\end{equation}
+  If we were interested in interpolating our function, we could find the expansion coefficients through inverting the matrix $B$
+  \begin{equation} \label{eq:coefficients}
+    \mathbf{a} = B^{-1} \mathbf{f}.
+  \end{equation}
+  Up until now we haven't placed any restrictions on sampling points or basis functions and indeed our results will be general until we introduce Fourier basis functions.
+  
+  Next, let's numerically integrate our Fourier expansion expansion over our mesh
+  \begin{align} \label{eq:expansion_integral}
+    \int dx \, f(x) &\approx \sum_{i = 0}^{N-1} w_i f(x_i) \\ \nonumber
+    &= \sum_{i = 0}^{N-1} w_i \sum_{j = 0}^{N-1} a_j b_j(x_i),
+  \end{align}
+  where $w_i$ are integration weights that are determined from the numerical integration method chosen.
+  
+  Trigonometric functions are usually chosen as a basis when the function being expanded is periodic, in which case the periods of the basis functions are equal to or multiples of the period of the function $T$. We can represent our function exactly with an infinite number basis functions. Consider calculating the integral of our function by calculating the integral of each term in the expansion
+
+  \begin{align}
+    \int_T dx \, f(x) = \bar{f} &= \int_T dx \, \sum_{i = 0}^{\infty} a_i b_i(x) \nonumber \\
+    &= \sum_{i = 0}^{\infty} a_i \int_T dx \, b_i(x) \nonumber \\
+    &= a_0. \label{eq:first_coeff}
+  \end{align}
+  where $\bar{f}$ is the average value of $f(x)$ over one period $T$. The last line in Eq. \ref{eq:first_coeff} follows from the integral of a periodic function over one period or integer multiples of its period being equal to its average value, which, in the case of trigonometric functions, is zero unless the period is infinite and then the average is 1. Eq. \ref{eq:first_coeff} tells us that the integral of our function is equal to the average value of the function or the leading coefficient in our basis expansion.
+
+  Motivated by this result, we're going to choose sampling points that will allow us to obtain a good estimate of the leading coefficient. Let's expand the sum in Eq. \ref{eq:expansion_integral}
+  \begin{align}
+    \int dx \, f(x) &\approx \sum_{i = 0}^{N-1} w_i \sum_{j = 0}^{N-1} a_j b_j(x_i) \nonumber \\
+    &= a_0 b_0(x_0) + a_1 b_1(x_0) + \dots + a_{N-1} b_{N-1}(x_0) \nonumber \\
+    & \hspace{12pt} + a_0 b_0(x_1) + a_1 b_1(x_1) + \dots + a_{N-1} b_{N-1}(x_1) \nonumber \\
+    & \hspace{.5in} \vdots \nonumber \\
+    & \hspace{12pt} + a_0 b_0(x_{N-1}) + a_1 b_1(x_{N-1}) + \dots + a_{N-1} b_{N-1} (x_{N-1}) \nonumber \\
+    &= a_0(b_0(x_0) + b_0(x_1) + \dots b_0(x_{N-1})) \nonumber \\
+    & \hspace{12pt} + a_1(b_0(x_0) + b_0(x_1) + \dots b_0(x_{N-1})) \nonumber \\
+    & \hspace{.5in} \vdots \nonumber \\
+    &\hspace{12pt} + a_{N-1}(b_0(x_0) + b_0(x_1) + \dots b_0(x_{N-1})).
+  \end{align}
+  From inspection, if the only surviving term is going to be proportional to $a_0$, the grid points chosen must satisfy
+  \begin{equation} \label{eq:fourier_points}
+    \sum_{i=1}^{N-1}b_i(x_j) = 0, \hspace{12pt} \text{for } j = 0, 1, 2, \dots, N-1
+  \end{equation}
+  
+  All that is left to show the equivalence of Fourier quadrature and rectangular integration is the points that satisfy Eq. \ref{eq:fourier_points} are evenly spaced. To achieve this, we'll do a physicist proof, meaning we'll show that it is true two for two small test cases.
+  First let's select a basis. For simplicity we'll assume that the function has even symmetry so we can ignore sine terms and the period is 1
+  \begin{equation}
+    b_i(x) = \cos(2 \pi i x).
+  \end{equation}
+  You may notice that in Eq. \ref{eq:fourier_points} there is one fewer equation than variables. This simple means that we are free to choose the position of one of our points or that any arbitrary offset of the grid will satisfy Eq. \ref{eq:fourier_points}. Let's choose the simplest case of $N = 2$. Eq. \ref{eq:fourier_points} becomes
+  \begin{align*}
+    b_1(x_0) + b_1(x_1) &= \cos(2 \pi x_0) + \cos(2 \pi x_1)  = 0\\
+    \rightarrow 2 \pi x_0 &= 2 \pi x_1 + \pi \\
+    \rightarrow x_0 &= x_1 + \text{d}x
+  \end{align*}
+  where d$x$ = 1/2. We see that the two points in our grid located anywhere between $[0, 1]$ and that they are separated by d$x$, which is what we expected.
+
+  Let's see what we get for $N = 3$. Starting from Eq. \ref{eq:fourier_points} and using the same basis as before we get
+  \begin{align*}
+    \cos{2 \pi x_0} + \cos{2 \pi x_0} + \cos{2 \pi x_0} = 0 \\
+    \cos{4 \pi x_0} + \cos{4 \pi x_0} + \cos{4 \pi x_0} = 0.
+  \end{align*}
+  Applying the double angle identity and letting $y_i = \cos(2 \pi x_i)$ we obtain
+  \begin{align*}
+    y_0 + y_1 + y_2 &= 0 \\
+    y_0^2 + y_1^2 + y_2^2 &= \frac{3}{2}.
+  \end{align*}
+  Let $y_2$ be the point we choose and then solving for $y_1$ and $y_0$
+  \begin{align*}
+    y_1 &= \frac{1}{2}(-y_2 \pm \sqrt(3 - 3y_2^2)) \\
+    y_0 &= -y_2 - y_1.
+  \end{align*}
+  If these equations are solved for arbitray $y_2$ in Mathematica, one can see the points are d$x = 1/3$ away from neighboring points.
+ 
+\bibliography{bib.bib}{}
+\bibliographystyle{unsrt}
+\end{document}

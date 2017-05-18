@@ -1,0 +1,4 @@
+bibtex FourierQuadrature
+pdflatex FourierQuadrature
+pdflatex fourierQuadrature
+open FourierQuadrature.pdf

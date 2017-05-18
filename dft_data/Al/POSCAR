@@ -1,0 +1,8 @@
+ Aluminum 
+   4.05  ! Lattice Constant
+   0.0 0.5 0.5  ! Lattice vector  a(1) 
+   0.5 0.0 0.5  ! Lattice vector  a(2) 
+   0.5 0.5 0.0  ! Lattice vector  a(3) 
+   1  ! Number of atoms for each species 
+ Direct 
+  0.000 0.000 0.000  ! Reduced coordinates atom 1 

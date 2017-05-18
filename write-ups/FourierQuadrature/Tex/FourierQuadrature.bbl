@@ -1,0 +1,47 @@
+\begin{thebibliography}{1}
+
+\bibitem{kresse1993ab}
+Georg Kresse and J{\"u}rgen Hafner.
+\newblock Ab initio molecular dynamics for liquid metals.
+\newblock {\em Physical Review B}, 47(1):558, 1993.
+
+\bibitem{kresse1994ab}
+G~Kresse and J~Hafner.
+\newblock Ab initio molecular-dynamics simulation of the
+  liquid-metal--amorphous-semiconductor transition in germanium.
+\newblock {\em Physical Review B}, 49(20):14251, 1994.
+
+\bibitem{kresse1996efficiency}
+Georg Kresse and J{\"u}rgen Furthm{\"u}ller.
+\newblock Efficiency of ab-initio total energy calculations for metals and
+  semiconductors using a plane-wave basis set.
+\newblock {\em Computational Materials Science}, 6(1):15--50, 1996.
+
+\bibitem{kresse1996efficient}
+Georg Kresse and J{\"u}rgen Furthm{\"u}ller.
+\newblock Efficient iterative schemes for ab initio total-energy calculations
+  using a plane-wave basis set.
+\newblock {\em Physical review B}, 54(16):11169, 1996.
+
+\bibitem{baldereschi1973mean}
+A.~Baldereschi.
+\newblock Mean-value point in the brillouin zone.
+\newblock {\em Phys. Rev. B}, 7:5212--5215, Jun 1973.
+
+\bibitem{chadi1973special}
+D.~J. Chadi and Marvin~L. Cohen.
+\newblock Special points in the brillouin zone.
+\newblock {\em Phys. Rev. B}, 8:5747--5753, Dec 1973.
+
+\bibitem{monkhorst1976special}
+Hendrik~J. Monkhorst and James~D. Pack.
+\newblock Special points for brillouin-zone integrations.
+\newblock {\em Phys. Rev. B}, 13:5188--5192, Jun 1976.
+
+\bibitem{froyen1989brillouin}
+Sverre Froyen.
+\newblock Brillouin-zone integration by fourier quadrature: Special points for
+  superlattice and supercell calculations.
+\newblock {\em Phys. Rev. B}, 39:3168--3172, Feb 1989.
+
+\end{thebibliography}

@@ -1,0 +1,10 @@
+ Diamond Structure Silicon 
+   5.430  ! Lattice Constant Kittel pg 17 
+   0.0 0.5 0.5  ! Lattice vector  a(1) 
+   0.5 0.0 0.5  ! Lattice vector  a(2) 
+   0.5 0.5 0.0  ! Lattice vector  a(3) 
+   2  ! Number of atoms for each species 
+ Direct 
+  -0.125 -0.125 -0.125  ! Reduced coordinates atom 1 
+   0.125  0.125  0.125  ! Reduced coordinates atom 2 
+ 
