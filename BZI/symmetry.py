@@ -10,27 +10,393 @@ import copy
 from itertools import islice
 from phenum.symmetry import _get_lattice_pointGroup
 
-# Define the symmetry points for a fcc lattice in lattice coordinates.
-# Coordinates are in lattice coordinates.
-fcc_sympts = {"G": [0., 0., 0.], # G is the gamma point.
-               "X": [1./2, 0., 1./2],
-               "L": [1./2, 1./2, 1./2],
-               "W": [1./2, 1./4, 3./4],
-               "U": [5./8, 1./4, 5./8],
-               "K": [3./8, 3./8, 3./4],
-               "G2":[1., 1., 1.]}
-
-# Define the symmetry points for a bcc lattice in lattice coordinates
-bcc_sympts = {"G": [0., 0., 0.],
-               "H": [1./2, 1./2, -1./2],
-               "P": [1./4, 1./4, 1./4],
-               "N": [1./2, 0., 0.]}
-
-# Define the symmetry points for a sc lattice in lattice coordinates.
+# Define the symmetry points for a simple-cubic lattice in lattice coordinates.
 sc_sympts = {"G": [0. ,0., 0.],
               "R": [1./2, 1./2, 1./2],
               "X": [0., 1./2, 0.],
               "M": [1./2, 1./2, 0.]}
+
+# Define the symmetry points for a fcc lattice in lattice coordinates.
+# Coordinates are in lattice coordinates.
+fcc_sympts = {"G": [0., 0., 0.], # G is the gamma point.
+               "K": [3./8, 3./8, 3./4],
+               "L": [1./2, 1./2, 1./2],
+               "U": [5./8, 1./4, 5./8],              
+               "W": [1./2, 1./4, 3./4],
+               "X": [1./2, 0., 1./2],
+               "G2":[1., 1., 1.]}
+
+# Define the symmetry points for a bcc lattice in lattice coordinates
+bcc_sympts = {"G": [0., 0., 0.],
+               "H": [1./2, -1./2, 1./2],
+               "P": [1./4, 1./4, 1./4],
+               "N": [0., 0., 1./2]}
+
+# Tetragonal high symmetry points
+tet_sympts = {"G": [0., 0., 0.],
+              "A": [1./2, 1./2, 1./2],
+              "M": [1/.2, 1./2, 0],
+              "R": [0., 1./2, 1./2],
+              "X": [0., 1./2, 0.],
+              "Z": [0., 0., 1./2]}
+
+# It may be better to have the arguments for the symmetry point
+# functions as lattice_constants and lattice_angles.
+
+def bct1_sympts(a, c):
+    """Return the body-centered tetragonal high symmetry points for c < a as a 
+    dictionary.
+    """
+    
+    eta = (1. + c**2/a**2)/4.
+    return {"G": [0., 0., 0.],
+            "M": [-1./2, 1./2, 1./2],
+            "N": [0., 1./2, 0.],
+            "P": [1./4, 1./4, 1./4],
+            "X": [0., 0., 1./2],
+            "Z": [eta, eta, -eta],
+            "Z1": [-eta, 1-eta, eta]}
+
+def bct2_sympts(a, c):
+    """Return the body-centered tetragonal high symmetry points for a < c
+    as a dictionary.
+    """
+    
+    eta = (1. + a**2/c**2)/4.
+    zeta = a**2/(2*c**2)
+    return {"G": [0., 0., 0.],
+            "N": [0., 1./2, 0.],
+            "P": [1./4, 1./4, 1./4],
+            "S": [-eta, eta, eta], # Sigma
+            "S1": [eta, 1-eta, -eta], # Sigma_1
+            "X": [0., 0., 1./2],
+            "Y": [-zeta, zeta, 1./2],
+            "Y1": [1./2, 1./2, -zeta],
+            "Z": [1./2, 1./2, -1./2]}
+
+# Orthorhombic high symmetry points
+orc_sympts = {"G": [0., 0., 0.],
+              "R": [1./2, 1./2, 1./2],
+              "S": [1./2, 1./2, 0.],
+              "T": [0., 1./2, 1./2],
+              "U": [1./2, 0., 1./2],
+              "X": [1./2, 0., 0.],
+              "Y": [0., 1./2, 0.],
+              "Z": [0., 0., 1./2]}
+
+def orcf13_sympts(a, b, c):
+    """Return the face-centered orthorhombic high symmetry points for
+     1/a**2 > 1/b**2 +1/c**2 and 1/a**2 = 1/b**2 +1/c**2 as a dictionary.
+    """
+    
+    a = float(a)
+    b = float(b)
+    c = float(c)
+    zeta = (1 + a**2/b**2 - a**2/c**2)/4
+    eta = (1 + a**2/b**2 + a**2/c**2)/4
+    
+    return {"G": [0., 0., 0.],
+            "A": [1./2, 1./2+zeta, zeta],
+            "A1": [1./2, 1./2 - zeta, 1 - zeta],
+            "L": [1./2, 1./2, 1./2],
+            "T": [1., 1./2, 1./2],
+            "X": [0., eta, eta],
+            "X1": [1., 1-eta, 1-eta],
+            "Y": [1./2, 0., 1./2],
+            "Z": [1./2, 1./2, 0.]}
+
+def orcf2_sympts(a, b, c):
+    """Return the face-centered orthorhombic high symmetry points for
+     1/a**2 < 1/b**2 +1/c**2 as a dictionary.
+    """
+    
+    a = float(a)
+    b = float(b)
+    c = float(c)
+    eta = (1 + a**2/b**2 - a**2/c**2)/4
+    phi = (1 + c**2/b**2 - c**2/a**2)/4
+    delta = (1 + b**2/a**2 - b**2/c**2)/4
+    
+    return {"G": [0., 0., 0.],
+            "C": [1./2, 1./2 - eta, 1. - eta],
+            "C1": [1./2, 1./2 + eta, eta],
+            "D": [1./2 - delta, 1./2, 1. - delta],
+            "D1": [1./2 + delta, 1./2, delta],
+            "L": [1./2, 1./2, 1./2],
+            "H": [1 - phi, 1./2 - phi, 1./2],
+            "H1": [phi, 1./2 + phi, 1./2],
+            "X": [0., 1./2, 1./2],
+            "Y": [1./2, 0., 1./2],
+            "Z": [1./2, 1./2, 0.]}
+
+def orci_sympts(a, b, c):
+    """Return the body-centered orthorhombic high symmetry points.
+    """
+    
+    a = float(a)
+    b = float(b)
+    c = float(c)
+    zeta = (1 + a**2/c**2)/4
+    eta = (1 + b**2/c**2)/4
+    delta = (b**2 - a**2)/(4*c**2)
+    mu = (a**2 + b**2)/(4*c**2)
+    
+    return {"G": [0., 0., 0.],
+            "L": [-mu, mu, 1/2 - delta],
+            "L1": [mu, -mu, 1/2 + delta],
+            "L2": [1/2 - delta, 1/2 + delta, -mu],
+            "R": [0., 1./2, 0.],
+            "S": [1./2, 0., 0.],
+            "T": [0., 0., 1./2],
+            "W": [1./4, 1./4, 1./4],
+            "X": [-zeta, -zeta, -zeta],
+            "X1": [zeta, 1-zeta, -zeta],
+            "Y": [eta, -eta, eta],
+            "Y1": [1-eta, eta, -eta],
+            "Z": [1./2, 1./2, -1./2]}
+
+def orcc_sympts(a, b):
+    """Return the base-centered orthorhombic high symmetry points.
+    """
+    
+    a = float(a)
+    b = float(b)
+    zeta = (1 + a**2/b**2)/4
+    
+    return {"G": [0., 0., 0.],
+            "A": [zeta, zeta, 1./2],
+            "A1": [-zeta, 1-zeta, 1./2],
+            "R": [0., 1./2, 1./2],
+            "S": [0., 1./2, 0.],
+            "T": [-1./2, 1./2, 1./2],
+            "X": [zeta, zeta, 0],
+            "X1": [-zeta, 1-zeta, 0],
+            "Y": [-1./2, 1./2, 0.],
+            "Z": [0., 0., 1./2]}
+
+hex_sympts = {"G": [0., 0., 0.],
+              "A": [0., 0., 1./2],
+              "H": [1./3, 1./3, 1./2],
+              "K": [1./2, 0., 1./2],
+              "L": [1./2, 0., 1./2],
+              "M": [1./2, 0., 0.]}
+
+def rhl1_sympts(alpha):
+    """Return the rhombohedral lattice points for alpha < pi/2 radians.
+    """
+    
+    alpha = float(alpha)
+    eta = (1 + 4*np.cos(alpha))(2 + 4*np.cos(alpha))
+    nu = 3./4 - eta/2
+    
+    return {"G": [0., 0., 0.],
+            "B": [eta, 1./2, 1-eta],
+            "B1": [1./2, 1-eta, eta-1],
+            "F": [1./2, 1./2, 0.],
+            "L": [1./2, 0.,  0.],
+            "L1": [0., 0., -1./2],
+            "P": [eta, nu, nu],
+            "P1": [1-nu, 1-nu, 1-eta],
+            "P2": [nu, nu, eta-1],
+            "Q": [1-nu, nu, 0],
+            "X": [nu, 0, -nu],
+            "Z": [1./2, 1./2, 1./2]}
+
+def rhl2_sympts(alpha):
+    """Return the rhombohedral lattice points for alpha > pi/2 radians.
+    """
+    
+    alpha = float(alpha)
+    eta = 1/(2*np.tan(alpha/2)**2)
+    vu = 3/4 - eta/2
+    return {"G": [0., 0., 0.],
+            "F": [1./2, -1./2, 0.],
+            "L": [1./2, 0., 0.],
+            "P": [1-nu, -nu, 1-nu],
+            "P1": [nu, nu-1, nu-1],
+            "Q": [eta, eta, eta],
+            "Q1": [1-eta, -eta, -eta],
+            "Z": [1./2, -1./2, 1./2]}
+
+def mcl_sympts(b, c, alpha):
+    """Return the high symmetry points for the monoclinic lattice as a 
+    dictionary where the keys are strings the values are the lattice coordinates
+    of the high symmetry points.
+    """
+
+    b = float(b)
+    c = float(c)
+    alpha = float(alpha)
+    
+    eta = (1 - b*np.cos(alpha/c))/(2*np.sin(alpha)**2)
+    nu = 1./2 - eta*c*np.cos(alpha/b)
+    return {"G": [0., 0., 0.],
+            "A": [1./2, 1./2 0.],
+            "C": [0., 1./2, 1./2],
+            "D": [1./2, 0., 1./2],
+            "D1": [1./2, 0., -1./2],
+            "E": [1./2, 1./2, 1./2],
+            "H": [0., eta, 1-nu],
+            "H1": [0., 1-eta, nu],
+            "H2": [0, eta, -nu],
+            "M": [1./2, eta, 1-nu],
+            "M1": [1./2, 1-eta, nu],
+            "M2": [1./2, eta, -nu],
+            "X": [0., 1./2, 0.],
+            "Y": [0., 0., 1./2],
+            "Y1": [0., 0., -1./2],
+            "Z": [1./2, 0., 0.]}
+
+def mclc12_sympts(a, b, c, alpha):
+    """Return the high symmetry points for a base-centered monoclinic lattice with gamma > pi/2 and gamma = pi/2 as
+    a dictionary where the keys are strings the values are the lattice
+    coordinates of the high symmetry points. 
+    """
+    
+    a = float(a)
+    b = float(b)
+    c = float(c)
+    alpha = float(alpha)
+    
+    zeta = (2 - b*np.cos(alpha/c))/(4*np.sin(alpha)**2)
+    eta = 1./2 + 2*zeta*c*np.cos(alpha/b)
+    psi = 3./4 - a**2/(4*b**2*np.sin(alpha)**2)
+    phi = psi + (3./4 - psi)*b*np.cos(alpha/c)
+
+    return {"G": [0., 0., 0.],
+            "N": [1./2, 0., 0.],
+            "N1": [0., -1./2, 0.],
+            "F": [1-zeta, 1-zeta, 1-eta],
+            "F1": [zeta, zeta, eta],
+            "F2": [-zeta, -zeta, 1-eta],
+            "F3": [1-zeta, -zeta, 1-eta],
+            "I": [phi, 1-phi, 1./2],
+            "I1": [1-phi, phi-1, 1./2],
+            "L": [1./2, 1./2, 1./2],
+            "M": [1./2, 0., 1./2],
+            "X": [1-psi, psi-1, 0.],
+            "X1": [psi, 1-psi, 0.],
+            "X2": [psi-1, -psi, 0.],
+            "Y": [1./2, 1./2, 0.],
+            "Y1": [-1./2, -1./2, 0.],
+            "Z": [0., 0., 1./2]}
+
+def mclc34_sympts(a, b, c, alpha):
+    """Return the high symmetry points for a base-centered monoclinic lattice
+    with gamma < pi/2 and b*cos(alpha/c) + b**2*sin(alpha/a**2)**2 <= 1 (3 is < 1, 4 = 1) as
+    a dictionary where the keys are strings the values are the lattice
+    coordinates of the high symmetry points. 
+    """
+    
+    a = float(a)
+    b = float(b)
+    c = float(c)
+    alpha = float(alpha)
+
+    mu = (1 + b**2/a**2)/4
+    delta = B8C*np.cos(alpha/(2*a**2))
+    zeta = mu - 1./4 + (a - b*np.cos(alpha/c))/(4*np.sin(alpha)**2)
+    eta = 1./2 + 2*zeta*c*np.cos(alpha/b)
+    phi = 1 + zeta - 2*mu
+    psi = eta - 2*delta
+                
+    return {"G": [0., 0., 0.],
+            "F": [1-phi, 1-phi, 1-psi],
+            "F1": [phi, phi-1, psi],
+            "F2": [1-phi, -phi, 1-psi],
+            "H": [zeta, zeta, eta],
+            "H1": [1-zeta, -zeta, 1-eta],
+            "H2": [-zeta, -zeta, 1-eta],
+            "I": [1./2, -1./2, 1./2],
+            "M": [1./2, 0., 1./2],
+            "N": [1./2, 0., 0.],
+            "N1": [0., -1./2, 0.],
+            "X": [1./2, -1./2, 0.],
+            "Y": [mu, mu, delta],
+            "Y1": [1-mu, -mu, -delta],
+            "Y2": [-mu, -mu, -delta],
+            "Y3": [mu, mu-1, delta],
+            "Z": [0., 0., 1./2]}
+
+def mclc5_sympts(a, b, c, alpha):
+    """Return the high symmetry points for a base-centered monoclinic lattice
+    with gamma < pi/2 and b*cos(alpha/c) + b**2*sin(alpha/a**2)**2 > 1 as
+    a dictionary where the keys are strings the values are the lattice
+    coordinates of the high symmetry points. 
+    """
+    
+    a = float(a)
+    b = float(b)
+    c = float(c)
+    alpha = float(alpha)
+
+    zeta = (b**2/a**2 + (1 - b*np.cos(alpha/c))/np.sin(alpha)**2)/4
+    eta = 1./2 + 2*zeta*c*np.cos(alpha/b)
+    mu = eta/2 + b**2/(3*a**2) - b*c*np.cos(alpha)/(2*a**2)
+    omega = (4*nu - 1 - b**2*np.sin(alpha/a**2)**2)*c/(2*b*np.cos(alpha))
+    delta = zeta*c*np.cos(alpha/b) + omega/2 - 1./4
+    nu = 2*mu - zeta
+    rho = 1 - zeta*a**2/b**2
+    
+    return {"G": [0., 0., 0.],
+            "F": [nu, nu, omega],
+            "F1": [1-nu, 1-nu, 1-omega],
+            "F2": [nu, nu-1, omega],
+            "H": [zeta, zeta, eta],
+            "H1": [1-zeta, -zeta, 1-eta],
+            "H2": [-zeta, -zeta, 1-eta],
+            "I": [rho, 1-rho, 1./2],
+            "I1": [1-rho, rho-1, 1./2],
+            "L": [1./2, 1./2, 1./2],
+            "M": [1./2, 0., 1./2],
+            "N": [1./2, 0., 0.],
+            "N1": [0., -1./2, 0.],
+            "X": [1./2, -1./2, 0.],
+            "Y": [mu, mu, delta],
+            "Y1": [1-mu, -mu, -delta],
+            "Y2": [-mu, -mu, -delta],
+            "Y3": [mu, mu-1, delta],
+            "Z": [0., 0., 1./2]}
+
+# Triclinic symmatry points with lattice parameters that satisfy
+
+## tri1a ##
+# k_alpha > pi/2
+# k_beta > pi/2
+# k_gamma > pi/2 where k_gamma = min(k_alpha, k_beta, k_gamma)
+
+## tri2a ##
+# k_alpha > pi/2
+# k_beta > pi/2
+# k_gamma = pi/2
+tri1a2a_sympts = {"G": [0., 0., 0.],
+                  "L": [1./2, 1./2, 0.],
+                  "M": [0., 1./2, 1./2]
+                  "N": [1./2, 0., 1./2],
+                  "R": [1./2, 1./2, 1./2],
+                  "X": [1./2, 0., 0.],
+                  "Y": [0., 1./2, 0.],
+                  "Z": [0., 0., 1./2]}
+
+# Triclinic symmatry points with lattice parameters that satisfy
+
+## tri1b ##
+# k_alpha < pi/2
+# k_beta < pi/2
+# k_gamma < pi/2 where k_gamma = max(k_alpha, k_beta, k_gamma)
+
+## tri2b ##
+# k_alpha < pi/2
+# k_beta < pi/2
+# k_gamma = pi/2
+tr1b2b_sympts = {"G": [0., 0., 0.],
+                 "L": [1./2, -1./2, 0.],
+                 "M": [0., 0., 1./2],
+                 "N": [-1./2, 1./2, 1./2],
+                 "R": [0., -1./2, 1./2],
+                 "X": [0., -1./2, 0.],
+                 "Y": [1./2, 0., 0.],
+                 "Z": [-1./2, 0., 1./2]}
 
 def rsym_pts(lat_type, a, lat_coords=False):
     """Define the symmetry points in reciprocal space for a given real

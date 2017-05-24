@@ -15,3 +15,5 @@
 Revision 0.0.3
 - Generalize make_ptvecs so that it can handle all 14 Bravais lattices.
 - Create make_lattice_vectors that also generates the 14 Bravais lattices.
+- Create dictionaries and functions that return the high symmetry points for
+  all possible Brillouin zones.
