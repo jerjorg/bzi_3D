@@ -4,10 +4,9 @@
 import pytest
 import numpy as np
 from BZI.pseudopots import find_intvecs, customSi_PP, Si_lat_const
-from BZI.symmetry import sym_path, make_rptvecs
+from BZI.symmetry import sym_path, make_ptvecs, make_rptvecs
 
 def test_find_intvecs():
-    
     a_list = [3,4,8,11]
     test3 = [ [1,1,1], [1,1,-1], [1,-1,1], [1,-1,-1], [-1,1,1],
                          [-1,1,-1], [-1,-1,1], [-1,-1,-1] ]
@@ -39,12 +38,16 @@ def test_Si_PP():
     rlat_pts = find_intvecs(0) + find_intvecs(3) + find_intvecs(8) + find_intvecs(11)
     rlat_pts = [np.array(r) for r in rlat_pts]
     sympt_pairs = [("L","G"),("G","X"),("X","K"),("K","G")]
+    lat_centering = "face"
     lat_type = "fcc"
+    lat_angles = [np.pi/2]*3
+    lat_consts = [Si_lat_const]*3
     npts = 3
 
     # The k-points between symmetry points in reciprocal lattice coordinates.
     lat_kpoints = sym_path(lat_type,npts,sympt_pairs)
-    rlat_vecs = make_rptvecs(lat_type, Si_lat_const)
+    lat_vecs = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
 
     # The k-points between symmetry points in cartesian coordinates.
     car_kpoints = [np.dot(rlat_vecs,k) for k in lat_kpoints]

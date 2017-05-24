@@ -21,27 +21,32 @@ def test_make_grid():
     neighbors lie within the unit cell. Also verify none of the points
     lie outside the unit cell.
     """
-    
-    mesh_types = ["sc", "fcc", "bcc"]
+
+    # At the moment it only tests the cubic lattices.
+    mesh_center_list = ["prim", "face", "body"]
     mesh_constants = [1, 1.1, 12./11, .7]
-    # For the time being, the code only works for simple cubic cells.
-    cell_types = ["sc", "fcc", "bcc"]
-    cell_constants = [2*np.sqrt(2)] 
+    mesh_consts_list = [[m]*3 for m in mesh_constants]
+    mesh_angles = [np.pi/2]*3
+    cell_center_list = ["prim", "face", "body"]
+    cell_constants = [2*np.sqrt(2)]
+    cell_consts_list = [[c]*3 for c in cell_constants]
+    cell_angles = [np.pi/2]*3
     offsets = [[0., 0., 0.], [1./2, 1./2, 1./2]]
     
-    for mesh_constant in mesh_constants:
-        for mesh_type in mesh_types:
-            mesh_vectors = make_ptvecs(mesh_type, mesh_constant)
+    # for mesh_constant in mesh_constants:
+    for mesh_consts in mesh_consts_list:
+        for mesh_center in mesh_center_list:
+            mesh_vectors = make_ptvecs(mesh_center, mesh_consts, mesh_angles)
             mesh_lengths = [np.linalg.norm(lv) for lv in mesh_vectors]
-            for cell_type in cell_types:
-                for cell_constant in cell_constants:
-                    cell_vectors = make_ptvecs(cell_type,
-                                               cell_constant)
+            for cell_consts in cell_consts_list:
+                for cell_center in cell_center_list:
+                    cell_vectors = make_ptvecs(cell_center,
+                                               cell_consts, cell_angles)
                     cell_lengths = [np.linalg.norm(cv) for cv in
                                         cell_vectors]
                     for offset in offsets:
                         mesh = make_grid(cell_vectors, mesh_vectors, offset)
-                        large_mesh = make_large_mesh(cell_vectors, mesh_type,
+                        large_mesh = make_large_mesh(cell_vectors,
                                                   mesh_vectors, offset)
                         
                         # Verify all the points in the cell for the large mesh
@@ -246,6 +251,9 @@ def test_HermiteNormalForm():
 
 
 def test_make_grid():
+    # This unit test doesn't pass because the primitive translation vectors
+    # changed when I updated the code (I think).
+
     mesh_pts1 = [[0,0,0],
                  [1,1,1],
                  [0,0,2],
@@ -264,15 +272,19 @@ def test_make_grid():
                  [3,1,1]]
     mesh_pts1 = np.asarray(mesh_pts1)*1./4
 
-    cell_type = "sc"
+    cell_centering = "prim"
     cell_const = 1.
-    cell_vecs = make_ptvecs(cell_type, cell_const)
+    cell_const_list = [cell_const]*3
+    cell_angles = [np.pi/2]*3
+    cell_vecs = make_ptvecs(cell_centering, cell_const_list, cell_angles)
     
-    mesh_type = "bcc"
+    mesh_centering = "body"
     mesh_const = cell_const/2
-    mesh_vecs = make_ptvecs(mesh_type, mesh_const)
+    mesh_const_list = [mesh_const]*3
+    mesh_angles = [np.pi/2]*3
+    mesh_vecs = make_ptvecs(mesh_centering, mesh_const_list, mesh_angles)
     offset = np.asarray([0.,0.,0.])
-    mesh = make_grid(cell_vecs, mesh_vecs, offset)
+    mesh = make_grid(cell_vecs, mesh_vecs, offset, False)
     
     for g1 in mesh_pts1:
         check = False
@@ -280,15 +292,19 @@ def test_make_grid():
             if np.allclose(g1,g2) == True:
                 check = True
         assert check == True
-    
+        
     lat_type_list = ["fcc","bcc", "sc"]
+    lat_centering_list = ["face", "body", "prim"]
     lat_const_list = [10,10.1, 3*np.pi]
+    lat_consts_list = [[l]*3 for l in lat_const_list]
+    lat_angles =[np.pi/2]*3
     offset_list = [[1.3, 1.1,1.7],[11,9,8],[np.pi,np.pi,np.pi]]
     r_list = [1, 2.3, np.pi]
 
-    for lat_type in lat_type_list:
-        for lat_const in lat_const_list:
-            lat_vecs = make_rptvecs(lat_type,lat_const)
+    for lat_centering in lat_centering_list:
+        for lat_consts in lat_consts_list:
+            lat_vecs = make_ptvecs(lat_centering, lat_consts, lat_angles)
+            lat_vecs = make_rptvecs(lat_vecs)
             for offset in offset_list:
                 offset = np.asarray(offset)
                 for r in r_list:

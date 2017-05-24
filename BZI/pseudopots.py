@@ -34,9 +34,11 @@ def find_intvecs(a):
     return allowed_ints
 
 #### Toy Pseudopotential ####
-Toy_lat_type = "sc"
-Toy_lat_const = 1.
-Toy_lv = make_ptvecs(Toy_lat_type, Toy_lat_const) # toy lattice vectors
+Toy_lat_center = "prim"
+Toy_lat_const_list = [1., 1., 1.]
+Toy_lat_angles = [np.pi/2]*3
+# Toy lattice vectors
+Toy_lv = make_ptvecs(Toy_lat_center, Toy_lat_const_list, Toy_lat_angles)
 
 Toy_pff = [0.2]
 Toy_shells = [[0.,0.,0], [0.,0.,1.]]
@@ -74,9 +76,11 @@ def ToyPP(kpt):
     return np.sort(np.linalg.eigvals(Toy_H))
 
 #### Free electron Pseudopotential ####
-Free_lat_type = "sc"
-Free_lat_const = 1.
-Free_lv = make_ptvecs(Free_lat_type, Free_lat_const) # free lattice vectors
+Free_lat_center = "prim"
+Free_lat_const_list = [1., 1., 1.]
+Free_lat_angles = [np.pi/2]*3
+# Free lattice vectors
+Free_lv = make_ptvecs(Free_lat_center, Free_lat_const_list, Free_lat_angles)
 
 Free_pff = [0.2]
 Free_shells = [[0.,0.,0], [0.,0.,1.]]
@@ -116,7 +120,11 @@ def W2(spt):
 Al_pff = [0.0179, 0.0562]
 Al_lat_const = 7.65339025545
 Al_lat_type = "fcc"
-Al_rlat_vecs = make_rptvecs(Al_lat_type, Al_lat_const)
+Al_lat_const_list = [Al_lat_const]*3
+Al_lat_angles = [np.pi/2]*3
+Al_lat_centering = "face"
+Al_lat_vecs = make_ptvecs(Al_lat_centering, Al_lat_const_list, Al_lat_angles)
+Al_rlat_vecs = make_rptvecs(Al_lat_vecs)
 Al_cutoff = 4*(2*np.pi/Al_lat_const)**2
 Al_rlat_pts = sphere_pts(Al_rlat_vecs, Al_cutoff, [0,0,0])
 
@@ -233,9 +241,12 @@ ZnTe_pff = [-0.22, 0.00, 0.05, 0.13, 0.10, 0.01]
 CdTe_pff = [-0.20, 0.00, 0.04, 0.15, 0.09, 0.04]    
 
 #### Pseudopotential of Si ####
-Si_lat_type = "fcc"
+Si_lat_centering = "face"
 Si_lat_const = 5.43*angstrom_to_Bohr # the lattice constant in Bohr
-Si_rlat_vecs = make_rptvecs(Si_lat_type, Si_lat_const)
+Si_lat_const_list = [Si_lat_const]*3
+Si_lat_angles = [np.pi/2]*3
+Si_lat_vecs = make_ptvecs(Si_lat_centering, Si_lat_const_list, Si_lat_angles)
+Si_rlat_vecs = make_rptvecs(Si_lat_vecs)
 Si_tau = Si_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
 
 # The pseudopotential form factors of Si
@@ -327,9 +338,12 @@ def customSi_PP(kpoint, neigvals, Si_cutoff, shift=True, matrix=False):
 
 
 #### Pseudopotential of Ge ####
-Ge_lat_type = "fcc"
+Ge_lat_centering = "face"
 Ge_lat_const = 5.66*angstrom_to_Bohr # the lattice constant in Bohr
-Ge_rlat_vecs = make_rptvecs(Ge_lat_type, Ge_lat_const)
+Ge_lat_const_list = [Ge_lat_const]*3
+Ge_lat_angles = [np.pi/2]*3
+Ge_lat_vecs = make_ptvecs(Ge_lat_centering, Ge_lat_const_list, Ge_lat_angles)
+Ge_rlat_vecs = make_rptvecs(Ge_lat_vecs)
 Ge_tau = Ge_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
 
 # The pseudopotential form factors of Ge
@@ -421,9 +435,12 @@ def customGe_PP(kpoint, neigvals, Ge_cutoff, shift=True, matrix=False):
 
 
 #### Pseudopotential of Sn ####
-Sn_lat_type = "fcc"
+Sn_lat_centering = "face"
 Sn_lat_const = 6.49*angstrom_to_Bohr # the lattice constant in Bohr
-Sn_rlat_vecs = make_rptvecs(Sn_lat_type, Sn_lat_const)
+Sn_lat_const_list = [Sn_lat_const]*3
+Sn_lat_angles = [np.pi/2]*3
+Sn_lat_vecs = make_ptvecs(Sn_lat_centering, Sn_lat_const_list, Sn_lat_angles)
+Sn_rlat_vecs = make_rptvecs(Sn_lat_vecs)
 Sn_tau = Sn_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
 
 # The pseudopotential form factors of Sn
@@ -511,9 +528,13 @@ def customSn_PP(kpoint, neigvals, Sn_cutoff, shift=True, matrix=False):
 
 
 #### Pseudopotential of GaP ####
-GaP_lat_type = "fcc"
+GaP_lat_centering = "face"
 GaP_lat_const = 5.44*angstrom_to_Bohr # the lattice constant in Bohr
-GaP_rlat_vecs = make_rptvecs(GaP_lat_type, GaP_lat_const)
+GaP_lat_const_list = [GaP_lat_const]*3
+GaP_lat_angles = [np.pi/2]*3
+GaP_lat_vecs = make_ptvecs(GaP_lat_centering, GaP_lat_const_list,
+                             GaP_lat_angles)
+GaP_rlat_vecs = make_rptvecs(GaP_lat_vecs)
 GaP_tau = GaP_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
 
 # The pseudopotential form factors of GaP
@@ -614,9 +635,13 @@ def customGaP_PP(kpoint, neigvals, GaP_cutoff, shift=True, matrix=False):
         return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - GaP_shift    
 
 #### Pseudopotential of GaAs ####
-GaAs_lat_type = "fcc"
+GaAs_lat_centering = "face"
 GaAs_lat_const = 5.64*angstrom_to_Bohr # the lattice constant in Bohr
-GaAs_rlat_vecs = make_rptvecs(GaAs_lat_type, GaAs_lat_const)
+GaAs_lat_const_list = [GaAs_lat_const]*3
+GaAs_lat_angles = [np.pi/2]*3
+GaAs_lat_vecs = make_ptvecs(GaAs_lat_centering, GaAs_lat_const_list,
+                              GaAs_lat_angles)
+GaAs_rlat_vecs = make_rptvecs(GaAs_lat_vecs)
 GaAs_tau = GaAs_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
 
 # The pseudopotential form factors of GaAs
@@ -717,9 +742,13 @@ def customGaAs_PP(kpoint, neigvals, GaAs_cutoff, shift=True, matrix=False):
         return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - GaAs_shift
 
 #### Pseudopotential of AlSb ####
-AlSb_lat_type = "fcc"
+AlSb_lat_centering = "face"
 AlSb_lat_const = 6.13*angstrom_to_Bohr # the lattice constant in Bohr
-AlSb_rlat_vecs = make_rptvecs(AlSb_lat_type, AlSb_lat_const)
+AlSb_lat_const_list = [AlSb_lat_const]*3
+AlSb_lat_angles = [np.pi/2]*3
+AlSb_lat_vecs = make_ptvecs(AlSb_lat_centering, AlSb_lat_const_list,
+                              AlSb_lat_angles)
+AlSb_rlat_vecs = make_rptvecs(AlSb_lat_vecs)
 AlSb_tau = AlSb_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
 
 # The pseudopotential form factors of AlSb
@@ -819,9 +848,13 @@ def customAlSb_PP(kpoint, neigvals, AlSb_cutoff, shift=True, matrix=False):
         return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - AlSb_shift    
 
 #### Pseudopotential of InP ####
-InP_lat_type = "fcc"
+InP_lat_centering = "face"
 InP_lat_const = 5.86*angstrom_to_Bohr # the lattice constant in Bohr
-InP_rlat_vecs = make_rptvecs(InP_lat_type, InP_lat_const)
+InP_lat_const_list = [InP_lat_const]*3
+InP_lat_angles = [np.pi/2]*3
+InP_lat_vecs = make_ptvecs(InP_lat_centering, InP_lat_const_list,
+                             InP_lat_angles)
+InP_rlat_vecs = make_rptvecs(InP_lat_vecs)
 InP_tau = InP_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
 
 # The pseudopotential form factors of InP
@@ -921,9 +954,13 @@ def customInP_PP(kpoint, neigvals, InP_cutoff, shift=True, matrix=False):
         return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - InP_shift    
 
 #### Pseudopotential of GaSb ####
-GaSb_lat_type = "fcc"
+GaSb_lat_centering = "face"
 GaSb_lat_const = 6.12*angstrom_to_Bohr # the lattice constant in Bohr
-GaSb_rlat_vecs = make_rptvecs(GaSb_lat_type, GaSb_lat_const)
+GaSb_lat_const_list = [GaSb_lat_const]*3
+GaSb_lat_angles = [np.pi/2]*3
+GaSb_lat_vecs = make_ptvecs(GaSb_lat_centering, GaSb_lat_const_list,
+                              GaSb_lat_angles)
+GaSb_rlat_vecs = make_rptvecs(GaSb_lat_vecs)
 GaSb_tau = GaSb_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
 
 # The pseudopotential form factors of GaSb
@@ -1019,9 +1056,13 @@ def customGaSb_PP(kpoint, neigvals, GaSb_cutoff, shift=True, matrix=False):
         return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - GaSb_shift    
 
 #### Pseudopotential of InAs ####
-InAs_lat_type = "fcc"
+InAs_lat_centering = "face"
 InAs_lat_const = 6.04*angstrom_to_Bohr # the lattice constant in Bohr
-InAs_rlat_vecs = make_rptvecs(InAs_lat_type, InAs_lat_const)
+InAs_lat_const_list = [InAs_lat_const]*3
+InAs_lat_angles = [np.pi/2]*3
+InAs_lat_vecs = make_ptvecs(InAs_lat_centering, InAs_lat_const_list,
+                              InAs_lat_angles)
+InAs_rlat_vecs = make_rptvecs(InAs_lat_vecs)
 InAs_tau = InAs_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
 
 # The pseudopotential form factors of InAs
@@ -1116,9 +1157,13 @@ def customInAs_PP(kpoint, neigvals, InAs_cutoff, shift=True, matrix=False):
         return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - InAs_shift    
 
 #### Pseudopotential of InSb ####
-InSb_lat_type = "fcc"
+InSb_lat_centering = "face"
 InSb_lat_const = 6.48*angstrom_to_Bohr # the lattice constant in Bohr
-InSb_rlat_vecs = make_rptvecs(InSb_lat_type, InSb_lat_const)
+InSb_lat_const_list = [InSb_lat_const]*3
+InSb_lat_angles = [np.pi/2]*3
+InSb_lat_vecs = make_ptvecs(InSb_lat_centering, InSb_lat_const_list,
+                              InSb_lat_angles)
+InSb_rlat_vecs = make_rptvecs(InSb_lat_vecs)
 InSb_tau = InSb_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
 
 # The pseudopotential form factors of InSb
@@ -1213,9 +1258,13 @@ def customInSb_PP(kpoint, neigvals, InSb_cutoff, shift=True, matrix=False):
         return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - InSb_shift    
 
 #### Pseudopotential of ZnS ####
-ZnS_lat_type = "fcc"
+ZnS_lat_centering = "face"
 ZnS_lat_const = 5.41*angstrom_to_Bohr # the lattice constant in Bohr
-ZnS_rlat_vecs = make_rptvecs(ZnS_lat_type, ZnS_lat_const)
+ZnS_lat_const_list = [ZnS_lat_const]*3
+ZnS_lat_angles = [np.pi/2]*3
+ZnS_lat_vecs = make_ptvecs(ZnS_lat_centering, ZnS_lat_const_list,
+                             ZnS_lat_angles)
+ZnS_rlat_vecs = make_rptvecs(ZnS_lat_vecs)
 ZnS_tau = ZnS_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
 
 # The pseudopotential form factors of ZnS
@@ -1314,9 +1363,13 @@ def customZnS_PP(kpoint, neigvals, ZnS_cutoff, shift=True, matrix=False):
         return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - ZnS_shift    
 
 #### Pseudopotential of ZnSe ####
-ZnSe_lat_type = "fcc"
+ZnSe_lat_centering = "face"
 ZnSe_lat_const = 5.65*angstrom_to_Bohr # the lattice constant in Bohr
-ZnSe_rlat_vecs = make_rptvecs(ZnSe_lat_type, ZnSe_lat_const)
+ZnSe_lat_const_list = [ZnSe_lat_const]*3
+ZnSe_lat_angles = [np.pi/2]*3
+ZnSe_lat_vecs = make_ptvecs(ZnSe_lat_centering, ZnSe_lat_const_list,
+                              ZnSe_lat_angles)
+ZnSe_rlat_vecs = make_rptvecs(ZnSe_lat_vecs)
 ZnSe_tau = ZnSe_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
 
 # The pseudopotential form factors of ZnSe
@@ -1415,9 +1468,13 @@ def customZnSe_PP(kpoint, neigvals, ZnSe_cutoff, shift=True, matrix=False):
         return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - ZnSe_shift    
 
 #### Pseudopotential of ZnTe ####
-ZnTe_lat_type = "fcc"
+ZnTe_lat_centering = "face"
 ZnTe_lat_const = 6.07*angstrom_to_Bohr # the lattice constant in Bohr
-ZnTe_rlat_vecs = make_rptvecs(ZnTe_lat_type, ZnTe_lat_const)
+ZnTe_lat_const_list = [ZnTe_lat_const]*3
+ZnTe_lat_angles = [np.pi/2]*3
+ZnTe_lat_vecs = make_ptvecs(ZnTe_lat_centering, ZnTe_lat_const_list,
+                              ZnTe_lat_angles)
+ZnTe_rlat_vecs = make_rptvecs(ZnTe_lat_vecs)
 ZnTe_tau = ZnTe_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
 
 # The pseudopotential form factors of ZnTe
@@ -1512,9 +1569,13 @@ def customZnTe_PP(kpoint, neigvals, ZnTe_cutoff, shift=True, matrix=False):
         return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - ZnTe_shift    
 
 #### Pseudopotential of CdTe ####
-CdTe_lat_type = "fcc"
+CdTe_lat_centering = "face"
 CdTe_lat_const = 6.07*angstrom_to_Bohr # the lattice constant in Bohr
-CdTe_rlat_vecs = make_rptvecs(CdTe_lat_type, CdTe_lat_const)
+CdTe_lat_const_list = [CdTe_lat_const]*3
+CdTe_lat_angles = [np.pi/2]*3
+CdTe_lat_vecs = make_ptvecs(CdTe_lat_centering, CdTe_lat_const_list,
+                              CdTe_lat_angles)
+CdTe_rlat_vecs = make_rptvecs(CdTe_lat_vecs)
 CdTe_tau = CdTe_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
 
 # The pseudopotential form factors of CdTe
@@ -1613,8 +1674,11 @@ def customCdTe_PP(kpoint, neigvals, CdTe_cutoff, shift=True, matrix=False):
 # Define the pseudopotential form factors taken from Ashcroft for Li.
 Li_pff = [0.11]
 Li_lat_const = 2.968*angstrom_to_Bohr
-Li_lat_type = "bcc"
-Li_rlat_vecs = make_rptvecs(Li_lat_type, Li_lat_const)
+Li_lat_const_list = [Li_lat_const]*3
+Li_lat_centering = "body"
+Li_lat_angles = [np.pi/2]*3
+Li_lat_vecs = make_ptvecs(Li_lat_centering, Li_lat_const_list, Li_lat_angles)
+Li_rlat_vecs = make_rptvecs(Li_lat_vecs)
 Li_cutoff = 2*(2*np.pi/Li_lat_const)**2
 Li_rlat_pts = sphere_pts(Li_rlat_vecs, Li_cutoff, [0,0,0])
 
@@ -1704,8 +1768,11 @@ def customLi_PP(kpoint, neigvals, Li_cutoff=21*(2*np.pi/Li_lat_const)**2,
 # Define the pseudopotential form factors taken from Ashcroft for Na.
 Na_pff = [0.0158]
 Na_lat_const = 3.633*angstrom_to_Bohr
-Na_lat_type = "bcc"
-Na_rlat_vecs = make_rptvecs(Na_lat_type, Na_lat_const)
+Na_lat_const_list = [Na_lat_const]*3
+Na_lat_centering = "body"
+Na_lat_angles = [np.pi/2]*3
+Na_lat_vecs = make_ptvecs(Na_lat_centering, Na_lat_const_list, Na_lat_angles)
+Na_rlat_vecs = make_rptvecs(Na_lat_vecs)
 Na_cutoff = 2*(2*np.pi/Na_lat_const)**2
 Na_rlat_pts = sphere_pts(Na_rlat_vecs, Na_cutoff, [0,0,0])
 
@@ -1795,8 +1862,11 @@ def customNa_PP(kpoint, neigvals, Na_cutoff=21*(2*np.pi/Na_lat_const)**2,
 # Define the pseudopotential form factors taken from Ashcroft for K.
 K_pff = [0.0075, -0.009]
 K_lat_const = 9.873*angstrom_to_Bohr
-K_lat_type = "bcc"
-K_rlat_vecs = make_rptvecs(K_lat_type, K_lat_const)
+K_lat_const_list = [K_lat_const]*3
+K_lat_centering = "body"
+K_lat_angles = [np.pi/2]*3
+K_lat_vecs = make_ptvecs(K_lat_centering, K_lat_const_list, K_lat_angles)
+K_rlat_vecs = make_rptvecs(K_lat_vecs)
 K_cutoff = 4*(2*np.pi/K_lat_const)**2
 K_rlat_pts = sphere_pts(K_rlat_vecs, K_cutoff, [0,0,0])
 
@@ -1891,8 +1961,11 @@ def customK_PP(kpoint, neigvals, K_cutoff=21*(2*np.pi/K_lat_const)**2,
 # Define the pseudopotential form factors taken from Ashcroft for Rb.
 Rb_pff = [-0.002]
 Rb_lat_const = 5.585*angstrom_to_Bohr
-Rb_lat_type = "bcc"
-Rb_rlat_vecs = make_rptvecs(Rb_lat_type, Rb_lat_const)
+Rb_lat_const_list = [Rb_lat_const]*3
+Rb_lat_centering = "body"
+Rb_lat_angles = [np.pi/2]*3
+Rb_lat_vecs = make_ptvecs(Rb_lat_centering, Rb_lat_const_list, Rb_lat_angles)
+Rb_rlat_vecs = make_rptvecs(Rb_lat_vecs)
 Rb_cutoff = 2*(2*np.pi/Rb_lat_const)**2
 Rb_rlat_pts = sphere_pts(Rb_rlat_vecs, Rb_cutoff, [0,0,0])
 
@@ -1983,8 +2056,11 @@ def customRb_PP(kpoint, neigvals, Rb_cutoff=21*(2*np.pi/Rb_lat_const)**2,
 # Define the pseudopotential form factors taken from Ashcroft for Cs.
 Cs_pff = [-0.03]
 Cs_lat_const = 6.141*angstrom_to_Bohr
-Cs_lat_type = "bcc"
-Cs_rlat_vecs = make_rptvecs(Cs_lat_type, Cs_lat_const)
+Cs_lat_const_list = [Cs_lat_const]*3
+Cs_lat_centering = "body"
+Cs_lat_angles = [np.pi/2]*3
+Cs_lat_vecs = make_ptvecs(Cs_lat_centering, Cs_lat_const_list, Cs_lat_angles)
+Cs_rlat_vecs = make_rptvecs(Cs_lat_vecs)
 Cs_cutoff = 2*(2*np.pi/Cs_lat_const)**2
 Cs_rlat_pts = sphere_pts(Cs_rlat_vecs, Cs_cutoff, [0,0,0])
 
@@ -2075,8 +2151,11 @@ def customCs_PP(kpoint, neigvals, Cs_cutoff=21*(2*np.pi/Cs_lat_const)**2,
 # Define the pseudopotential form factors taken from Ashcroft for Cu.
 Cu_pff = [0.282, 0.18]
 Cu_lat_const = 3.615*angstrom_to_Bohr
-Cu_lat_type = "fcc"
-Cu_rlat_vecs = make_rptvecs(Cu_lat_type, Cu_lat_const)
+Cu_lat_const_list = [Cu_lat_const]*3
+Cu_lat_centering = "face"
+Cu_lat_angles = [np.pi/2]*3
+Cu_lat_vecs = make_ptvecs(Cu_lat_centering, Cu_lat_const_list, Cu_lat_angles)
+Cu_rlat_vecs = make_rptvecs(Cu_lat_vecs)
 Cu_cutoff = 4*(2*np.pi/Cu_lat_const)**2
 Cu_rlat_pts = sphere_pts(Cu_rlat_vecs, Cu_cutoff, [0,0,0])
 
@@ -2171,8 +2250,11 @@ def customCu_PP(kpoint, neigvals, Cu_cutoff=21*(2*np.pi/Cu_lat_const)**2,
 # Define the pseudopotential form factors taken from Ashcroft for Ag.
 Ag_pff = [0.195, 0.121]
 Ag_lat_const = 4.0853*angstrom_to_Bohr
-Ag_lat_type = "fcc"
-Ag_rlat_vecs = make_rptvecs(Ag_lat_type, Ag_lat_const)
+Ag_lat_const_list = [Ag_lat_const]*3
+Ag_lat_centering = "face"
+Ag_lat_vecs = [np.pi/2]*3
+Ag_lat_vecs = make_ptvecs(Ag_lat_centering, Ag_lat_const_list, Ag_lat_vecs)
+Ag_rlat_vecs = make_rptvecs(Ag_lat_vecs)
 Ag_cutoff = 4*(2*np.pi/Ag_lat_const)**2
 Ag_rlat_pts = sphere_pts(Ag_rlat_vecs, Ag_cutoff, [0,0,0])
 
@@ -2267,8 +2349,11 @@ def customAg_PP(kpoint, neigvals, Ag_cutoff=21*(2*np.pi/Ag_lat_const)**2,
 # Define the pseudopotential form factors taken from Ashcroft for Au.
 Au_pff = [0.252, 0.152]
 Au_lat_const = 4.0782*angstrom_to_Bohr
-Au_lat_type = "fcc"
-Au_rlat_vecs = make_rptvecs(Au_lat_type, Au_lat_const)
+Au_lat_const_list = [Au_lat_const]*3
+Au_lat_centering = "face"
+Au_lat_angles = [np.pi/2]*3
+Au_lat_vecs = make_ptvecs(Au_lat_centering, Au_lat_const_list, Au_lat_angles)
+Au_rlat_vecs = make_rptvecs(Au_lat_vecs)
 Au_cutoff = 4*(2*np.pi/Au_lat_const)**2
 Au_rlat_pts = sphere_pts(Au_rlat_vecs, Au_cutoff, [0,0,0])
 
@@ -2363,8 +2448,11 @@ def customAu_PP(kpoint, neigvals, Au_cutoff=21*(2*np.pi/Au_lat_const)**2,
 # Define the pseudopotential form factors taken from Ashcroft for Pb.
 Pb_pff = [-0.084, -0.039]
 Pb_lat_const = 4.9508*angstrom_to_Bohr
-Pb_lat_type = "fcc"
-Pb_rlat_vecs = make_rptvecs(Pb_lat_type, Pb_lat_const)
+Pb_lat_const_list = [Pb_lat_const]*3
+Pb_lat_centering = "face"
+Pb_lat_angles = [np.pi/2]*3
+Pb_lat_vecs = make_ptvecs(Pb_lat_centering, Pb_lat_const_list, Pb_lat_angles)
+Pb_rlat_vecs = make_rptvecs(Pb_lat_vecs)
 Pb_cutoff = 4*(2*np.pi/Pb_lat_const)**2
 Pb_rlat_pts = sphere_pts(Pb_rlat_vecs, Pb_cutoff, [0,0,0])
 

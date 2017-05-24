@@ -4,8 +4,8 @@
 import numpy as np
 from copy import deepcopy
 from itertools import product
-
 from math import ceil
+
 from BZI.symmetry import make_ptvecs
 
 # Find transformation to create HNF from integer matrix.
@@ -31,7 +31,6 @@ def get_minmax_indices(a):
         if ai > 0 and ai < min:
             min = ai
             mini = i
-#     min = np.size(a) - 1 - a[::-1][a > 0].argmin()
     return np.asarray([mini, maxi])
 
 def swap_column(M, B, k):
@@ -104,8 +103,8 @@ def LowerHermiteNormalForm(S):
     B = np.identity(np.shape(S)[0]).astype(int)
     H = deepcopy(S)
     
-#    Keep doing column operations until all elements in the first row are zero
-#    except for the one on the diagonal.
+    # Keep doing column operations until all elements in the first row are zero
+    # except for the one on the diagonal.
     while np.count_nonzero(H[0,:]) > 1:
         # Divide the column with the smallest value into the largest.
         minidx, maxidx = get_minmax_indices(H[0,:])
@@ -318,7 +317,7 @@ def HermiteNormalForm(S):
         raise ValueError("Lower triangular elements bigger than diagonal.")
     return H, B
 
-def make_grid(cell_vecs, grid_vecs, offset):
+def make_grid(cell_vecs, grid_vecs, offset, cart=True):
     """Sample within a parallelepiped using any regular grid.
 
     Args:
@@ -326,19 +325,24 @@ def make_grid(cell_vecs, grid_vecs, offset):
             to sample. The vectors are the columns of the matrix.
         grid_vecs (numpy.ndarray): the vectors that generate the grid as 
             columns of the matrix..
-        offset: the origin of the coordinate system.
+        offset: the offset of the coordinate system in Cartesian or lattice
+            coordinates.
+        cart (bool): if true, return the grid in Cartesian coordinates; other-
+            wise, return the grid in lattice coordinates.
 
     Returns:
-        grid (numpy.ndarray): an array of sampling-point coordinates.
+        grid (list): an array of sampling-point coordinates.
 
     Examples:
-        >>> cell_type = "fcc"
-        >>> cell_const = 1.
-        >>> cell_vecs = make_ptvecs(cell_type, cell_const)
-        >>> grid_type = "bcc"
-        >>> grid_const = cell_const/140
-        >>> grid_vecs = make_ptvecs(grid_type, grid_const)
-        >>> offset = [0.5, 0.5, 0.5]
+        >>> cell_centering = "face"
+        >>> cell_consts = [1.]*3
+        >>> cell_angles = [np.pi/2]*3
+        >>> cell_vecs = make_ptvecs(cell_centering, cell_consts, cell_angles)
+        >>> grid_centering = "base"
+        >>> grid_consts = [cell_const/140]*3
+        >>> grid_angles = [np.pi/2]*3
+        >>> grid_vecs = make_ptvecs(grid_centering, grid_consts, grid_angles)
+        >>> offset = .5*numpy.sum(cell_vecs,1)
         >>> grid = make_grid(cell_vecs, grid_vecs, offset)
     """
     
@@ -353,34 +357,67 @@ def make_grid(cell_vecs, grid_vecs, offset):
                 raise ValueError("The cell and grid vectors are incommensurate.")
             
     # H is an HNF and U is the transform.
-    L, U = HermiteNormalForm(N)
-    a = L[0,0]
-    b = L[0,1]
-    c = L[0,2]
-    d = L[1,1]
-    e = L[1,2]
-    f = L[2,2]
+    H, U = HermiteNormalForm(N)
+    a = H[0,0]
+    b = H[0,1]
+    c = H[0,2]
+    d = H[1,1]
+    e = H[1,2]
+    f = H[2,2]
     cell_const = np.linalg.norm(cell_vecs[:,0])
-    
-    grid = []
-    z3pl = 0
-    z3pu = int(f)
-    for z3p in range(z3pl + 1, z3pu + 1):
-        z2pl = int(e*z3p/f) # lower and upper limits
-        z2pu = int(z2pl + d)
-        for z2p in range(z2pl + 1, z2pu + 1):
-            z1pl = int((c - b*e/d)*z3p/f + b/d*z2p)
-            z1pu = int(z1pl + a)
-            for z1p in range(z1pl + 1, z1pu + 1):
-                z = np.dot(np.linalg.inv(U), [z1p,z2p,z3p])
-                pt = np.dot(grid_vecs, z)
-                gpt = np.dot(np.linalg.inv(cell_vecs), pt)%1
-                grid.append(np.dot(cell_vecs, gpt) - offset)
-    return grid
 
-def make_large_grid(cell_vectors, grid_type, grid_vectors, offset):
-    """This function is identical to make_grid except it samples a volume
+    if cart:
+        grid = []
+        z3pl = 0 # Limits for first loop of integers
+        z3pu = int(f)
+        for z3p in range(z3pl + 1, z3pu + 1):
+            z2pl = int(e*z3p/f) # lower and upper limits
+            z2pu = int(z2pl + d)
+            for z2p in range(z2pl + 1, z2pu + 1):
+                z1pl = int((c - b*e/d)*z3p/f + b/d*z2p)
+                z1pu = int(z1pl + a)
+                for z1p in range(z1pl + 1, z1pu + 1):
+                    z = np.dot(np.linalg.inv(U), [z1p,z2p,z3p])
+                    pt = np.dot(grid_vecs, z)
+                    gpt = np.dot(np.linalg.inv(cell_vecs), pt)%1.
+                    grid.append(np.dot(cell_vecs, gpt) - offset)
+        return grid
+    else:
+        grid = []
+        z3pl = 0
+        z3pu = int(f)
+        for z3p in range(z3pl + 1, z3pu + 1):
+            z2pl = int(e*z3p/f) # lower and upper limits
+            z2pu = int(z2pl + d)
+            for z2p in range(z2pl + 1, z2pu + 1):
+                z1pl = int((c - b*e/d)*z3p/f + b/d*z2p)
+                z1pu = int(z1pl + a)
+                for z1p in range(z1pl + 1, z1pu + 1):
+                    z = np.dot(np.linalg.inv(U), [z1p,z2p,z3p])
+                    pt = np.dot(grid_vecs, z)
+                    gpt = np.round(np.dot(np.linalg.inv(cell_vecs), pt), 12)%1
+                    grid.append(gpt - offset)
+        return grid
+                    
+
+def make_large_grid(cell_vectors, grid_vectors, offset, cart=True):
+    """This function is similar to make_grid except it samples a volume
     that is larger and saves the points that are thrown away in make_grid.
+
+    Args:
+        cell_vecs (numpy.ndarray): the vectors defining the volume in which 
+            to sample. The vectors are the columns of the matrix.
+        grid_vecs (numpy.ndarray): the vectors that generate the grid as 
+            columns of the matrix..
+        offset: the origin of the coordinate system in Cartesian or lattice
+            coordinates.
+        cart (bool): if true, return the grid in Cartesian coordinates. Other-
+            wise return the grid in lattice coordinates.        
+
+    Returns:
+        grid (numpy.ndarray): an array of sampling-point coordinates.
+        null_grid (numpy.ndarray): an array of sampling-point coordinates outside
+            volume.
     """
     
     grid = []
@@ -393,21 +430,13 @@ def make_large_grid(cell_vectors, grid_type, grid_vectors, offset):
 
     # Find the optimum integer values for creating the grid.
     n = [0,0,0]
-    if grid_type == "fcc":    
-        for i in range(len(n)):
-            index = np.where(np.asarray(G) == np.max(G))
-            # The factor 5./4 makes the sampling volume larger.
-            n[index[1][0]] = int(cell_lengths[index[1][0]]/np.max(G)*5./4)
-            G[index[0][0],:] = 0.
-            G[:,index[1][0]] = 0.
-    else:
-        for i in range(len(n)):
-            index = np.where(np.asarray(G) == np.max(G))
-            # The factor 4./5 makes the sampling volume larger.
-            n[index[1][0]] = int(cell_lengths[index[1][0]]/np.max(G)*(4./5))
-            G[index[0][0],:] = 0.
-            G[:,index[1][0]] = 0.
-
+    for i in range(len(n)):
+        index = np.where(np.asarray(G) == np.max(G))
+        # The factor 5./4 makes the sampling volume larger.
+        n[index[1][0]] = int(cell_lengths[index[1][0]]/np.max(G)*(5./4))
+        G[index[0][0],:] = 0.
+        G[:,index[1][0]] = 0.
+        
     for nv in product(range(-n[0], n[0]+1), range(-n[1], n[1]+1),
                       range(-n[2], n[2]+1)):
         # Sum across columns since we're adding up components of each vector.

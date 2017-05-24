@@ -1,4 +1,3 @@
-pyparsing
 matplotlib
 numpy
 phenum

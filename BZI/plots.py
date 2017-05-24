@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import itertools
 from mpl_toolkits.mplot3d import Axes3D
 from BZI.pseudopots import ToyPP, W1
-from BZI.symmetry import (bcc_sympts, fcc_sympts, sc_sympts, make_rptvecs,
-                          sym_path)
+from BZI.symmetry import (bcc_sympts, fcc_sympts, sc_sympts, make_ptvecs,
+                          make_rptvecs, sym_path)
 
 def ScatterPlotMultiple(func, states, ndivisions, cutoff=None):
     """Plot the energy states of a multivalued toy pseudo-potential using 
@@ -192,14 +192,15 @@ def PlotMeshes(mesh_points_list, cell_vecs, atoms, offset = np.asarray([0.,0.,0.
     plt.show()
     return None
 
-def PlotBandStructure(materials_list, PPlist, PPargs_list, lat_type, lat_const,
-                      sympt_pairs, npts, neigvals, energy_shift, elimits=False,
-                      fermi_level=False, save=False, show=True):
+def PlotBandStructure(materials_list, PPlist, PPargs_list, lat_type,
+                      lat_centering, lat_consts, lat_angles, sympt_pairs, npts,
+                      neigvals, energy_shift, elimits=False, fermi_level=False,
+                      save=False, show=True):
     """Plot the band structure of a pseudopotential along symmetry paths.
     
     Args:
         materials_list (str): a list of materials whose bandstructures will be 
-            plotted. The first string will label figures and files.
+        plotted. The first string will label figures and files.
         PPlist (function): a list of pseudopotenial functions.
         PPargs_list (list): a list of pseudopotential arguments as dictionaries.
         lat_type (str): the lattice type.
@@ -207,17 +208,18 @@ def PlotBandStructure(materials_list, PPlist, PPargs_list, lat_type, lat_const,
         sympt_pairs (list or numpy.ndarray): a list of symmetry point pairs.
         npts (int): the number of points to plot along each symmetry line.
         neigvals (int): the number of lower-most eigenvalues to include 
-            in the plot.
+        in the plot.
         energy_shift (float): energy shift for band structure
         elimits (list): the energy window for the plot.
         fermi_level (float): if provided, the Fermi level will be included
-            in the plot.
+        in the plot.
         save (bool): if true, the band structure will be saved.
+
     Returns:
         Display or save the band structure.
     """
-    
-    rlat_vecs = make_rptvecs(lat_type, lat_const)
+    lat_vecs = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
 
     # k-points between symmetry point pairs in lattice coordinates.
     lat_kpoints = sym_path(lat_type, npts, sympt_pairs)
@@ -340,17 +342,9 @@ def PlotSphereMesh(mesh_points,r2, offset = np.asarray([0.,0.,0.]),
         >>> PlotSphereMesh(grid,r2,offset)
     """
     
-    # Plot the points within the sphere.
-    ngpts = len(mesh_points)
-    kxlist = [mesh_points[i][0] for i in range(ngpts)]
-    kylist = [mesh_points[i][1] for i in range(ngpts)]
-    kzlist = [mesh_points[i][2] for i in range(ngpts)]
-    
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.set_aspect('equal')
-    ax.scatter(kxlist, kylist, kzlist, c="black",s=1)
-    
+
     # Plot the sphere
     u = np.linspace(0, 2 * np.pi, 100)
     v = np.linspace(0, np.pi, 100)
@@ -360,23 +354,37 @@ def PlotSphereMesh(mesh_points,r2, offset = np.asarray([0.,0.,0.]),
     z = r * np.outer(np.ones(np.size(u)), np.cos(v)) + offset[2]
     
     ax.scatter(x,y,z,s=0.001)
+
+    # Plot the points within the sphere.
+    ngpts = len(mesh_points)
+    kxlist = [mesh_points[i][0] for i in range(ngpts)]
+    kylist = [mesh_points[i][1] for i in range(ngpts)]
+    kzlist = [mesh_points[i][2] for i in range(ngpts)]
+    
+    ax.set_aspect('equal')
+    ax.scatter(kxlist, kylist, kzlist, c="black",s=1)
+
+    lim = np.sqrt(r2)*1.1
+    ax.set_xlim(-lim, lim)
+    ax.set_ylim(-lim, lim)
+    ax.set_zlim(-lim, lim)
     if save:
         plt.savefig("sphere_mesh.png")
     if show:
         plt.show()
     return None
 
-def PlotVaspBandStructure(file_loc, material, lat_type, energy_shift=0.0,
-                          fermi_level=False, elimits=False, save=False,
-                          show=True):
+def PlotVaspBandStructure(file_loc, material, lat_type, lat_consts, lat_angles,
+                          energy_shift=0.0, fermi_level=False, elimits=False,
+                          save=False, show=True):
     """Plot the band structure from a VASP INCAR, KPOINT, and OUTCAR file.
 
     Args:
         file_loc (str): the location of the directory with the VASP output files.
-            The KPOINTS file MUST be in a very particular format: there must be
-            4 introductory lines, each k-point must be on its own line and there
-            must only be one space between pairs of k-points. There mustn't be 
-            any space after the last entered k-point.
+        The KPOINTS file MUST be in a very particular format: there must be
+        4 introductory lines, each k-point must be on its own line and there
+        must only be one space between pairs of k-points. There mustn't be 
+        any space after the last entered k-point.
         material (str): the material whose band structure is being plotted.
         lat_type (str): the lattice type
         energy_shift (float): energy shift for band structure
@@ -393,10 +401,13 @@ def PlotVaspBandStructure(file_loc, material, lat_type, energy_shift=0.0,
     # Get the correct symmetry point dictionary.
     if lat_type == "fcc":
         sympt_dict = fcc_sympts
+        lat_centering = "face"
     elif lat_type == "bcc":
         sympt_dict = bcc_sympts
+        lat_centering = "body"
     elif lat_type == "sc":
         sympt_dict = sc_sympts
+        lat_centering = "prim"
     else:
         raise ValueError("Invalid lattice type")
 
@@ -416,10 +427,11 @@ def PlotVaspBandStructure(file_loc, material, lat_type, energy_shift=0.0,
                 if c == "!":
                     break
                 continue
-        lat_const = float(lat_const)
+    lat_const = float(lat_const)
     angstrom_to_Bohr = 1.889725989
     lat_const *= angstrom_to_Bohr
-    rlat_vecs = make_rptvecs(lat_type, lat_const)
+    lat_vecs = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
     
     nbands = ""
     with open(file_loc + "INCAR","r") as file:
@@ -464,8 +476,10 @@ def PlotVaspBandStructure(file_loc, material, lat_type, energy_shift=0.0,
     for i,sympt in enumerate(sympt_list):
         if sympt == "gamma" or sympt == "Gamma":
             sympt_list[i] = "G"
+            
     # Remove all duplicate symmetry points
     unique_sympts = [sympt_list[i] for i in range(0, len(sympt_list), 2)] + [sympt_list[-1]]
+    
     # Replace symbols representing points with their lattice coordinates.
     lat_sympt_coords = [sympt_dict[sp] for sp in unique_sympts]
     car_sympt_coords = [np.dot(rlat_vecs,k) for k in lat_sympt_coords]
