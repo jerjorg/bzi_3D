@@ -5,6 +5,7 @@ Materials Science 49.2 (2010): 299-312.
 """
 
 import numpy as np
+from numpy.linalg import norm
 import itertools
 import copy
 from itertools import islice
@@ -19,12 +20,12 @@ sc_sympts = {"G": [0. ,0., 0.],
 # Define the symmetry points for a fcc lattice in lattice coordinates.
 # Coordinates are in lattice coordinates.
 fcc_sympts = {"G": [0., 0., 0.], # G is the gamma point.
-               "K": [3./8, 3./8, 3./4],
-               "L": [1./2, 1./2, 1./2],
-               "U": [5./8, 1./4, 5./8],              
-               "W": [1./2, 1./4, 3./4],
-               "X": [1./2, 0., 1./2],
-               "G2":[1., 1., 1.]}
+              "K": [3./8, 3./8, 3./4],
+              "L": [1./2, 1./2, 1./2],
+              "U": [5./8, 1./4, 5./8],              
+              "W": [1./2, 1./4, 3./4],
+              "X": [1./2, 0., 1./2],
+              "G2":[1., 1., 1.]}
 
 # Define the symmetry points for a bcc lattice in lattice coordinates
 bcc_sympts = {"G": [0., 0., 0.],
@@ -35,13 +36,10 @@ bcc_sympts = {"G": [0., 0., 0.],
 # Tetragonal high symmetry points
 tet_sympts = {"G": [0., 0., 0.],
               "A": [1./2, 1./2, 1./2],
-              "M": [1/.2, 1./2, 0],
+              "M": [1./2, 1./2, 0.],
               "R": [0., 1./2, 1./2],
               "X": [0., 1./2, 0.],
               "Z": [0., 0., 1./2]}
-
-# It may be better to have the arguments for the symmetry point
-# functions as lattice_constants and lattice_angles.
 
 def bct1_sympts(a, c):
     """Return the body-centered tetragonal high symmetry points for c < a as a 
@@ -92,8 +90,8 @@ def orcf13_sympts(a, b, c):
     a = float(a)
     b = float(b)
     c = float(c)
-    zeta = (1 + a**2/b**2 - a**2/c**2)/4
-    eta = (1 + a**2/b**2 + a**2/c**2)/4
+    zeta = (1 + (a/b)**2 - (a/c)**2)/4.
+    eta = (1 + (a/b)**2 + (a/c)**2)/4.
     
     return {"G": [0., 0., 0.],
             "A": [1./2, 1./2+zeta, zeta],
@@ -109,7 +107,7 @@ def orcf2_sympts(a, b, c):
     """Return the face-centered orthorhombic high symmetry points for
      1/a**2 < 1/b**2 +1/c**2 as a dictionary.
     """
-    
+
     a = float(a)
     b = float(b)
     c = float(c)
@@ -142,14 +140,14 @@ def orci_sympts(a, b, c):
     mu = (a**2 + b**2)/(4*c**2)
     
     return {"G": [0., 0., 0.],
-            "L": [-mu, mu, 1/2 - delta],
-            "L1": [mu, -mu, 1/2 + delta],
-            "L2": [1/2 - delta, 1/2 + delta, -mu],
+            "L": [-mu, mu, 1./2 - delta],
+            "L1": [mu, -mu, 1./2 + delta],
+            "L2": [1./2 - delta, 1./2 + delta, -mu],
             "R": [0., 1./2, 0.],
             "S": [1./2, 0., 0.],
             "T": [0., 0., 1./2],
             "W": [1./4, 1./4, 1./4],
-            "X": [-zeta, -zeta, -zeta],
+            "X": [-zeta, zeta, zeta],
             "X1": [zeta, 1-zeta, -zeta],
             "Y": [eta, -eta, eta],
             "Y1": [1-eta, eta, -eta],
@@ -174,19 +172,19 @@ def orcc_sympts(a, b):
             "Y": [-1./2, 1./2, 0.],
             "Z": [0., 0., 1./2]}
 
+# High symmetry points for a hexagonal lattice.
 hex_sympts = {"G": [0., 0., 0.],
               "A": [0., 0., 1./2],
               "H": [1./3, 1./3, 1./2],
-              "K": [1./2, 0., 1./2],
+              "K": [1./3, 1./3, 0.],
               "L": [1./2, 0., 1./2],
               "M": [1./2, 0., 0.]}
 
 def rhl1_sympts(alpha):
     """Return the rhombohedral lattice points for alpha < pi/2 radians.
     """
-    
     alpha = float(alpha)
-    eta = (1 + 4*np.cos(alpha))(2 + 4*np.cos(alpha))
+    eta = (1 + 4*np.cos(alpha))/(2 + 4*np.cos(alpha))
     nu = 3./4 - eta/2
     
     return {"G": [0., 0., 0.],
@@ -208,7 +206,7 @@ def rhl2_sympts(alpha):
     
     alpha = float(alpha)
     eta = 1/(2*np.tan(alpha/2)**2)
-    vu = 3/4 - eta/2
+    nu = 3./4 - eta/2
     return {"G": [0., 0., 0.],
             "F": [1./2, -1./2, 0.],
             "L": [1./2, 0., 0.],
@@ -228,10 +226,10 @@ def mcl_sympts(b, c, alpha):
     c = float(c)
     alpha = float(alpha)
     
-    eta = (1 - b*np.cos(alpha/c))/(2*np.sin(alpha)**2)
-    nu = 1./2 - eta*c*np.cos(alpha/b)
+    eta = (1 - b*np.cos(alpha)/c)/(2*np.sin(alpha)**2)
+    nu = 1./2 - eta*c*np.cos(alpha)/b
     return {"G": [0., 0., 0.],
-            "A": [1./2, 1./2 0.],
+            "A": [1./2, 1./2, 0.],
             "C": [0., 1./2, 1./2],
             "D": [1./2, 0., 1./2],
             "D1": [1./2, 0., -1./2],
@@ -248,9 +246,9 @@ def mcl_sympts(b, c, alpha):
             "Z": [1./2, 0., 0.]}
 
 def mclc12_sympts(a, b, c, alpha):
-    """Return the high symmetry points for a base-centered monoclinic lattice with gamma > pi/2 and gamma = pi/2 as
-    a dictionary where the keys are strings the values are the lattice
-    coordinates of the high symmetry points. 
+    """Return the high symmetry points for a base-centered monoclinic lattice 
+    with kgamma > pi/2 and kgamma = pi/2 as a dictionary where the keys are 
+    strings the values are the lattice coordinates of the high symmetry points.
     """
     
     a = float(a)
@@ -258,10 +256,10 @@ def mclc12_sympts(a, b, c, alpha):
     c = float(c)
     alpha = float(alpha)
     
-    zeta = (2 - b*np.cos(alpha/c))/(4*np.sin(alpha)**2)
-    eta = 1./2 + 2*zeta*c*np.cos(alpha/b)
+    zeta = (2 - b*np.cos(alpha)/c)/(4*np.sin(alpha)**2)
+    eta = 1./2 + 2*zeta*c*np.cos(alpha)/b
     psi = 3./4 - a**2/(4*b**2*np.sin(alpha)**2)
-    phi = psi + (3./4 - psi)*b*np.cos(alpha/c)
+    phi = psi + (3./4 - psi)*b*np.cos(alpha)/c
 
     return {"G": [0., 0., 0.],
             "N": [1./2, 0., 0.],
@@ -294,9 +292,9 @@ def mclc34_sympts(a, b, c, alpha):
     alpha = float(alpha)
 
     mu = (1 + b**2/a**2)/4
-    delta = B8C*np.cos(alpha/(2*a**2))
-    zeta = mu - 1./4 + (a - b*np.cos(alpha/c))/(4*np.sin(alpha)**2)
-    eta = 1./2 + 2*zeta*c*np.cos(alpha/b)
+    delta = b*c*np.cos(alpha)/(2*a**2)
+    zeta = mu - 1./4 + (1 - b*np.cos(alpha)/c)/(4*np.sin(alpha)**2)
+    eta = 1./2 + 2*zeta*c*np.cos(alpha)/b
     phi = 1 + zeta - 2*mu
     psi = eta - 2*delta
                 
@@ -333,9 +331,9 @@ def mclc5_sympts(a, b, c, alpha):
     zeta = (b**2/a**2 + (1 - b*np.cos(alpha/c))/np.sin(alpha)**2)/4
     eta = 1./2 + 2*zeta*c*np.cos(alpha/b)
     mu = eta/2 + b**2/(3*a**2) - b*c*np.cos(alpha)/(2*a**2)
+    nu = 2*mu - zeta
     omega = (4*nu - 1 - b**2*np.sin(alpha/a**2)**2)*c/(2*b*np.cos(alpha))
     delta = zeta*c*np.cos(alpha/b) + omega/2 - 1./4
-    nu = 2*mu - zeta
     rho = 1 - zeta*a**2/b**2
     
     return {"G": [0., 0., 0.],
@@ -371,7 +369,7 @@ def mclc5_sympts(a, b, c, alpha):
 # k_gamma = pi/2
 tri1a2a_sympts = {"G": [0., 0., 0.],
                   "L": [1./2, 1./2, 0.],
-                  "M": [0., 1./2, 1./2]
+                  "M": [0., 1./2, 1./2],
                   "N": [1./2, 0., 1./2],
                   "R": [1./2, 1./2, 1./2],
                   "X": [1./2, 0., 0.],
@@ -387,16 +385,174 @@ tri1a2a_sympts = {"G": [0., 0., 0.],
 
 ## tri2b ##
 # k_alpha < pi/2
-# k_beta < pi/2
+# k_beta > pi/2
 # k_gamma = pi/2
 tr1b2b_sympts = {"G": [0., 0., 0.],
                  "L": [1./2, -1./2, 0.],
                  "M": [0., 0., 1./2],
-                 "N": [-1./2, 1./2, 1./2],
+                 "N": [-1./2, -1./2, 1./2],
                  "R": [0., -1./2, 1./2],
                  "X": [0., -1./2, 0.],
                  "Y": [1./2, 0., 0.],
                  "Z": [-1./2, 0., 1./2]}
+
+def get_sympts(lattice_centering, lattice_constants, lattice_angles):
+    """Find the symmetry points for the provided lattice.
+
+    Args:
+        lattice_centering (str): the centering type for the lattice. Vaild
+            options include 'prim', 'base', 'body', and 'face'.
+        lattice_constants (list): a list of lattice constants [a, b, c].
+        lattice_angles (list): a list of lattice angles [alpha, beta, gamma].
+
+    Returns:
+        (dict): a dictionary with a string of letters as the keys and lattice 
+            coordinates of the symmetry points ase values.
+
+    Example:
+        >>> lattice_constants = [4.05]*3
+        >>> lattice_angles = [numpy.pi/2]*3
+        >>> symmetry_points = get_sympts(lattice_constants, lattice_angles)
+    """
+    
+    a = float(lattice_constants[0])
+    b = float(lattice_constants[1])
+    c = float(lattice_constants[2])
+    
+    alpha = float(lattice_angles[0])
+    beta = float(lattice_angles[1])
+    gamma = float(lattice_angles[2])
+    
+    lattice_vectors = make_ptvecs(lattice_centering, lattice_constants,
+                                  lattice_angles)
+    reciprocal_lattice_vectors = make_rptvecs(lattice_vectors)
+    
+    rlat_veca = reciprocal_lattice_vectors[:,0] # individual reciprocal lattice vectors
+    rlat_vecb = reciprocal_lattice_vectors[:,1]
+    rlat_vecc = reciprocal_lattice_vectors[:,2]
+    
+    ka = norm(rlat_veca) # lengths of primitive reciprocal lattice vectors
+    kb = norm(rlat_vecb)
+    kc = norm(rlat_vecc)
+
+    # These are the angles between reciprocal lattice vectors.
+    kalpha = np.arccos(np.dot(rlat_vecb, rlat_vecc)/(kb*kc))
+    kbeta = np.arccos(np.dot(rlat_veca, rlat_vecc)/(ka*kc))
+    kgamma = np.arccos(np.dot(rlat_veca, rlat_vecb)/(ka*kb))
+    
+    # Start with the cubic lattices, which have all angles equal to pi/2 radians.
+    if (np.isclose(alpha, np.pi/2) and
+        np.isclose(beta, np.pi/2) and
+        np.isclose(gamma, np.pi/2)):
+        if (np.isclose(a, b) and
+            np.isclose(b, c)):
+            if lattice_centering == "prim":
+                return sc_sympts
+            elif lattice_centering == "body":
+                return bcc_sympts
+            elif lattice_centering == "face":
+                return fcc_sympts
+            else:
+                msg = ("Valid lattice centerings for cubic latices include "
+                       "'prim', 'body', and 'face'.")
+                raise ValueError(msg.format(lattice_centering))
+            
+        # Tetragonal.
+        elif (np.isclose(a,b) and not np.isclose(b,c)):
+            if lattice_centering == "prim":
+                return tet_sympts
+            elif lattice_centering == "body":
+                if c < a:
+                    return bct1_sympts(a, c)
+                else:
+                    return bct2_sympts(a, c)
+            else:
+                msg = ("Valid lattice centerings for tetragonal lattices "
+                       "include 'prim' and 'body'.")
+                raise ValueError(msg.format(lattice_centering))
+            
+        # Last of the lattices with all angles equal to pi/2 is orthorhombic.
+        else:
+            if lattice_centering == "prim":
+                return orc_sympts
+            
+            elif lattice_centering == "base":
+                return orcc_sympts(a, b)
+            
+            elif lattice_centering == "body":
+                return orci_sympts(a, b, c)
+            
+            elif lattice_centering == "face":
+                if  (1/a**2 >= 1/b**2 +1/c**2):
+                    return orcf13_sympts(a, b, c)
+                else:
+                    return orcf2_sympts(a, b, c)
+                
+            else:
+                msg = ("Valid lattice centerings for orthorhombic lattices "
+                       "include 'prim', 'base', 'body', and 'face'.")
+                raise ValueError(msg.format(lattice_centering))
+            
+    # Hexagonal has alpha = beta = pi/2, gamma = 2pi/3, a = b != c.
+    if (np.isclose(alpha, beta) and np.isclose(beta, np.pi/2) and
+        np.isclose(gamma, 2*np.pi/3) and np.isclose(a, b) and not
+        np.isclose(b, c)):
+        return hex_sympts
+
+    # Rhombohedral has equal angles and constants.
+    elif (np.isclose(alpha, beta) and np.isclose(beta, gamma) and 
+          np.isclose(a, b) and np.isclose(b, c)):
+            if alpha < np.pi/2:
+                return rhl1_sympts(alpha)
+            else:
+                return rhl2_sympts(alpha)
+
+    # Monoclinic a,b <= c, alpha < pi/2, beta = gamma = pi/2, a != b != c
+    elif (a < c and b < c
+          and not (np.isclose(a,b) or np.isclose(b,c) or np.isclose(a,c))
+          and alpha < np.pi/2
+          and np.isclose(beta, gamma)
+          and np.isclose(gamma, np.pi/2)):
+        if lattice_centering == "prim":
+            return mcl_sympts(b, c, alpha)
+        elif lattice_centering == "base":
+            if kgamma > np.pi/2 or np.isclose(kgamma, np.pi/2):
+                return mclc12_sympts(a, b, c, alpha)
+            
+            elif (kgamma < np.pi/2
+                  and ((b*np.cos(alpha)/c + (b*np.sin(alpha)/a)**2) < 1.
+                       or np.isclose(b*np.cos(alpha)/c + (b*np.sin(alpha)/a)**2, 1))):
+                return mclc34_sympts(a, b, c, alpha)
+            
+            elif (kgamma < np.pi/2 and
+                  (b*np.cos(alpha)/c + (b*np.sin(alpha)/a)**2) > 1.):
+                return mclc5_sympts(a, b, c, alpha)
+            
+            else:
+                msg = "Something is wrong with the monoclinic lattice provided."
+                raise ValueError(msg.format(reciprocal_lattice_vectors))
+        else:
+            msg = ("Valid lattice centerings for monoclinic lattices "
+                   "include 'prim' and 'base'")
+            raise ValueError(msg.format(lattice_centering))
+        
+    # Triclinic a != b != c, alpha != beta != gamma
+    elif not (np.isclose(a,b) and np.isclose(b,c) and np.isclose(alpha,beta) and
+              np.isclose(beta, gamma)):
+        if ((kalpha > np.pi/2 and kbeta > np.pi/2 and kgamma > np.pi/2) or
+            (kalpha > np.pi/2 and kbeta > np.pi/2 and np.isclose(kgamma, np.pi/2))):
+            return tri1a2a_sympts
+        elif ((kalpha < np.pi/2 and kbeta < np.pi/2 and kgamma < np.pi/2) or
+              (kalpha < np.pi/2 and kbeta < np.pi/2 and np.isclose(kgamma, np.pi/2))):
+            return tr1b2b_sympts
+        else:
+            msg = "Something is wrong with the triclinic lattice provided."
+            raise ValueError(msg.format(reciprocal_lattice_vectors))
+    else:
+        msg = ("The lattice parameters provided don't correspond to a valid "
+               "3D Bravais lattice.")
+        raise ValueError(msg.format())
+    
 
 def rsym_pts(lat_type, a, lat_coords=False):
     """Define the symmetry points in reciprocal space for a given real
@@ -466,7 +622,7 @@ def make_ptvecs(center_type, lat_consts, lat_angles):
         center_type (str): identifies the location of the atoms in the cell.
         lat_consts (float or int): the characteristic spacing of atoms in the
             material with a first, b second, and c third in the list. These
-            should be ordered such that a < b < c.
+            are typically ordered such that a < b < c.
         angles (list): a list of angles between the primitive translation vectors,
             in radians, with alpha the first entry, beta the second, and gamma the 
             third in the list.
@@ -488,23 +644,28 @@ def make_ptvecs(center_type, lat_consts, lat_angles):
     if type(lat_angles) not in (list, np.ndarray):
         raise ValueError("The lattice angles must be in a list or numpy array.")
 
-    for i in range(len(lat_consts)-1):
-        if lat_consts[i+1] < lat_consts[i]:
-            msg = ("The lattice constants should be ordered from least to "
-                   "greatest.")
-            raise ValueError(msg.format(lat_consts))
-    
+    # Extract the angles
     alpha = float(lat_angles[0])
     beta = float(lat_angles[1])
     gamma = float(lat_angles[2])
+
+    if (np.isclose(alpha, beta) and np.isclose(beta, gamma) and
+        np.isclose(beta, 2*np.pi/3)):
+        msg = ("The lattice vectors are linearly dependent with all angles "
+               "equal to 2pi/3.")
+        raise ValueError(msg.format(lat_angles))
+    
+    # Extract the lattice constants for the conventional lattice.
     a = float(lat_consts[0])
     b = float(lat_consts[1])
     c = float(lat_consts[2])
     
+    # avec is chosen to lie along the x-direction.
     avec = np.array([a, 0., 0.])
+    # bvec is chosen to lie in the xy-plane.
     bvec = np.array([b*np.cos(gamma), b*np.sin(gamma), 0])
     # I had to round the argument of the sqrt function in order to avoid
-    # numerical errors.
+    # numerical errors in cvec.
     cvec = np.array([c*np.cos(beta),
                 c/np.sin(gamma)*(np.cos(alpha) -
                                  np.cos(beta)*np.cos(gamma)),
@@ -513,22 +674,52 @@ def make_ptvecs(center_type, lat_consts, lat_angles):
                                   np.cos(beta)*np.cos(gamma)))**2, 9))])
     
     if center_type == "prim":
-        pt_vecs = np.transpose(np.array([avec, bvec, cvec], dtype=float))
-        return pt_vecs
+        # I have to take care that a hexagonal grid is rotated 60 degrees so
+        # it matches what was obtained in Stefano's paper.
+        if ((np.isclose(a, b) and not np.isclose(b,c)) and
+            np.isclose(alpha, beta) and np.isclose(beta, np.pi/2) and
+            np.isclose(gamma, 2*np.pi/3)):
+            rotate = [[np.cos(gamma/2), np.sin(gamma/2), 0],
+                        [-np.sin(gamma/2), np.cos(gamma/2), 0],
+                        [0, 0, 1]]
+            av = np.dot(rotate, avec)
+            bv = np.dot(rotate, bvec)
+            cv = np.dot(rotate, cvec)
+            pt_vecs = np.transpose(np.array([av, bv, cv], dtype=float))
+            return pt_vecs
+        
+        # The rhombohedral lattice vectors also need to be rotated to match
+        # those of Stefano.
+        elif (np.isclose(alpha, beta) and np.isclose(beta, gamma) and
+              not np.isclose(beta, np.pi/2) and np.isclose(a, b) and
+              np.isclose(b,c)):
+            
+            # The vectors in Stefano's paper are mine rotated 60 degrees.
+            rotate = [[np.cos(gamma/2), np.sin(gamma/2), 0],
+                      [-np.sin(gamma/2), np.cos(gamma/2), 0],
+                      [0, 0, 1]]
+            av = np.dot(rotate, avec)
+            bv = np.dot(rotate, bvec)
+            cv = np.dot(rotate, cvec)
+            pt_vecs = np.transpose(np.array([av, bv, cv], dtype=float))
+            return pt_vecs
+        else:
+            pt_vecs = np.transpose(np.array([avec, bvec, cvec], dtype=float))
+            return pt_vecs
     
     elif center_type == "base":
         av = .5*(avec - bvec)
         bv = .5*(avec + bvec)
         cv = cvec
-        # I have to rotate two of my vectors in the xy-plane so that they
-        # agree with Stefano's paper for base-centered monoclinic.
+        
+        # The vectors defined in Stefano's paper are defined
+        # differently for base-centered, monoclinic lattices.
         if (alpha < np.pi/2 and np.isclose(beta, np.pi/2)
-            and np.isclose(gamma, np.pi/2) and a <= c and b <= c):
-            rotatex = [[np.cos(gamma), -np.sin(gamma), 0],
-                       [np.sin(gamma), np.cos(gamma), 0],
-                       [0, 0, 1]]
-            av = np.dot(rotatex, av)
-            bv = np.dot(rotatex, bv)
+            and np.isclose(gamma, np.pi/2) and a <= c and b <= c
+            and not (np.isclose(a,b) or np.isclose(b,c) or np.isclose(a,c))):            
+            av = .5*(avec + bvec)
+            bv = .5*(-avec + bvec)
+            cv = cvec
         pt_vecs  = np.transpose(np.array([av, bv, cv], dtype=float))
         return pt_vecs
     
@@ -545,27 +736,7 @@ def make_ptvecs(center_type, lat_consts, lat_angles):
         cv = .5*(avec + bvec)
         pt_vecs = np.transpose(np.array([av, bv, cv], dtype=float))
         return pt_vecs
-
-    elif center_type == "hex":
-        # The vectors in Stefano's paper are mine rotated 60 degrees.
-        rotate = [[np.cos(gamma/2), np.sin(gamma/2), 0],
-                    [-np.sin(gamma/2), np.cos(gamma/2), 0],
-                    [0, 0, 1]]
-        av = np.dot(rotate, avec)
-        bv = np.dot(rotate, bvec)
-        cv = np.dot(rotate, cvec)
-        pt_vecs = np.transpose(np.array([av, bv, cv], dtype=float))
-        return pt_vecs
-    elif center_type == "rhom":
-        # The vectors in Stefano's paper are mine rotated 60 degrees.
-        rotate = [[np.cos(alpha/2), np.sin(alpha/2), 0],
-                  [-np.sin(alpha/2), np.cos(alpha/2), 0],
-                  [0, 0, 1]]
-        av = np.dot(rotate, avec)
-        bv = np.dot(rotate, bvec)
-        cv = np.dot(rotate, cvec)
-        pt_vecs = np.transpose(np.array([av, bv, cv], dtype=float))
-        return pt_vecs
+    
     else:
         msg = "Please provide a valid centering type."
         raise ValueError(msg.format(center_type))
@@ -581,27 +752,8 @@ def make_rptvecs(A):
         B (numpy.ndarray): return the primitive translation vectors in 
             reciprocal space as the columns of a matrix.    
     """
-    
-    ndims = 3
-    V = np.linalg.det(A) # volume of unit cell
-    B = np.empty(np.shape(A))
-    for i in range(ndims):
-        B[:,i] = 2*np.pi*np.cross(A[:,np.mod(i+1, ndims)],
-                                  A[:, np.mod(i+2, ndims)])/V
-    return B
-
-def make_reciprocal_lattice_vectors(A):
-    """Return the reciprocal lattice vectors of the provided lattice vectors.
-
-    Args:
-        A (list or numpy.ndarray): the lattice vectors in real space ase columns
-            of a nested list or numpy array.
-    Return:
-        (numpy.ndarray): the reciprocal lattice vectors.    
-    """
-
     return np.transpose(np.linalg.inv(A))*2*np.pi
-
+    
 def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
     """Create the vectors that generate a lattice.
 
@@ -858,6 +1010,10 @@ def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
             msg = ("The first and second lattice constants, a and b, should "
                    "both be less than or equal to the last lattice constant, c,"
                    " for a monoclinic lattice.")
+            raise ValueError(msg.format(lattice_constants))
+        if (np.isclose(a,b) or np.isclose(b,c) or np.isclose(a,c)):
+            msg = ("No two lattice constants are the same for a monoclinic "
+                   "lattice.")
             raise ValueError(msg.format(lattice_constants))
         if alpha >= np.pi/2:
             msg = ("The first lattice angle, alpha, should be less than pi/2 "

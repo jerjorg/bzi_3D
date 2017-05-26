@@ -17,3 +17,8 @@ Revision 0.0.3
 - Create make_lattice_vectors that also generates the 14 Bravais lattices.
 - Create dictionaries and functions that return the high symmetry points for
   all possible Brillouin zones.
+- Create a function that returns the symmetry points of a lattice with the
+  provided lattice parameters by referencing the symmetry point dictionaries.
+- Make unit tests for the symmetry point function for all possible Brilloun
+  zones.
+- Make unit tests for the primitive translation vectors.
