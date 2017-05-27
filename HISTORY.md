@@ -22,3 +22,6 @@ Revision 0.0.3
 - Make unit tests for the symmetry point function for all possible Brilloun
   zones.
 - Make unit tests for the primitive translation vectors.
+- Make unit tests for the symmetry paths functions.
+- Create a function that identifies the lattice type.
+- Create a lattice class that stores all variables related to the lattice.

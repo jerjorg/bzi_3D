@@ -11,6 +11,61 @@ import copy
 from itertools import islice
 from phenum.symmetry import _get_lattice_pointGroup
 
+
+class Lattice(object):
+    """Create a lattice.
+
+    Args:
+        centering_type (str): identifies the position of lattice points in
+            the conventional unit cell. Option include 'prim', 'base', 'body',
+            and 'center'.
+        lattice_constants (list): a list of constants that correspond to the
+            lengths of the lattice vectors in the conventional unit cell ordered
+            as [a,b,c].
+        lattice_angles (list): a list of angles in radians that correspond to
+            the angles between lattice vectors in the conventional unit cell
+            ordered as [alpha, beta, gamma] where alpha is the angle between bc,
+            beta is the angle between ac, and gamma is the angle between ab.
+
+    Attributes:
+        centering (str): the type of lattice point centering in the 
+            conventional unit cell. Option include 'prim', 'base', 'body', and
+            'center'.
+        constants (list): a list of constants that correspond to the
+            lengths of the lattice vectors in the conventional unit cell ordered
+            as [a,b,c].
+        angles (list): a list of angles in radians that correspond to
+            the angles between lattice vectors in the conventional unit cell
+            ordered as [alpha, beta, gamma] where alpha is the angle between bc,
+            beta is the angle between ac, and gamma is the angle between ab.
+        vectors (numpy.ndarray): an array of primitive lattice vectors
+            as columns of a 3x3 matrix.
+        reciprocal_vectors (numpy.ndarray): the reciprocal primitive 
+            translation vectors as columns of a 3x3 matrix.
+        symmetry_group (numpy.ndarray): the group of transformations under which
+            the lattice in invariant.
+        symmetry_points (dict): a dictionary of high symmetry points with the
+            keys as letters and values as lattice coordinates.
+        symmetry_paths (list): a list of symmetry point pairs used when creating
+            a band structure plot.
+        type (str): the Bravais lattice type.
+    """
+    
+    def __init__(self, centering_type, lattice_constants, lattice_angles):
+        self.centering = centering_type
+        self.constants = lattice_constants
+        self.angles = lattice_angles
+        self.vectors = make_ptvecs(centering_type, lattice_constants,
+                                   lattice_angles)
+        self.reciprocal_vectors = make_rptvecs(self.vectors)
+        self.symmetry_group = point_group(self.vectors)
+        self.symmetry_points = get_sympts(centering_type, lattice_constants,
+                                          lattice_angles)
+        self.symmetry_paths = get_sympaths(centering_type, lattice_constants,
+                                         lattice_angles)
+        self.type = find_lattice_type(centering_type, lattice_constants,
+                                      lattice_angles)
+
 # Define the symmetry points for a simple-cubic lattice in lattice coordinates.
 sc_sympts = {"G": [0. ,0., 0.],
               "R": [1./2, 1./2, 1./2],
@@ -322,20 +377,20 @@ def mclc5_sympts(a, b, c, alpha):
     a dictionary where the keys are strings the values are the lattice
     coordinates of the high symmetry points. 
     """
-    
+
     a = float(a)
     b = float(b)
     c = float(c)
     alpha = float(alpha)
 
-    zeta = (b**2/a**2 + (1 - b*np.cos(alpha/c))/np.sin(alpha)**2)/4
-    eta = 1./2 + 2*zeta*c*np.cos(alpha/b)
-    mu = eta/2 + b**2/(3*a**2) - b*c*np.cos(alpha)/(2*a**2)
+    zeta = (b**2/a**2 + (1 - b*np.cos(alpha)/c)/np.sin(alpha)**2)/4
+    eta = 1./2 + 2*zeta*c*np.cos(alpha)/b
+    mu = eta/2 + b**2/(4*a**2) - b*c*np.cos(alpha)/(2*a**2)
     nu = 2*mu - zeta
-    omega = (4*nu - 1 - b**2*np.sin(alpha/a**2)**2)*c/(2*b*np.cos(alpha))
-    delta = zeta*c*np.cos(alpha/b) + omega/2 - 1./4
+    omega = (4*nu - 1 - b**2*np.sin(alpha)**2/a**2)*c/(2*b*np.cos(alpha))
+    delta = zeta*c*np.cos(alpha)/b + omega/2 - 1./4
     rho = 1 - zeta*a**2/b**2
-    
+
     return {"G": [0., 0., 0.],
             "F": [nu, nu, omega],
             "F1": [1-nu, 1-nu, 1-omega],
@@ -385,7 +440,7 @@ tri1a2a_sympts = {"G": [0., 0., 0.],
 
 ## tri2b ##
 # k_alpha < pi/2
-# k_beta > pi/2
+# k_beta < pi/2
 # k_gamma = pi/2
 tr1b2b_sympts = {"G": [0., 0., 0.],
                  "L": [1./2, -1./2, 0.],
@@ -396,11 +451,11 @@ tr1b2b_sympts = {"G": [0., 0., 0.],
                  "Y": [1./2, 0., 0.],
                  "Z": [-1./2, 0., 1./2]}
 
-def get_sympts(lattice_centering, lattice_constants, lattice_angles):
+def get_sympts(centering_type, lattice_constants, lattice_angles):
     """Find the symmetry points for the provided lattice.
 
     Args:
-        lattice_centering (str): the centering type for the lattice. Vaild
+        centering_type (str): the centering type for the lattice. Vaild
             options include 'prim', 'base', 'body', and 'face'.
         lattice_constants (list): a list of lattice constants [a, b, c].
         lattice_angles (list): a list of lattice angles [alpha, beta, gamma].
@@ -423,7 +478,7 @@ def get_sympts(lattice_centering, lattice_constants, lattice_angles):
     beta = float(lattice_angles[1])
     gamma = float(lattice_angles[2])
     
-    lattice_vectors = make_ptvecs(lattice_centering, lattice_constants,
+    lattice_vectors = make_ptvecs(centering_type, lattice_constants,
                                   lattice_angles)
     reciprocal_lattice_vectors = make_rptvecs(lattice_vectors)
     
@@ -446,22 +501,22 @@ def get_sympts(lattice_centering, lattice_constants, lattice_angles):
         np.isclose(gamma, np.pi/2)):
         if (np.isclose(a, b) and
             np.isclose(b, c)):
-            if lattice_centering == "prim":
+            if centering_type == "prim":
                 return sc_sympts
-            elif lattice_centering == "body":
+            elif centering_type == "body":
                 return bcc_sympts
-            elif lattice_centering == "face":
+            elif centering_type == "face":
                 return fcc_sympts
             else:
                 msg = ("Valid lattice centerings for cubic latices include "
                        "'prim', 'body', and 'face'.")
-                raise ValueError(msg.format(lattice_centering))
+                raise ValueError(msg.format(centering_type))
             
         # Tetragonal.
         elif (np.isclose(a,b) and not np.isclose(b,c)):
-            if lattice_centering == "prim":
+            if centering_type == "prim":
                 return tet_sympts
-            elif lattice_centering == "body":
+            elif centering_type == "body":
                 if c < a:
                     return bct1_sympts(a, c)
                 else:
@@ -469,20 +524,20 @@ def get_sympts(lattice_centering, lattice_constants, lattice_angles):
             else:
                 msg = ("Valid lattice centerings for tetragonal lattices "
                        "include 'prim' and 'body'.")
-                raise ValueError(msg.format(lattice_centering))
+                raise ValueError(msg.format(centering_type))
             
         # Last of the lattices with all angles equal to pi/2 is orthorhombic.
         else:
-            if lattice_centering == "prim":
+            if centering_type == "prim":
                 return orc_sympts
             
-            elif lattice_centering == "base":
+            elif centering_type == "base":
                 return orcc_sympts(a, b)
             
-            elif lattice_centering == "body":
+            elif centering_type == "body":
                 return orci_sympts(a, b, c)
             
-            elif lattice_centering == "face":
+            elif centering_type == "face":
                 if  (1/a**2 >= 1/b**2 +1/c**2):
                     return orcf13_sympts(a, b, c)
                 else:
@@ -491,7 +546,7 @@ def get_sympts(lattice_centering, lattice_constants, lattice_angles):
             else:
                 msg = ("Valid lattice centerings for orthorhombic lattices "
                        "include 'prim', 'base', 'body', and 'face'.")
-                raise ValueError(msg.format(lattice_centering))
+                raise ValueError(msg.format(centering_type))
             
     # Hexagonal has alpha = beta = pi/2, gamma = 2pi/3, a = b != c.
     if (np.isclose(alpha, beta) and np.isclose(beta, np.pi/2) and
@@ -508,14 +563,11 @@ def get_sympts(lattice_centering, lattice_constants, lattice_angles):
                 return rhl2_sympts(alpha)
 
     # Monoclinic a,b <= c, alpha < pi/2, beta = gamma = pi/2, a != b != c
-    elif (a < c and b < c
-          and not (np.isclose(a,b) or np.isclose(b,c) or np.isclose(a,c))
-          and alpha < np.pi/2
-          and np.isclose(beta, gamma)
-          and np.isclose(gamma, np.pi/2)):
-        if lattice_centering == "prim":
+    elif (not (a > c or b > c) and np.isclose(beta, gamma) and
+          np.isclose(beta, np.pi/2) and alpha < np.pi/2):
+        if centering_type == "prim":
             return mcl_sympts(b, c, alpha)
-        elif lattice_centering == "base":
+        elif centering_type == "base":
             if kgamma > np.pi/2 or np.isclose(kgamma, np.pi/2):
                 return mclc12_sympts(a, b, c, alpha)
             
@@ -534,7 +586,7 @@ def get_sympts(lattice_centering, lattice_constants, lattice_angles):
         else:
             msg = ("Valid lattice centerings for monoclinic lattices "
                    "include 'prim' and 'base'")
-            raise ValueError(msg.format(lattice_centering))
+            raise ValueError(msg.format(centering_type))
         
     # Triclinic a != b != c, alpha != beta != gamma
     elif not (np.isclose(a,b) and np.isclose(b,c) and np.isclose(alpha,beta) and
@@ -552,67 +604,210 @@ def get_sympts(lattice_centering, lattice_constants, lattice_angles):
         msg = ("The lattice parameters provided don't correspond to a valid "
                "3D Bravais lattice.")
         raise ValueError(msg.format())
-    
 
-def rsym_pts(lat_type, a, lat_coords=False):
-    """Define the symmetry points in reciprocal space for a given real
-    space lattice.
+    
+def get_sympaths(centering_type, lattice_constants, lattice_angles):
+    """Find the symmetry paths for the provided lattice.
 
     Args:
-        lat_type (string): the type of real space lattice, e.g., fcc or bcc.
-        a (float): the lattice constant or characteristic spacing
-        of atoms on the lattice.
+        centering_type (str): the centering type for the lattice. Vaild
+            options include 'prim', 'base', 'body', and 'face'.
+        lattice_constants (list): a list of lattice constants [a, b, c].
+        lattice_angles (list): a list of lattice angles [alpha, beta, gamma].
 
-    Return:
-        (dict): A dictionary where a string of a lattice point is a
-        key and the coordinate of the lattice point is the value.
+    Returns:
+        (dict): a dictionary with a string of letters as the keys and lattice 
+            coordinates of the symmetry points ase values.
+
+    Example:
+        >>> lattice_constants = [4.05]*3
+        >>> lattice_angles = [numpy.pi/2]*3
+        >>> symmetry_points = get_sympts(lattice_constants, lattice_angles)
     """
-
-    if type(a) not in (float, int, np.float64):
-        raise ValueError("The lattice constant must be an int or float.")
     
-    if lat_coords == False:
-        if lat_type == "fcc":    
-            return {"G": [0,0,0],
-                    "X": [0, 2*np.pi/a, 0],
-                    "L": [np.pi/a, np.pi/a, np.pi/a],
-                    "W": [np.pi/a, 2*np.pi/a, 0],
-                    "U": [np.pi/(2*a), 2*np.pi/a, np.pi/(2*a)],
-                    "K": [3*np.pi/(2*a), 3*np.pi/(2*a),0]}
-        elif lat_type == "bcc":
-            return {"G": [0,0,0],
-                    "H": [0,0,2*np.pi/a],
-                    "P": [np.pi/a,np.pi/a,np.pi/a],
-                    "N": [0,np.pi/a,np.pi/a]}
-        elif lat_type == "sc":
-            return {"G": [0,0,0],
-                    "R": [np.pi/a,np.pi/a,np.pi/a],
-                    "X": [0,np.pi/a,0],
-                    "M": [np.pi/a,np.pi/a,0]}
+    a = float(lattice_constants[0])
+    b = float(lattice_constants[1])
+    c = float(lattice_constants[2])
+    
+    alpha = float(lattice_angles[0])
+    beta = float(lattice_angles[1])
+    gamma = float(lattice_angles[2])
+    
+    lattice_vectors = make_ptvecs(centering_type, lattice_constants,
+                                  lattice_angles)
+    reciprocal_lattice_vectors = make_rptvecs(lattice_vectors)
+    
+    rlat_veca = reciprocal_lattice_vectors[:,0] # individual reciprocal lattice vectors
+    rlat_vecb = reciprocal_lattice_vectors[:,1]
+    rlat_vecc = reciprocal_lattice_vectors[:,2]
+    
+    ka = norm(rlat_veca) # lengths of primitive reciprocal lattice vectors
+    kb = norm(rlat_vecb)
+    kc = norm(rlat_vecc)
+
+    # These are the angles between reciprocal lattice vectors.
+    kalpha = np.arccos(np.dot(rlat_vecb, rlat_vecc)/(kb*kc))
+    kbeta = np.arccos(np.dot(rlat_veca, rlat_vecc)/(ka*kc))
+    kgamma = np.arccos(np.dot(rlat_veca, rlat_vecb)/(ka*kb))
+
+    # Start with the cubic lattices, which have all angles equal to pi/2 radians.
+    if (np.isclose(alpha, np.pi/2) and
+        np.isclose(beta, np.pi/2) and
+        np.isclose(gamma, np.pi/2)):
+        if (np.isclose(a, b) and
+            np.isclose(b, c)):
+            if centering_type == "prim":
+                return [["G", "X"], ["X", "M"], ["M", "G"], ["G", "R"],
+                        ["R", "X"], ["M", "R"]]
+            elif centering_type == "body":
+                return [["G", "H"], ["H", "N"], ["N", "G"], ["G", "P"],
+                        ["P", "H"], ["P", "N"]]
+            elif centering_type == "face":
+                return [["G", "X"], ["X", "W"], ["W", "K"], ["K", "G"],
+                        ["G", "L"], ["L", "U"], ["U", "W"], ["W", "L"],
+                        ["L", "K"], ["U", "X"]]
+            else:
+                msg = ("Valid lattice centerings for cubic latices include "
+                       "'prim', 'body', and 'face'.")
+                raise ValueError(msg.format(centering_type))
+            
+        # Tetragonal.
+        elif (np.isclose(a,b) and not np.isclose(b,c)):
+            if centering_type == "prim":
+                return [["G", "X"], ["X", "M"], ["M", "G"], ["G", "Z"],
+                        ["Z", "R"], ["R", "A"], ["A", "Z"], ["X", "R"],
+                        ["M", "A"]]
+            elif centering_type == "body":
+                if c < a:
+                    return [["G", "X"], ["X", "M"], ["M", "G"], ["G", "Z"],
+                            ["Z", "P"], ["P", "N"], ["N", "Z1"], ["Z1", "M"],
+                            ["X", "P"]]
+                else:
+                    return [["G", "X"], ["X", "Y"], ["Y", "S"], ["S", "G"],
+                            ["G", "Z"], ["Z", "S1"], ["S1", "N"], ["N", "P"],
+                            ["P", "Y1"], ["Y1", "Z"], ["X", "P"]]
+            else:
+                msg = ("Valid lattice centerings for tetragonal lattices "
+                       "include 'prim' and 'body'.")
+                raise ValueError(msg.format(centering_type))
+            
+        # Last of the lattices with all angles equal to pi/2 is orthorhombic.
         else:
-            raise KeyError("Please provide a cubic lattice type.")
-    elif lat_coords == True:
-        if lat_type == "fcc":    
-            return {"G": [0., 0., 0.],
-                    "X": [0, 0.5, 0.5],
-                    "L": [0.5, 0.5, 0.5],
-                    "W": [0.25, 0.75, 0.5],
-                    "U": [0.25, 0.625, 0.625],
-                    "K": [0.375, 0.75, 0.375]}
-        elif lat_type == "bcc":
-            return {"G": [0., 0., 0.],
-                    "H": [-0.5, 0.5, 0.5],
-                    "P": [0.25, 0.25, 0.25],
-                    "N": [0, 0.5, 0]}
-        elif lat_type == "sc":
-            return {"G": [0., 0., 0.],
-                    "R": [0.5, 0.5, 0.5],
-                    "X": [0, 0.5, 0],
-                    "M": [0.5, 0.5, 0]}
+            if centering_type == "prim": # orc
+                return [["G", "X"], ["X", "S"], ["S", "Y"], ["Y", "G"],
+                        ["G", "Z"], ["Z", "U"], ["U", "R"], ["R", "T"],
+                        ["T", "Z"], ["Y", "T"], ["U", "X"], ["S", "R"]]
+            elif centering_type == "base": # orcc
+                return [["G", "X"], ["X", "S"], ["S", "R"], ["R", "A"],
+                        ["A", "Z"], ["Z", "G"], ["G", "Y"], ["Y", "X1"],
+                        ["X1", "A1"], ["A1", "T"], ["T", "Y"], ["Z", "T"]]
+            elif centering_type == "body": # orci
+                return [["G", "X"], ["X", "L"], ["L", "T"], ["T", "W"],
+                        ["W", "R"], ["R", "X1"], ["X1", "Z"], ["Z", "G"],
+                        ["G", "Y"], ["Y", "S"], ["S", "W"], ["L1", "Y"],
+                        ["Y1", "Z"]]
+            elif centering_type == "face":
+                if (1/a**2 > 1/b**2 +1/c**2): # orcf1
+                    return[["G", "Y"], ["Y", "T"], ["T", "Z"], ["Z", "G"],
+                           ["G", "X"], ["X", "A1"], ["A1", "Y"], ["T", "X1"],
+                           ["X", "A"], ["A", "Z"], ["L", "G"]]
+                elif np.isclose(1/a**2, 1/b**2 +1/c**2): # orcf3
+                    return [["G", "Y"], ["Y", "T"], ["T", "Z"], ["Z", "G"],
+                            ["G", "X"], ["X", "A1"], ["A1", "Y"], ["X", "A"],
+                            ["A", "Z"], ["L", "G"]]                    
+                else: #orcf2
+                    return [["G", "Y"], ["Y", "C"], ["C", "D"], ["D", "X"],
+                            ["X", "G"], ["G", "Z"], ["Z", "D1"], ["D1", "H"],
+                            ["H", "C"], ["C1", "Z"], ["X", "H1"], ["H", "Y"],
+                            ["L", "G"]]            
+            else:
+                msg = ("Valid lattice centerings for orthorhombic lattices "
+                       "include 'prim', 'base', 'body', and 'face'.")
+                raise ValueError(msg.format(centering_type))
+            
+    # Hexagonal has alpha = beta = pi/2, gamma = 2pi/3, a = b != c.
+    if (np.isclose(alpha, beta) and np.isclose(beta, np.pi/2) and
+        np.isclose(gamma, 2*np.pi/3) and np.isclose(a, b) and not
+        np.isclose(b, c)):
+        return [["G", "M"], ["M", "K"], ["K", "G"], ["G", "A"], ["A", "L"],
+                ["L", "H"], ["H", "A"], ["L", "M"], ["K", "H"]]
+
+    # Rhombohedral has equal angles and constants.
+    elif (np.isclose(alpha, beta) and np.isclose(beta, gamma) and 
+          np.isclose(a, b) and np.isclose(b, c)):
+            if alpha < np.pi/2: # RHL1
+                return [["G", "L"], ["L", "B1"], ["B", "Z"], ["Z", "G"],
+                        ["G", "X"], ["Q", "F"], ["F", "P1"], ["P1", "Z"],
+                        ["L", "P"]]
+            else: #RHL2
+                return [["G", "P"], ["P", "Z"], ["Z", "Q"], ["Q", "G"],
+                        ["G", "F"], ["F", "P1"], ["P1", "Q1"], ["Q1", "L"],
+                        ["L", "Z"]]
+
+    # Monoclinic a,b <= c, alpha < pi/2, beta = gamma = pi/2, a != b != c
+    elif (not (a > c or b > c) and np.isclose(beta, gamma) and
+          np.isclose(beta, np.pi/2) and alpha < np.pi/2):
+        if centering_type == "prim":
+            return [["G", "Y"], ["Y", "H"], ["H", "C"], ["C", "E"],
+                    ["E", "M1"], ["M1", "A"], ["A", "X"], ["X", "H1"],
+                    ["M", "D"], ["D", "Z"], ["Y", "D"]]
+        elif centering_type == "base": # MCLC1
+            if kgamma > np.pi/2:
+                return [["G", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
+                        ["I1", "Z"], ["Z", "F1"], ["Y", "X1"], ["X", "G"],
+                        ["G", "N"], ["M", "G"]]
+            elif np.isclose(kgamma, np.pi/2): # MCLC2
+                return [["G", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
+                        ["I1", "Z"], ["Z", "F1"], ["N", "G"], ["G", "M"]]
+            elif (kgamma < np.pi/2 # MCLC3
+                  and ((b*np.cos(alpha)/c + (b*np.sin(alpha)/a)**2) < 1)):
+                return [["G", "Y"], ["Y", "F"], ["F", "H"], ["H", "Z"],
+                        ["Z", "I"], ["I", "F1"], ["H1", "Y1"], ["Y1", "X"],
+                        ["X", "G"], ["G", "N"], ["M", "G"]]
+            elif (kgamma < np.pi/2 and # MCLC4
+                  np.isclose(b*np.cos(alpha)/c + (b*np.sin(alpha)/a)**2, 1)):
+                return [["G", "Y"], ["Y", "F"], ["F", "H"], ["H", "Z"], 
+                        ["Z", "I"], ["H1", "Y1"], ["Y1", "X"], ["X", "G"],
+                        ["G", "N"], ["M", "G"]]
+            elif (kgamma < np.pi/2 and # MCLC5
+                  (b*np.cos(alpha)/c + (b*np.sin(alpha)/a)**2) > 1.):
+                return [["G", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
+                        ["I1", "Z"], ["Z", "H"], ["H", "F1"], ["H1", "Y1"],
+                        ["Y1", "X"], ["X", "G"], ["G", "N"], ["M", "G"]]
+            else:
+                msg = "Something is wrong with the monoclinic lattice provided."
+                raise ValueError(msg.format(reciprocal_lattice_vectors))
         else:
-            raise KeyError("Please provide a cubic lattice type.")
+            msg = ("Valid lattice centerings for monoclinic lattices "
+                   "include 'prim' and 'base'")
+            raise ValueError(msg.format(centering_type))
+        
+    # Triclinic a != b != c, alpha != beta != gamma
+    elif not (np.isclose(a,b) and np.isclose(b,c) and np.isclose(a,c) and 
+              np.isclose(alpha,beta) and np.isclose(beta, gamma) and
+              np.isclose(alpha, gamma)):
+        kangles = np.sort([kalpha, kbeta, kgamma])
+        if kangles[0] > np.pi/2: # TRI1a
+            return [["X", "G"], ["G", "Y"], ["L", "G"], ["G", "Z"], ["N", "G"],
+                    ["G", "M"], ["R", "G"]]
+        elif kangles[2] < np.pi/2: #TRI1b
+            return [["X", "G"], ["G", "Y"], ["L", "G"], ["G", "Z"],
+                    ["N", "G"], ["G", "M"], ["R", "G"]]
+        elif (np.isclose(kangles[0], np.pi/2) and (kangles[1] > np.pi/2) and
+              (kangles[2] > np.pi/2)): #TRI2a
+            return [["X", "G"], ["G", "Y"], ["L", "G"], ["G", "Z"], ["N", "G"],
+                    ["G", "M"], ["R", "G"]]
+        elif (np.isclose(kangles[2], np.pi/2) and (kangles[0] < np.pi/2) and
+              (kangles[1] < np.pi/2)): #TRI2b
+            return [["X", "G"], ["G", "Y"], ["L", "G"], ["G", "Z"],
+                    ["N", "G"], ["G", "M"], ["R", "G"]]
+        else:
+            msg = "Something is wrong with the triclinic lattice provided."
+            raise ValueError(msg.format(reciprocal_lattice_vectors))
     else:
-        raise KeyError("lat_coords can either be True or False.")
+        msg = ("The lattice parameters provided don't correspond to a valid "
+               "3D Bravais lattice.")
+        raise ValueError(msg.format())
     
 def make_ptvecs(center_type, lat_consts, lat_angles):
     """Provided the lattice type, constants, and angles, return the primitive 
@@ -643,6 +838,13 @@ def make_ptvecs(center_type, lat_consts, lat_angles):
                          "array.")
     if type(lat_angles) not in (list, np.ndarray):
         raise ValueError("The lattice angles must be in a list or numpy array.")
+
+    if (np.sum(np.sort(lat_angles)[:2]) < max(lat_angles) or
+        np.isclose(np.sum(np.sort(lat_angles)[:2]), max(lat_angles))):
+        msg = ("The sum of the two smallest lattice angles must be greater than "
+               "the largest lattice angle for the lattice vectors to be "
+               "linearly independent.")
+        raise ValueError(msg.format(lat_angles))
 
     # Extract the angles
     alpha = float(lat_angles[0])
@@ -720,6 +922,14 @@ def make_ptvecs(center_type, lat_consts, lat_angles):
             av = .5*(avec + bvec)
             bv = .5*(-avec + bvec)
             cv = cvec
+        pt_vecs  = np.transpose(np.array([av, bv, cv], dtype=float))
+        return pt_vecs
+        
+    elif (not (a > c or b > c) and np.isclose(beta, gamma) and
+          np.isclose(beta, np.pi/2) and alpha < np.pi/2):
+        av = .5*(avec + bvec)
+        bv = .5*(-avec + bvec)
+        cv = cvec
         pt_vecs  = np.transpose(np.array([av, bv, cv], dtype=float))
         return pt_vecs
     
@@ -1074,7 +1284,6 @@ def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
     else:
         msg = "Please provide a valid lattice type."
         raise ValueError(msg.format(lattice_type))
-
     
 def sym_path(lat_type, npts, sym_pairs):
     """Create an array of coordinates between the provided symmetry points in
@@ -1257,7 +1466,11 @@ def find_full_orbitals(mesh_car, cell_vecs, coord = "cart"):
         nirr_kpts += 1
         mp_orbitals[nirr_kpts] = []
         for pg in pointgroup:
-            new_mp = np.dot(pg, mp)
+            # If the group operation moves the point outside the cell, %1 moves
+            # it back in.
+            # I ran into floating point precision problems the last time I ran
+            # %1. Just to be safe it's included here.
+            new_mp = np.round(np.dot(pg, mp), 12)%1.
             if any([np.allclose(new_mp, mc) for mc in mesh_copy]):
                 ind = np.where(np.array([np.allclose(new_mp, mc) for mc in mesh_copy]) == True)[0][0]
                 del mesh_copy[ind]
@@ -1277,3 +1490,146 @@ def find_full_orbitals(mesh_car, cell_vecs, coord = "cart"):
         raise ValueError("There is no method for the coordinate system provided yet.")
 
     return mp_orbitals
+
+def find_lattice_type(centering_type, lattice_constants, lattice_angles):
+    """Find the type of the Bravais lattice.
+
+    Args:
+        centering_type (str): how points are centered in the conventional
+            unit cell of the lattice. Options include 'prim', 'base', 'body',
+            and 'face'.
+        lattice_constants (list or numpy.ndarray): the axial lengths of the
+            conventional lattice vectors.
+        lattice_angles (list or numpy.ndarray): the interaxial angles of the
+            conventional lattice vectors.
+
+    Returns:
+        (str): the Bravais lattice type.
+    Example:
+        >>> centering_type = "prim
+        >>> lattice_constants = [1]*3
+        >>> lattice_angles = [numpy.pi/2]*3
+        >>> lattice_type = find_lattice_type(centering_type,
+                                             lattice_constants,
+                                             lattice_angles)
+    """
+    
+    # Extract parameters.
+    a = float(lattice_constants[0])
+    b = float(lattice_constants[1])
+    c = float(lattice_constants[2])
+    alpha = float(lattice_angles[0])
+    beta = float(lattice_angles[1])
+    gamma = float(lattice_angles[2])
+
+    # Lattices with all angles = pi/2.
+    if (np.isclose(alpha, beta) and np.isclose(beta, gamma) and
+        np.isclose(gamma, np.pi/2)):
+        # Check if it is a cubic lattice.
+        if (np.isclose(a,b) and np.isclose(b,c)):
+            if centering_type == "body":
+                return "body-centered cubic"
+            elif centering_type == "prim":
+                return "simple cubic"
+            elif centering_type == "face":
+                return "face-centered cubic"
+            else:
+                msg = ("Valid centering types for cubic lattices include "
+                       "'prim', 'body', and 'face'.")
+                raise ValueError(msg.format(centering_type))
+                
+        # Check if it is tetragonal.
+        elif (np.isclose(a,b) and not np.isclose(b,c)):
+            if centering_type == "prim":
+                return "tetragonal"
+            elif centering_type == "body":
+                return "body-centered tetragonal"
+            else:
+                msg = ("Valid centering types for tetragonal lattices include "
+                       "'prim' and 'body'.")
+                raise ValueError(msg.format(centering_type))
+            
+        # Check if it is orthorhombic
+        elif not (np.isclose(a,b) and np.isclose(b,c) and np.isclose(a,c)):
+            if centering_type == "body":
+                return "body-centered orthorhombic"
+            elif centering_type == "prim":
+                return "orthorhombic"
+            elif centering_type == "face":
+                return "face-centered orthorhombic"
+            elif centering_type == "base":
+                return "base-centered orthorhombic"
+            else:
+                msg = ("Valid centering types for orthorhombic lattices include "
+                       "'prim', 'base', 'body', and 'face'.")
+                raise ValueError(msg.format(centering_type))
+        else:
+            msg = ("The lattice constants provided do not appear to correspond "
+                   "to a Bravais lattice. They almost represent a cubic, "
+                   "tetragonal, or orthorhombic lattice.")
+            raise ValueError(msg.format(lattice_constants))
+        
+    # Check if it is rhombohedral.
+    elif (np.isclose(alpha, beta) and np.isclose(beta, gamma)):
+        if (np.isclose(a, b) and np.isclose(b,c)):
+            if centering_type == "prim":
+                return "rhombohedral"
+            else:
+                msg = ("The only valid centering type for rhombohedral lattices "
+                       "is 'prim'.")
+                raise ValueError(msg.format(centering_type))
+        else:
+            msg = ("None of the lattice constants should have the same value "
+                   "for a rhombohedral lattice")
+            raise ValueError(msg.format(lattice_constants))
+        
+    # Check if it is hexagonal.
+    elif (np.isclose(alpha, beta) and np.isclose(beta, np.pi/2) and
+          np.isclose(gamma, 2*np.pi/3)):
+          if (np.isclose(a, b) and not np.isclose(b, c)):
+            if centering_type == "prim":
+                return "hexagonal"
+            else:
+                msg = ("The only valid centering type for hexagonal lattices "
+                       "is 'prim'.")
+                raise ValueError(msg.format(centering_type))
+          else:
+              msg = ("For a hexagonal lattice, a = b != c.")
+              raise ValueError(msg.format(lattice_constants))
+          
+    # Check if it is monoclinic
+    # Monoclinic a,b <= c, alpha < pi/2, beta = gamma = pi/2, a != b != c
+    elif (np.isclose(beta, gamma) and np.isclose(beta, np.pi/2) and
+          (alpha < np.pi/2)):
+        if ((a < c or np.isclose(a, c)) and (b < c or np.isclose(b,c))):
+            if centering_type == "prim":
+                return "monoclinic"
+            elif centering_type == "base":
+                return "base-centered monoclinic"
+            else:
+                msg = ("Valid centering types for monoclinic lattices include "
+                       "'prim' and 'base'.")
+                raise ValueError(msg.format(centering_type))
+        else:
+            msg = ("The lattice constants of a monoclinic lattice should be "
+                   "arranged such that a, b <= c.")
+            raise ValueError(msg.format(lattice_constants))
+            
+    # Check if the lattice is triclinic.
+    elif not(np.isclose(alpha, beta) and np.isclose(beta, gamma) and
+             np.isclose(alpha, gamma)):
+        if (not np.isclose(a, b) and np.isclose(b, c) and np.isclose(a, c)):
+            if centering_type == "prim":
+                return "triclinic"
+            else:
+                msg = ("The onld valid centering type for triclinic "
+                       "lattices is 'prim'.")
+                raise ValueError(msg.format(centering_type))
+        else:
+            msg = ("None of the lattice constants are equivalent for a "
+                   "triclinic lattice.")
+            raise ValueError(msg.format(lattice_constants))
+    else:
+        msg = ("The lattice angles provided do not correspond to any Bravais "
+               "lattice type.")
+        raise ValueError(msg.format(lattice_angles))

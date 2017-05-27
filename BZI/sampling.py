@@ -531,3 +531,7 @@ def large_sphere_pts(A,r2,offset):
         else:
             continue                
     return grid
+
+
+
+

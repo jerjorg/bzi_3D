@@ -6,6 +6,8 @@ from BZI.sampling import make_grid
 from BZI.pseudopots import W1
 from BZI.integration import rectangle_method, monte_carlo
 from BZI.plots import PlotGrid
+
+
 class Convergence(object):
     """ Compare integrations of pseudo-potentials by creating convergence plots.
 
