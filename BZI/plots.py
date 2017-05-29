@@ -2,6 +2,7 @@
 """
 
 import numpy as np
+from numpy.linalg import norm
 import matplotlib.pyplot as plt
 import itertools
 from mpl_toolkits.mplot3d import Axes3D
@@ -192,129 +193,6 @@ def PlotMeshes(mesh_points_list, cell_vecs, atoms, offset = np.asarray([0.,0.,0.
     plt.show()
     return None
 
-def PlotBandStructure(materials_list, PPlist, PPargs_list, lat_type,
-                      lat_centering, lat_consts, lat_angles, sympt_pairs, npts,
-                      neigvals, energy_shift, elimits=False, fermi_level=False,
-                      save=False, show=True):
-    """Plot the band structure of a pseudopotential along symmetry paths.
-    
-    Args:
-        materials_list (str): a list of materials whose bandstructures will be 
-        plotted. The first string will label figures and files.
-        PPlist (function): a list of pseudopotenial functions.
-        PPargs_list (list): a list of pseudopotential arguments as dictionaries.
-        lat_type (str): the lattice type.
-        lat_const (float): the lattice constant.
-        sympt_pairs (list or numpy.ndarray): a list of symmetry point pairs.
-        npts (int): the number of points to plot along each symmetry line.
-        neigvals (int): the number of lower-most eigenvalues to include 
-        in the plot.
-        energy_shift (float): energy shift for band structure
-        elimits (list): the energy window for the plot.
-        fermi_level (float): if provided, the Fermi level will be included
-        in the plot.
-        save (bool): if true, the band structure will be saved.
-
-    Returns:
-        Display or save the band structure.
-    """
-    lat_vecs = make_ptvecs(lat_centering, lat_consts, lat_angles)
-    rlat_vecs = make_rptvecs(lat_vecs)
-
-    # k-points between symmetry point pairs in lattice coordinates.
-    lat_kpoints = sym_path(lat_type, npts, sympt_pairs)
-
-    # k-points between symmetry point pairs in cartesian coordinates.
-    car_kpoints = [np.dot(rlat_vecs,k) for k in lat_kpoints]
-
-    # Store the energy eigenvalues in an nested array.
-    nPP = len(PPlist)
-    energies = [[] for i in range(nPP)]
-    for i in range(nPP):
-        PP = PPlist[i]
-        PPargs = PPargs_list[i]
-        PPargs["neigvals"] = neigvals
-        for kpt in car_kpoints:
-            PPargs["kpoint"] = kpt
-            energies[i].append(PP(**PPargs) - energy_shift)
-
-    # Grab the symmetry points.
-    if lat_type == "fcc":
-        sympt_dict = fcc_sympts
-    elif lat_type == "bcc":
-        sympt_dict = bcc_sympts
-    elif lat_type == "sc":
-        sympt_dict = sc_sympts
-    else:
-        raise ValueError("Invalid lattice type")
-
-    # Flatten the list of symmetry point pairs.
-    sympts = [item for sublist in sympt_pairs for item in sublist]
-    # Remove all duplicate symmetry points
-    unique_sympts = [sympts[i] for i in range(0, len(sympts), 2)] + [sympts[-1]]
-    # Replace symbols representing points with their lattice coordinates.
-    lat_sympt_coords = [sympt_dict[sp] for sp in unique_sympts]
-    # Put the symmetry points in cartesian coordinates
-    car_sympt_coords = [np.dot(rlat_vecs,k) for k in lat_sympt_coords]
-
-    # Find the distances between symmetry points.
-    nsympts = len(unique_sympts)
-    sympt_dist = [0] + [np.linalg.norm(car_sympt_coords[i+1]
-                                       - car_sympt_coords[i])
-                        for i in range(nsympts - 1)]
-
-    # Create coordinates for plotting.
-    lines = []
-    for i in range(nsympts - 1):
-        start = np.sum(sympt_dist[:i+1])
-        stop = np.sum(sympt_dist[:i+2])
-        if i == (nsympts - 2):
-            lines += list(np.linspace(start, stop, npts))            
-        else:
-            lines += list(np.delete(np.linspace(start, stop, npts),-1))
-
-    # Plot the energy dispersion curves one at a time.
-    colors = ["green", "blue", "red", "violet", "orange", "cyan", "black"]
-    for i in range(nPP):        
-        for ne in range(neigvals):
-            ienergy = []
-            for nk in range(len(car_kpoints)):
-                ienergy.append(energies[i][nk][ne])
-            if ne == 0:
-                plt.plot(lines, ienergy, color=colors[i], label="%s"%materials_list[i])
-            else:
-                plt.plot(lines, ienergy, color=colors[i])
-
-    # Plot the Fermi level if provided.
-    if type(fermi_level) != bool:
-        plt.axhline(y = fermi_level, c="yellow", label="Fermi level")
-
-    # Plot a vertical line at the symmetry points with proper labels.
-    for i in range(nsympts):
-        pos = np.sum(sympt_dist[:i+1])
-        plt.axvline(x = pos, c="gray")        
-    tick_labels = unique_sympts
-    tick_locs = [np.sum(sympt_dist[:i+1]) for i in range(nsympts)]
-    plt.xticks(tick_locs,tick_labels)
-
-    # Adjust the energy range if one was provided.
-    if elimits:
-        plt.ylim(elimits)
-    
-    # Adjust the legend.
-    lgd = plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.xlim([0,np.sum(sympt_dist)])
-    plt.xlabel("Symmetry points")
-    plt.ylabel("Energy (eV)")
-    plt.title("%s Band Structure" %materials_list[0])
-    plt.grid(linestyle="dotted")
-    if save:
-        plt.savefig("%s_band_struct.pdf" %materials_list[0],
-                    bbox_extra_artists=(lgd,), bbox_inches='tight')
-    if show:
-        plt.show()
-    return None
-
 def PlotSphereMesh(mesh_points,r2, offset = np.asarray([0.,0.,0.]),
                    save=False, show=True):
     """Create a 3D scatter plot of a set of points inside a sphere.
@@ -370,6 +248,125 @@ def PlotSphereMesh(mesh_points,r2, offset = np.asarray([0.,0.,0.]),
     ax.set_zlim(-lim, lim)
     if save:
         plt.savefig("sphere_mesh.png")
+    if show:
+        plt.show()
+    return None
+
+def PlotBandStructure(materials_list, PPlist, PPargs_list, lattice, npts,
+                      neigvals, energy_shift, energy_limits=False, fermi_level=False,
+                      save=False, show=True):
+    """Plot the band structure of a pseudopotential along symmetry paths.
+    
+    Args:
+        materials_list (str): a list of materials whose bandstructures will be 
+        plotted. The first string will label figures and files.
+        PPlist (function): a list of pseudopotenial functions.
+        PPargs_list (list): a list of pseudopotential arguments as dictionaries.
+        lattice
+        npts (int): the number of points to plot along each symmetry line.
+        neigvals (int): the number of lower-most eigenvalues to include 
+        in the plot.
+        energy_shift (float): energy shift for band structure
+        energy_limits (list): the energy window for the plot.
+        fermi_level (float): if provided, the Fermi level will be included
+        in the plot.
+        save (bool): if true, the band structure will be saved.
+
+    Returns:
+        Display or save the band structure.
+    """
+    
+    # k-points between symmetry point pairs in lattice coordinates.
+    lat_kpoints = sym_path(lattice, npts)
+
+    # k-points between symmetry point pairs in cartesian coordinates.
+    car_kpoints = [np.dot(lattice.reciprocal_vectors, k) for k in lat_kpoints]
+
+    # Find the distance of each symmetry path by putting the symmetry point pairs 
+    # that make up a path in lattice coordinates, converting to Cartesian, and then
+    # taking the norm of the difference of the pairs.
+    lat_symmetry_paths = np.empty_like(lattice.symmetry_paths, dtype=list)
+    car_symmetry_paths = np.empty_like(lattice.symmetry_paths, dtype=list)
+    distances = []
+    
+    for i,path in enumerate(lattice.symmetry_paths):
+        for j,sympt in enumerate(path):
+            lat_symmetry_paths[i][j] = lattice.symmetry_points[sympt]
+            car_symmetry_paths[i][j] = np.dot(lattice.reciprocal_vectors,
+                                              lat_symmetry_paths[i][j])
+        distances.append(norm(car_symmetry_paths[i][1] - car_symmetry_paths[i][0]))
+
+    # Create coordinates for plotting.
+    lines = []
+    for i in range(len(distances)):
+        start = np.sum(distances[:i])
+        stop = np.sum(distances[:i+1])
+        if i == (len(distances) - 1):
+            lines += list(np.linspace(start, stop, npts))            
+        else:
+            lines += list(np.delete(np.linspace(start, stop, npts),-1))                
+            
+    # Store the energy eigenvalues in an nested array.
+    nPP = len(PPlist)
+    energies = [[] for i in range(nPP)]
+    for i in range(nPP):
+        PP = PPlist[i]
+        PPargs = PPargs_list[i]
+        PPargs["neigvals"] = neigvals
+        for kpt in car_kpoints:
+            PPargs["kpoint"] = kpt
+            energies[i].append(PP.eval(**PPargs) - energy_shift)
+            
+    # Find the x-axis labels and label locations.
+    plot_xlabels = [lattice.symmetry_paths[0][0]]
+    plot_xlabel_pos = [0.]
+    lattice.symmetry_paths
+    for i in range(len(lattice.symmetry_paths) - 1):
+        if (lattice.symmetry_paths[i][1] == lattice.symmetry_paths[i+1][0]):
+            plot_xlabels.append(lattice.symmetry_paths[i][1])
+            plot_xlabel_pos.append(np.sum(distances[:i+1]))
+        else:
+            plot_xlabels.append(lattice.symmetry_paths[i][1] + "|" + 
+                                lattice.symmetry_paths[i+1][0])
+            plot_xlabel_pos.append(np.sum(distances[:i+1]))
+    plot_xlabels.append(lattice.symmetry_paths[-1][1])
+    plot_xlabel_pos.append(np.sum(distances))    
+
+    # Plot the energy dispersion curves one at a time.
+    colors = ["green", "blue", "red", "violet", "orange", "cyan", "black"]
+    for i in range(nPP):        
+        for ne in range(neigvals):
+            ienergy = []
+            for nk in range(len(car_kpoints)):
+                ienergy.append(energies[i][nk][ne])
+            if ne == 0:
+                plt.plot(lines, ienergy, color=colors[i], label="%s"%materials_list[i])
+            else:
+                plt.plot(lines, ienergy, color=colors[i])
+
+    # Plot the Fermi level if provided.
+    if type(fermi_level) != bool:
+        plt.axhline(y = fermi_level, c="yellow", label="Fermi level")
+
+    # Plot a vertical line at the symmetry points with proper labels.
+    for pos in plot_xlabel_pos:
+        plt.axvline(x = pos, c="gray")
+    plt.xticks(plot_xlabel_pos, plot_xlabels)
+
+    # Adjust the energy range if one was provided.
+    if energy_limits:
+        plt.ylim(energy_limits)
+    
+    # Adjust the legend.
+    lgd = plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    plt.xlim([0,np.sum(distances)])
+    plt.xlabel("Symmetry points")
+    plt.ylabel("Energy (eV)")
+    plt.title("%s Band Structure" %materials_list[0])
+    plt.grid(linestyle="dotted")
+    if save:
+        plt.savefig("%s_band_struct.pdf" %materials_list[0],
+                    bbox_extra_artists=(lgd,), bbox_inches='tight')
     if show:
         plt.show()
     return None
@@ -527,8 +524,8 @@ def PlotVaspBandStructure(file_loc, material, lat_type, lat_consts, lat_angles,
 
     # Find the distances between symmetry points.
     nsympts = len(unique_sympts)
-    sympt_dist = [0] + [np.linalg.norm(car_sympt_coords[i+1]
-                                       - car_sympt_coords[i])
+    sympt_dist = [0] + [norm(car_sympt_coords[i+1]
+                             - car_sympt_coords[i])
                         for i in range(nsympts - 1)]
 
     # Create coordinates for plotting

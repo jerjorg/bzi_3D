@@ -25,3 +25,6 @@ Revision 0.0.3
 - Make unit tests for the symmetry paths functions.
 - Create a function that identifies the lattice type.
 - Create a lattice class that stores all variables related to the lattice.
+
+Revision 0.0.4
+- Add a class for the empirical pseudopotentials.

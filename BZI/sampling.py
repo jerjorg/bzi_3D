@@ -399,7 +399,6 @@ def make_grid(cell_vecs, grid_vecs, offset, cart=True):
                     grid.append(gpt - offset)
         return grid
                     
-
 def make_large_grid(cell_vectors, grid_vectors, offset, cart=True):
     """This function is similar to make_grid except it samples a volume
     that is larger and saves the points that are thrown away in make_grid.
@@ -449,14 +448,13 @@ def make_large_grid(cell_vectors, grid_vectors, offset, cart=True):
             null_grid.append(grid_pt)
     return (np.asarray(grid), np.asarray(null_grid))
 
-def sphere_pts(A,r2,offset):
+def sphere_pts(A,r2,offset=[0.,0.,0.]):
     """ Calculate all the points within a sphere that are 
     given by an integer linear combination of the columns of 
     A.
     
     Args:
-        A (numpy.ndarray): the grid basis with the columns 
-            representing basis vectors.
+        A (numpy.ndarray): the columns representing basis vectors.
         r2 (float): the squared radius of the sphere.
         offset(list or numpy.ndarray): a vector that points to the center
             of the sphere.
@@ -488,12 +486,12 @@ def sphere_pts(A,r2,offset):
                          range(-n[2] + oi[2], n[2] + oi[2])):
         pt = np.dot(A,[i,j,k])
         if np.dot(pt-offset,pt-offset) <= r2 + eps:
-            grid.append(pt)
+            grid.append(np.array(pt))
         else:
             continue                
     return grid
 
-def large_sphere_pts(A,r2,offset):
+def large_sphere_pts(A,r2,offset=[0.,0.,0.]):
     """ Calculate all the points within a sphere that are 
     given by an integer linear combination of the columns of 
     A.
@@ -532,6 +530,52 @@ def large_sphere_pts(A,r2,offset):
             continue                
     return grid
 
+# Wiley's code.
+def make_cell_points(lat_vecs, grid_vecs):
+    """Makes the points of a grid inside the volume of the lattice vectors.
+    
+    Args:
+        lat_vecs (numpy.ndarray): A matrix whose columns hold the basis vectors
+            of the lattice in Cartesian coordinates.
+        gridp_vecs (numpy.ndarray): A matrix whose columns hold the basis vectors
+            of the grid in Cartesian coordinates.
+            
+    Returns:
+        points (numpy.ndarray): The grid points inside the lattice expressed in
+            cartesian coordinates.
+    """
+    
+    diags = _get_HNF_diags(lat_vecs, grid_vecs)
+    
+    v1 = grid_vecs[:,0]
+    v2 = grid_vecs[:,1]
+    v3 = grid_vecs[:,2]
+    
+    points = []
+    for i in range(diags[0]):
+        for j in range(diags[1]):
+            for k in range(diags[2]):
+                points.append(np.dot(np.linalg.inv(lat_vecs),v1*i+v2*j+v3*k))
+                
+    points = np.array(points)%1
+    return points
 
-
-
+def _get_HNF_diags(lat_vecs, grid_vecs):
+    """Find the diagonals of the HNF that makes the grid vector's supercell form
+    the parent lattice.
+    
+    Args:
+        lat_vecs (numpy.ndarray): The parent lattice vectors as columns of a 
+            matrix.
+        grid_vecs (numpy.ndarray): The grid vectors as columns of a matrix.
+        
+    Returns:
+        HNF_diags (list): The diagonals of the HNF.
+    """
+    
+    parent = lat_vecs
+    super_cell = np.transpose(np.linalg.inv(grid_vecs))
+    HNF = np.dot(np.linalg.inv(parent),super_cell)
+    HNF_diags = np.diagonal(HNF)
+    
+    return [int(i) for i in HNF_diags]

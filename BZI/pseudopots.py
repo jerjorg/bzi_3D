@@ -5,45 +5,144 @@
 import itertools
 import numpy as np
 from numpy.linalg import norm
-from BZI.symmetry import shells, make_ptvecs, make_rptvecs
+from BZI.symmetry import shells, make_ptvecs, make_rptvecs, Lattice
 from BZI.sampling import sphere_pts
 
 # Conversions
 angstrom_to_Bohr = 1.889725989
 Ry_to_eV = 13.605698066
 
-# Define the reciprocal lattice points that contribute.
-def find_intvecs(a):
-    """Find all integer vectors whose squared magnitude is a given value.
-    
-    Args:
-        a (int): the squared magnitude of the desired vectors.
-    
-    Returns:
-        vecs (list): a list of vectors with the provided squared magnitude
-    """
+class EmpiricalPP(object):
+    """Create an empirical pseudopotential.
 
-    if a == 0:
-        return [[0,0,0]]
-    # Determine what integers to use for the components of the vectors.
-    allowed_ints = []
-    for i,j,k in itertools.product(range(-a, a), repeat=3):
-        # Exit the loop if the component 
-        if (i**2 + j**2 + k**2) == a:
-            allowed_ints.append([i,j,k])
-    return allowed_ints
+    Args:
+        lattice (:py:obj:`BZI.symmetry.lattice`): an instance of Lattice.
+        form_factors (list): a list of pseudopotential form factors. Every 
+            energy shell up to the cutoff energy should be accounted for.
+        energy_cutoff (float): the cutoff energy of the Fourier expansion.  
+        atomic_basis (list): a list of atomic positions.
+        energy_shift (float): an energy shift typically used to place the Fermi
+            level at the correct position.
+        fermi_level (float): the fermi level.
+
+    Attributes:
+        lattice (:py:obj:`BZI.symmetry.lattice`): an instance of Lattice.
+        form_factors (list): a list of pseudopotential form factors. Every 
+            energy shell up to the cutoff energy should be accounted for.
+        energy_cutoff (float): the cutoff energy of the Fourier expansion.  
+        rlat_pts (list): a list of reciprocal lattice points included in the 
+            Fourier expansion.
+        energy_shells (list): a list of spherical shells that points in rlat_pts
+            reside on.
+        atomic_basis (list): a list of atomic positions.
+        energy_shift (float): an energy shift typically used to place the Fermi
+            level at the correct position.
+        fermi_level (float): the fermi level.
+
+    Example:
+        >>> centering_type = "face"
+        >>> lat_const = 4.0
+        >>> lat_consts = [lat_const]*3
+        >>> lat_angles = [np.pi/2]*3
+        >>> lattice = Lattice(centering_type, lat_consts, lat_angles)
+        >>> pff = [0.019, 0.055]
+        >>> cutoff = 4*(2*np.pi/lat_const)**2
+        >>> atomic_basis = [0.,0.,0.]
+        >>> PP = EmpiricalPP(lattice, pff, cutoff, atomic_basis)
+    """
+    
+    def __init__(self, lattice, form_factors, energy_cutoff, atomic_positions,
+                 energy_shift, fermi_level):
+        self.lattice = lattice
+        self.form_factors = form_factors
+        self.energy_cutoff = energy_cutoff
+        if np.shape(atomic_positions) == (3,):
+            msg = ("Please provide a list of atomic positions instead of an "
+                   "individual atomic position.")
+            raise ValueError(msg.format(atomic_positions))
+        else:
+            self.atomic_positions = atomic_positions
+        self.atomic_positions = atomic_positions
+        self.rlat_pts = sphere_pts(lattice.reciprocal_vectors,
+                                    energy_cutoff)
+        self.find_energy_shells()
+        self.energy_shift = energy_shift or 0.
+        self.fermi_level = fermi_level or 0.
+
+    def find_energy_shells(self):
+        """Find the spherical shells of constant on which the points in
+        :py:data:`rlat_pts` reside. Return the radius squared of these shells.
+        """
+
+        shells = []
+        for rpt in self.rlat_pts:
+            r2 = np.dot(rpt, rpt)
+            if any(np.isclose(r2,shells)):
+                continue
+            else:
+                shells.append(r2)
+        self.energy_shells = np.sort(shells)[1:]
+        
+    def eval(self, kpoint, neigvals):
+        """Evaluate the empirical pseudopotential eigenvalues at the provided
+        k-point. Only return the lowest 'neigvals' eigenvalues.
+        """
+        
+        size = len(self.rlat_pts)
+        H = np.zeros([size, size], dtype=complex)
+        for i,rpt1 in enumerate(self.rlat_pts):
+            for j in range(i+1):
+                rpt2 = self.rlat_pts[j]
+                h = rpt2 - rpt1
+                r2 = np.dot(h,h)
+                for ap in self.atomic_positions:
+                    if i == j:
+                        H[i,j] = np.dot(kpoint + rpt1, kpoint + rpt1)
+                        break
+                    else:
+                        try:
+                            k = np.where(np.isclose(self.energy_shells, r2))[0][0]
+                            H[i,j] += self.form_factors[k]*np.exp(-1j*np.dot(h,ap))
+                        except:
+                            continue
+        return np.sort(np.linalg.eigvalsh(H))[:neigvals]*Ry_to_eV
+
+    def hamiltonian(self, kpoint):
+        """Evaluate the empirical pseudopotential Hamiltonian at the provided
+        k-point. This function is typically used to verify the Hamiltonian is 
+        Hermitian.
+        """
+        
+        size = len(self.rlat_pts)
+        H = np.zeros([size, size], dtype=complex)
+        for i,rpt1 in enumerate(self.rlat_pts):
+            for j,rpt2 in enumerate(self.rlat_pts):
+                h = rpt2 - rpt1
+                r2 = np.dot(h,h)
+                for ap in self.atomic_positions:
+                    if i == j:
+                        H[i,j] = np.dot(kpoint + rpt1, kpoint + rpt1)
+                        break
+                    else:
+                        try:
+                            k = np.where(np.isclose(self.energy_shells, r2))[0][0]
+                            H[i,j] = self.form_factors[k]*np.exp(-1j*np.dot(h,ap))
+                        except:
+                            continue
+        return H*Ry_to_eV
 
 #### Toy Pseudopotential ####
 Toy_lat_center = "prim"
-Toy_lat_const_list = [1., 1., 1.]
+Toy_lat_consts = [1., 1., 1.]
 Toy_lat_angles = [np.pi/2]*3
+Toy_lattice = Lattice(Toy_lat_center, Toy_lat_consts, Toy_lat_angles)
 # Toy lattice vectors
-Toy_lv = make_ptvecs(Toy_lat_center, Toy_lat_const_list, Toy_lat_angles)
-
-Toy_pff = [0.2]
-Toy_shells = [[0.,0.,0], [0.,0.,1.]]
-nested_shells = [shells(i, Toy_lv) for i in Toy_shells]
-Toy_rlat_pts = np.array(list(itertools.chain(*nested_shells)))
+# Toy_lv = make_ptvecs(Toy_lat_center, Toy_lat_const_list, Toy_lat_angles)
+# Toy_pff = [0.2]
+#Toy_shells = [[0.,0.,0], [0.,0.,1.]]
+#nested_shells = [shells(i, Toy_lv) for i in Toy_shells]
+#Toy_rlat_pts = np.array(list(itertools.chain(*nested_shells)))
+Toy_rlat_pts = sphere_pts(Toy_lattice.vectors, 1.)
 
 # The number of contributing reciprocal lattice points determines the size
 # of the Hamiltonian.
@@ -77,7 +176,7 @@ def ToyPP(kpt):
 
 #### Free electron Pseudopotential ####
 Free_lat_center = "prim"
-Free_lat_const_list = [1., 1., 1.]
+Free_lat_const_list = [1.]*3
 Free_lat_angles = [np.pi/2]*3
 # Free lattice vectors
 Free_lv = make_ptvecs(Free_lat_center, Free_lat_const_list, Free_lat_angles)
@@ -156,9 +255,9 @@ def Al_PP(kpoint,neigvals):
             n2 = norm(k2 - k1)**2
             if i == j:
                 Al_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 3*(2*np.pi/Al_lat_const)**2) == True:
+            elif np.isclose(n2, 3*(2*np.pi/Al_lat_const)**2):
                 Al_H[i,j] = Al_pff[0]
-            elif np.isclose(n2, 4*(2*np.pi/Al_lat_const)**2) == True:
+            elif np.isclose(n2, 4*(2*np.pi/Al_lat_const)**2):
                 Al_H[i,j] = Al_pff[1]
             else:
                 continue
@@ -252,7 +351,7 @@ Si_tau = Si_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
 # The pseudopotential form factors of Si
 Si_pff =   [-0.21, 0.04, 0.08]
 
-# The cutoff energy for the fourier expansion of wavefunction
+# The cutoff energy for the wavefunction Fourier expansion.
 Si_r = 11.*(2*np.pi/Si_lat_const)**2
 Si_rlat_pts = sphere_pts(Si_rlat_vecs, Si_r, [0,0,0]) # reciprocal lattice points
 Si_size = len(Si_rlat_pts)

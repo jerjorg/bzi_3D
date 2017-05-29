@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import time
 from BZI.symmetry import make_ptvecs
 from BZI.sampling import make_grid
-from BZI.pseudopots import W1
+from BZI.pseudopots import Al_PP
 from BZI.integration import rectangle_method, monte_carlo
 from BZI.plots import PlotGrid
 
@@ -45,7 +45,7 @@ class Convergence(object):
                  cell_constants=None, cell_angles=None, offset=None,
                  grid_types=None, grid_constants=None,
                  integration_methods=None, origin=None, random = None):
-        self.pseudo_potential = pseudo_potential or Al
+        self.pseudo_potential = pseudo_potential or Al_PP
         self.cutoff = cutoff or 4.
         self.cell_centering = cell_centering or "prim"
         self.cell_constants = cell_constants or [1.]*3

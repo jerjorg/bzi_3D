@@ -55,6 +55,8 @@ class Lattice(object):
         self.centering = centering_type
         self.constants = lattice_constants
         self.angles = lattice_angles
+        self.type = find_lattice_type(centering_type, lattice_constants,
+                                      lattice_angles)        
         self.vectors = make_ptvecs(centering_type, lattice_constants,
                                    lattice_angles)
         self.reciprocal_vectors = make_rptvecs(self.vectors)
@@ -63,8 +65,6 @@ class Lattice(object):
                                           lattice_angles)
         self.symmetry_paths = get_sympaths(centering_type, lattice_constants,
                                          lattice_angles)
-        self.type = find_lattice_type(centering_type, lattice_constants,
-                                      lattice_angles)
 
 # Define the symmetry points for a simple-cubic lattice in lattice coordinates.
 sc_sympts = {"G": [0. ,0., 0.],
@@ -1284,34 +1284,24 @@ def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
     else:
         msg = "Please provide a valid lattice type."
         raise ValueError(msg.format(lattice_type))
-    
-def sym_path(lat_type, npts, sym_pairs):
-    """Create an array of coordinates between the provided symmetry points in
-    reciprocal space in lattice coordinates.
+
+def sym_path(lattice, npts):
+    """Create an array of lattice coordinates along the symmetry paths of 
+    the lattice.
 
     Args:
-        lat_type (str): the lattice type in real space
-        npts (int): the number of coordinates to create between the symmetry
-            points.
-        sym_pair (numpy.array): an array of point coordinates.
-
+        lattice (:py:obj:`BZI.symmetry.Lattice`): an instance of the Lattice
+            class.
+        npts (int): the number of points on each symmetry path.
     Return:
-        (numpy.array): an array of lattice coordinates along a line connecting
-            two symmetry points.
-    """
+        (numpy.array): an array of lattice coordinates along the symmetry
+            paths.
+    """    
     
-    if lat_type is "bcc":
-        dict = bcc_sympts
-    elif lat_type is "fcc":
-        dict = fcc_sympts
-    elif lat_type is "sc":
-        dict = sc_sympts
-    else:
-        raise ValueError("Invalid lattice type")
     paths = []
-    for i,sym_pair in enumerate(sym_pairs):
-        sym_pti = dict[sym_pair[0]]
-        sym_ptf = dict[sym_pair[1]]
+    for i,sym_pair in enumerate(lattice.symmetry_paths):
+        sym_pti = lattice.symmetry_points[sym_pair[0]]
+        sym_ptf = lattice.symmetry_points[sym_pair[1]]
 
         pxi = sym_pti[0]
         pxf = sym_ptf[0]
@@ -1328,7 +1318,8 @@ def sym_path(lat_type, npts, sym_pairs):
         else:
             del ipath[0]
             paths += ipath
-    return paths
+
+    return paths    
 
 def point_group(lat_vecs):
     """Return the point group of a lattice.
