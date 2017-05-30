@@ -252,9 +252,9 @@ def PlotSphereMesh(mesh_points,r2, offset = np.asarray([0.,0.,0.]),
         plt.show()
     return None
 
-def PlotBandStructure(materials_list, PPlist, PPargs_list, lattice, npts,
-                      neigvals, energy_shift, energy_limits=False, fermi_level=False,
-                      save=False, show=True):
+def plot_band_structure(materials_list, PPlist, PPargs_list, lattice, npts,
+                        neigvals, energy_shift=0.0, energy_limits=False,
+                        fermi_level=False, save=False, show=True):
     """Plot the band structure of a pseudopotential along symmetry paths.
     
     Args:

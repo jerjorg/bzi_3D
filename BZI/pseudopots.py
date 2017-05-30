@@ -52,7 +52,7 @@ class EmpiricalPP(object):
     """
     
     def __init__(self, lattice, form_factors, energy_cutoff, atomic_positions,
-                 energy_shift, fermi_level):
+                 energy_shift=None, fermi_level=None):
         self.lattice = lattice
         self.form_factors = form_factors
         self.energy_cutoff = energy_cutoff
@@ -131,6 +131,130 @@ class EmpiricalPP(object):
                             continue
         return H*Ry_to_eV
 
+class CohenEmpiricalPP(object):
+    """Create an empirical pseudopotential after Cohen's derivation.
+
+    Args:
+        lattice (:py:obj:`BZI.symmetry.lattice`): an instance of Lattice.
+        sym_form_factors (list): a list of symmetric, pseudopotential form 
+            factors. Every energy shell up to the cutoff energy should be
+            accounted for.
+        antisym_form_factors (list): a list of anti-symmetric, pseudopotential
+            form factors. Every energy shell up to the cutoff energy should be 
+            accounted for.
+        energy_cutoff (float): the cutoff energy of the Fourier expansion.  
+        atomic_basis (list): a list of atomic positions.
+        energy_shift (float): an energy shift typically used to place the Fermi
+            level at the correct position.
+        fermi_level (float): the fermi level.
+
+    Attributes:
+        lattice (:py:obj:`BZI.symmetry.lattice`): an instance of Lattice.
+        sym_form_factors (list): a list of symmetric, pseudopotential form 
+            factors. Every energy shell up to the cutoff energy should be
+            accounted for.
+        antisym_form_factors (list): a list of anti-symmetric, pseudopotential
+            form factors. Every energy shell up to the cutoff energy should be 
+            accounted for.
+        energy_cutoff (float): the cutoff energy of the Fourier expansion.  
+        rlat_pts (list): a list of reciprocal lattice points included in the 
+            Fourier expansion.
+        energy_shells (list): a list of spherical shells that points in rlat_pts
+            reside on.
+        atomic_basis (list): a list of atomic positions.
+        energy_shift (float): an energy shift typically used to place the Fermi
+            level at the correct position.
+        fermi_level (float): the fermi level.
+    """
+    
+    def __init__(self, lattice, sym_form_factors, antisym_form_factors,
+                 energy_cutoff, atomic_positions, energy_shift=None,
+                 fermi_level=None):
+        self.lattice = lattice
+        self.sym_form_factors = sym_form_factors
+        self.antisym_form_factors = antisym_form_factors
+        self.energy_cutoff = energy_cutoff
+        if np.shape(atomic_positions) == (3,):
+            msg = ("Please provide a list of atomic positions instead of an "
+                   "individual atomic position.")
+            raise ValueError(msg.format(atomic_positions))
+        else:
+            self.atomic_positions = atomic_positions
+        self.atomic_positions = atomic_positions
+        self.rlat_pts = sphere_pts(lattice.reciprocal_vectors,
+                                    energy_cutoff)
+        self.find_energy_shells()
+        self.energy_shift = energy_shift or 0.
+        self.fermi_level = fermi_level or 0.
+
+    def find_energy_shells(self):
+        """Find the spherical shells of constant energy on which the points in
+        :py:data:`rlat_pts` reside. Return the radius squared of these shells.
+        """
+
+        shells = []
+        for rpt in self.rlat_pts:
+            r2 = np.dot(rpt, rpt)
+            if any(np.isclose(r2,shells)):
+                continue
+            else:
+                shells.append(r2)
+        self.energy_shells = np.sort(shells)[1:]
+        
+    def eval(self, kpoint, neigvals):
+        """Evaluate the empirical pseudopotential eigenvalues at the provided
+        k-point. Only return the lowest 'neigvals' eigenvalues.
+        """
+        
+        size = len(self.rlat_pts)
+        H = np.zeros([size, size], dtype=complex)
+        for i,rpt1 in enumerate(self.rlat_pts):
+            for j in range(i+1):
+                rpt2 = self.rlat_pts[j]
+                h = rpt2 - rpt1
+                r2 = np.dot(h,h)
+                for ap in self.atomic_positions:
+                    if i == j:
+                        H[i,j] = np.dot(kpoint + rpt1, kpoint + rpt1)
+                        break
+                    else:
+                        try:
+                            k = np.where(np.isclose(self.energy_shells, r2))[0][0]
+                            H[i,j] = self.sym_form_factors[k]*(
+                                np.cos(np.dot(h,ap))) + (
+                                    1j*self.antisym_form_factors[k]*(
+                                        np.sin(np.dot(h,ap))))
+                        except:
+                            continue
+        return np.sort(np.linalg.eigvalsh(H))[:neigvals]*Ry_to_eV
+
+    def hamiltonian(self, kpoint):
+        """Evaluate the empirical pseudopotential Hamiltonian at the provided
+        k-point. This function is typically used to verify the Hamiltonian is 
+        Hermitian.
+        """
+        
+        size = len(self.rlat_pts)
+        H = np.zeros([size, size], dtype=complex)
+        for i,rpt1 in enumerate(self.rlat_pts):
+            for j,rpt2 in enumerate(self.rlat_pts):
+                h = rpt2 - rpt1
+                r2 = np.dot(h,h)
+                for ap in self.atomic_positions:
+                    if i == j:
+                        H[i,j] = np.dot(kpoint + rpt1, kpoint + rpt1)
+                        break
+                    else:
+                        try:
+                            k = np.where(np.isclose(self.energy_shells, r2))[0][0]
+                            H[i,j] = self.sym_form_factors[k]*(
+                                np.cos(np.dot(h, ap))) + (
+                                    1j*self.antisym_form_factors[k]*
+                                    np.sin(np.dot(h, ap)))
+                        except:
+                            continue
+        return H*Ry_to_eV
+    
 #### Toy Pseudopotential ####
 Toy_lat_center = "prim"
 Toy_lat_consts = [1., 1., 1.]
@@ -213,104 +337,6 @@ def W2(spt):
     
     return[-np.cos(np.sum([np.cos(2*np.pi*pt) for pt in spt]))]
 
-#### Pseudopotential of Al ####
-
-# Define the pseudopotential form factors taken from Ashcroft for Al.
-Al_pff = [0.0179, 0.0562]
-Al_lat_const = 7.65339025545
-Al_lat_type = "fcc"
-Al_lat_const_list = [Al_lat_const]*3
-Al_lat_angles = [np.pi/2]*3
-Al_lat_centering = "face"
-Al_lat_vecs = make_ptvecs(Al_lat_centering, Al_lat_const_list, Al_lat_angles)
-Al_rlat_vecs = make_rptvecs(Al_lat_vecs)
-Al_cutoff = 4*(2*np.pi/Al_lat_const)**2
-Al_rlat_pts = sphere_pts(Al_rlat_vecs, Al_cutoff, [0,0,0])
-
-# The number of contributing reciprocal lattice points determines the size
-# of the Hamiltonian.
-Al_size = len(Al_rlat_pts)
-# Al_shift = 10.65942710893091139
-
-def Al_PP(kpoint,neigvals):
-    """Evaluate an Al pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from 
-    `Ashcroft <http://journals.aps.org/pr/abstract/10.1103/PhysRev.116.555`_.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian at the provided
-        k-point.
-    """
-    # Initialize the Al Hamiltonian.
-    Al_H = np.zeros([Al_size, Al_size])
-    
-    # Construct the Al Hamiltonian.
-    for i in range(Al_size):
-        k1 = np.asarray(Al_rlat_pts[i])
-        for j in range(i + 1):
-            k2 = np.asarray(Al_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Al_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 3*(2*np.pi/Al_lat_const)**2):
-                Al_H[i,j] = Al_pff[0]
-            elif np.isclose(n2, 4*(2*np.pi/Al_lat_const)**2):
-                Al_H[i,j] = Al_pff[1]
-            else:
-                continue
-    return np.sort(np.linalg.eigvalsh(Al_H))[:neigvals]*Ry_to_eV # - Al_shift
-
-def customAl_PP(kpoint, neigvals, Al_cutoff=21*(2*np.pi/Al_lat_const)**2,
-               shift=True, matrix=False):
-    """Evaluate an Al pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Ashcroft.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Al_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        Al_rlat_pts = sphere_pts(Al_rlat_vecs, Al_cutoff, kpoint)
-    else:
-        Al_rlat_pts = sphere_pts(Al_rlat_vecs, Al_cutoff, [0,0,0])
-    Al_size = len(Al_rlat_pts)
-
-    # Initialize the Al Hamiltonian.
-    Al_H = np.zeros([Al_size, Al_size])
-    
-    # Populate the Al Hamiltonian.
-    for i in range(Al_size):
-        k1 = np.asarray(Al_rlat_pts[i])
-        for j in range(Al_size):
-            k2 = np.asarray(Al_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Al_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 3*(2*np.pi/Al_lat_const)**2) == True:
-                Al_H[i,j] = Al_pff[0]
-            elif np.isclose(n2, 4*(2*np.pi/Al_lat_const)**2) == True:
-                Al_H[i,j] = Al_pff[1]
-            else:
-                continue
-    if matrix:
-        return Al_H*Ry_to_eV # - Al_shift
-    else:
-        return np.sort(np.linalg.eigvalsh(Al_H))[:neigvals]*Ry_to_eV # - Al_shift
-
 #### 
 # Pseudo-potential from Band Structures and Pseudopotential Form Factors for
 # Fourteen Semiconductors of the Diamond. and. Zinc-blende Structures* by
@@ -337,2305 +363,316 @@ InSb_pff = [-0.20, 0.00, 0.04, 0.06, 0.05, 0.01]
 ZnS_pff =  [-0.22, 0.03, 0.07, 0.24, 0.14, 0.04]
 ZnSe_pff = [-0.23, 0.01, 0.06, 0.18, 0.12, 0.03]
 ZnTe_pff = [-0.22, 0.00, 0.05, 0.13, 0.10, 0.01]
-CdTe_pff = [-0.20, 0.00, 0.04, 0.15, 0.09, 0.04]    
+CdTe_pff = [-0.20, 0.00, 0.04, 0.15, 0.09, 0.04]
+
+# Here the pseudopotential form factors are reorganized to work with the code.
+# radius       3     4     8    11
+Si_spff =    [-0.21, 0.00, 0.04, 0.08]
+Si_apff =    [0.00, 0.00, 0.00, 0.00]
+Ge_spff =    [-0.23, 0.00, 0.01, 0.06]
+Ge_apff =    [0.00, 0.00, 0.00, 0.00]
+Sn_spff =    [-0.20, 0.00, 0.00, 0.04]
+Sn_apff =    [0.00, 0.00, 0.00, 0.00]
+GaP_spff =   [-0.22, 0.00, 0.03, 0.07]
+GaP_apff =   [0.12, 0.07, 0.00, 0.02]
+GaAs_spff =  [-0.23, 0.00, 0.01, 0.06]
+GaAs_apff =  [0.07, 0.05, 0.00, 0.01]
+AlSb_spff =  [-0.21, 0.00, 0.02, 0.06]
+AlSb_apff =  [0.06, 0.04, 0.00, 0.02]
+InP_spff =   [-0.23, 0.00, 0.01, 0.06]
+InP_apff =   [0.07, 0.05, 0.00, 0.01]
+GaSb_spff =  [-0.22, 0.00, 0.00, 0.05]
+GaSb_apff =  [0.06, 0.05, 0.00, 0.01]
+InAs_spff =  [-0.22, 0.00, 0.00, 0.05]
+InAs_apff =  [0.08, 0.05, 0.00, 0.03]
+InSb_spff =  [-0.20, 0.00, 0.00, 0.04]
+InSb_apff =  [0.06, 0.05, 0.00, 0.01]
+ZnS_spff =   [-0.22, 0.00, 0.03, 0.07]
+ZnS_apff =   [0.24, 0.14, 0.00, 0.04]
+ZnSe_spff =  [-0.23, 0.00, 0.01, 0.06]
+ZnSe_apff =  [0.18, 0.12, 0.00, 0.03]
+ZnTe_spff =  [-0.22, 0.00, 0.00, 0.05]
+ZnTe_apff =  [0.13, 0.10, 0.00, 0.01]
+CdTe_spff =  [-0.20, 0.00, 0.00, 0.04]
+CdTe_apff =  [0.15, 0.09, 0.00, 0.04]    
 
 #### Pseudopotential of Si ####
 Si_lat_centering = "face"
 Si_lat_const = 5.43*angstrom_to_Bohr # the lattice constant in Bohr
-Si_lat_const_list = [Si_lat_const]*3
+Si_lat_consts = [Si_lat_const]*3
 Si_lat_angles = [np.pi/2]*3
-Si_lat_vecs = make_ptvecs(Si_lat_centering, Si_lat_const_list, Si_lat_angles)
-Si_rlat_vecs = make_rptvecs(Si_lat_vecs)
-Si_tau = Si_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
+Si_lattice = Lattice(Si_lat_centering, Si_lat_consts, Si_lat_angles)
 
-# The pseudopotential form factors of Si
-Si_pff =   [-0.21, 0.04, 0.08]
-
-# The cutoff energy for the wavefunction Fourier expansion.
 Si_r = 11.*(2*np.pi/Si_lat_const)**2
-Si_rlat_pts = sphere_pts(Si_rlat_vecs, Si_r, [0,0,0]) # reciprocal lattice points
-Si_size = len(Si_rlat_pts)
-# Si_shift = 10.4864461
-
-def Si_PP(kpoint, neigvals):
-    """Find the eigenvalues of a Hamiltonian matrix built to match the
-    band structure of Si.
-    
-    Args:
-        kpoint (list or numpy.ndarray): a point in k-space.
-        neigvals (int): the number of returned eigenvalues in increasing
-            order.
-        
-    Returns:
-        eigvals (np.ndarray): the eigenvalues of the Hamiltonian matrix.
-    """
-
-    # Initialize the Hamiltonian.
-    H = np.zeros((Si_size, Si_size),dtype=complex)
-
-    # Populate the Hamiltonian.
-    for i in range(Si_size):
-        for j in range(i + 1):
-            h = (Si_rlat_pts[j] - Si_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + Si_rlat_pts[i], kpoint + Si_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/Si_lat_const)**2):
-                H[i,j] = Si_pff[0]*np.cos(np.dot(h,Si_tau))
-            if np.isclose(np.dot(h,h), 8*(2*np.pi/Si_lat_const)**2):
-                H[i,j] = Si_pff[1]*np.cos(np.dot(h,Si_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/Si_lat_const)**2):
-                H[i,j] = Si_pff[2]*np.cos(np.dot(h,Si_tau))
-            else:
-                continue
-            
-    return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - Si_shift
-
-def customSi_PP(kpoint, neigvals, Si_cutoff, shift=True, matrix=False):
-    """Evaluate a Si pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Cohen.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Al_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        Si_rlat_pts = sphere_pts(Si_rlat_vecs, Si_r, kpoint) # reciprocal lattice points
-    else:
-        Si_rlat_pts = sphere_pts(Si_rlat_vecs, Si_r, [0,0,0]) # reciprocal lattice points
-
-    Si_size = len(Si_rlat_pts)
-    H = np.zeros((Si_size, Si_size), dtype=complex)
-    
-    for i in range(Si_size):
-        for j in range(Si_size):
-            h = (Si_rlat_pts[j] - Si_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + Si_rlat_pts[i], kpoint + Si_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/Si_lat_const)**2):
-                H[i,j] = Si_pff[0]*np.cos(np.dot(h,Si_tau))
-            if np.isclose(np.dot(h,h), 8*(2*np.pi/Si_lat_const)**2):
-                H[i,j] = Si_pff[1]*np.cos(np.dot(h,Si_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/Si_lat_const)**2):
-                H[i,j] = Si_pff[2]*np.cos(np.dot(h,Si_tau))
-            else:
-                continue
-    if matrix:
-        return H*Ry_to_eV # - Si_shift
-    else:
-        return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - Si_shift
-
+Si_tau = [Si_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
+Si_PP = CohenEmpiricalPP(Si_lattice, Si_spff, Si_apff, Si_r, Si_tau)
 
 #### Pseudopotential of Ge ####
 Ge_lat_centering = "face"
 Ge_lat_const = 5.66*angstrom_to_Bohr # the lattice constant in Bohr
-Ge_lat_const_list = [Ge_lat_const]*3
+Ge_lat_consts = [Ge_lat_const]*3
 Ge_lat_angles = [np.pi/2]*3
-Ge_lat_vecs = make_ptvecs(Ge_lat_centering, Ge_lat_const_list, Ge_lat_angles)
-Ge_rlat_vecs = make_rptvecs(Ge_lat_vecs)
-Ge_tau = Ge_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
+Ge_lattice = Lattice(Ge_lat_centering, Ge_lat_consts, Ge_lat_angles)
 
-# The pseudopotential form factors of Ge
-Ge_pff =   [-0.23, 0.01, 0.06]
-
-# The cutoff energy for the fourier expansion of wavefunction
 Ge_r = 11.*(2*np.pi/Ge_lat_const)**2
-Ge_rlat_pts = sphere_pts(Ge_rlat_vecs, Ge_r, [0,0,0]) # reciprocal lattice points
-Ge_size = len(Ge_rlat_pts)
-# Ge_shift = 10.4864461
-
-def Ge_PP(kpoint, neigvals):
-    """Find the eigenvalues of a Hamiltonian matrix built to match the
-    band structure of Ge.
-    
-    Args:
-        kpoint (list or numpy.ndarray): a point in k-space.
-        neigvals (int): the number of returned eigenvalues in increasing
-            order.
-        
-    Returns:
-        eigvals (np.ndarray): the eigenvalues of the Hamiltonian matrix.
-    """
-
-    # Initialize the Hamiltonian.
-    H = np.zeros((Ge_size, Ge_size),dtype=complex)
-
-    # Populate the Hamiltonian.
-    for i in range(Ge_size):
-        for j in range(i + 1):
-            h = (Ge_rlat_pts[j] - Ge_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + Ge_rlat_pts[i], kpoint + Ge_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/Ge_lat_const)**2):
-                H[i,j] = Ge_pff[0]*np.cos(np.dot(h,Ge_tau))
-            if np.isclose(np.dot(h,h), 8*(2*np.pi/Ge_lat_const)**2):
-                H[i,j] = Ge_pff[1]*np.cos(np.dot(h,Ge_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/Ge_lat_const)**2):
-                H[i,j] = Ge_pff[2]*np.cos(np.dot(h,Ge_tau))
-            else:
-                continue
-            
-    return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - Ge_shift
-
-def customGe_PP(kpoint, neigvals, Ge_cutoff, shift=True, matrix=False):
-    """Evaluate a Ge pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Cohen.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Al_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        Ge_rlat_pts = sphere_pts(Ge_rlat_vecs, Ge_r, kpoint) # reciprocal lattice points
-    else:
-        Ge_rlat_pts = sphere_pts(Ge_rlat_vecs, Ge_r, [0,0,0]) # reciprocal lattice points
-
-    Ge_size = len(Ge_rlat_pts)
-    H = np.zeros((Ge_size, Ge_size),dtype=complex)
-    
-    for i in range(Ge_size):
-        for j in range(Ge_size):
-            h = (Ge_rlat_pts[j] - Ge_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + Ge_rlat_pts[i], kpoint + Ge_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/Ge_lat_const)**2):
-                H[i,j] = Ge_pff[0]*np.cos(np.dot(h,Ge_tau))
-            if np.isclose(np.dot(h,h), 8*(2*np.pi/Ge_lat_const)**2):
-                H[i,j] = Ge_pff[1]*np.cos(np.dot(h,Ge_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/Ge_lat_const)**2):
-                H[i,j] = Ge_pff[2]*np.cos(np.dot(h,Ge_tau))
-            else:
-                continue
-    if matrix:
-        return H*Ry_to_eV # - Ge_shift
-    else:
-        return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - Ge_shift
-
+Ge_tau = [Ge_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
+Ge_PP = CohenEmpiricalPP(Ge_lattice, Ge_spff, Ge_apff, Ge_r, Ge_tau)
 
 #### Pseudopotential of Sn ####
 Sn_lat_centering = "face"
 Sn_lat_const = 6.49*angstrom_to_Bohr # the lattice constant in Bohr
-Sn_lat_const_list = [Sn_lat_const]*3
+Sn_lat_consts = [Sn_lat_const]*3
 Sn_lat_angles = [np.pi/2]*3
-Sn_lat_vecs = make_ptvecs(Sn_lat_centering, Sn_lat_const_list, Sn_lat_angles)
-Sn_rlat_vecs = make_rptvecs(Sn_lat_vecs)
-Sn_tau = Sn_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
+Sn_lattice = Lattice(Sn_lat_centering, Sn_lat_consts, Sn_lat_angles)
 
-# The pseudopotential form factors of Sn
-Sn_pff =   [-0.20, 0.00, 0.04]
-
-# The cutoff energy for the fourier expansion of wavefunction
 Sn_r = 11.*(2*np.pi/Sn_lat_const)**2
-Sn_rlat_pts = sphere_pts(Sn_rlat_vecs, Sn_r, [0,0,0]) # reciprocal lattice points
-Sn_size = len(Sn_rlat_pts)
-# Sn_shift = 10.4864461
-
-def Sn_PP(kpoint, neigvals):
-    """Find the eigenvalues of a Hamiltonian matrix built to match the
-    band structure of Sn.
-    
-    Args:
-        kpoint (list or numpy.ndarray): a point in k-space.
-        neigvals (int): the number of returned eigenvalues in increasing
-            order.
-        
-    Returns:
-        eigvals (np.ndarray): the eigenvalues of the Hamiltonian matrix.
-    """
-
-    # Initialize the Hamiltonian.
-    H = np.zeros((Sn_size, Sn_size),dtype=complex)
-
-    # Populate the Hamiltonian.
-    for i in range(Sn_size):
-        for j in range(i + 1):
-            h = (Sn_rlat_pts[j] - Sn_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + Sn_rlat_pts[i], kpoint + Sn_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/Sn_lat_const)**2):
-                H[i,j] = Sn_pff[0]*np.cos(np.dot(h,Sn_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/Sn_lat_const)**2):
-                H[i,j] = Sn_pff[2]*np.cos(np.dot(h,Sn_tau))
-            else:
-                continue
-            
-    return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - Sn_shift
-
-def customSn_PP(kpoint, neigvals, Sn_cutoff, shift=True, matrix=False):
-    """Evaluate a Sn pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Cohen.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Al_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        Sn_rlat_pts = sphere_pts(Sn_rlat_vecs, Sn_r, kpoint) # reciprocal lattice points
-    else:
-        Sn_rlat_pts = sphere_pts(Sn_rlat_vecs, Sn_r, [0,0,0]) # reciprocal lattice points
-
-    Sn_size = len(Sn_rlat_pts)
-    H = np.zeros((Sn_size, Sn_size),dtype=complex)
-    
-    for i in range(Sn_size):
-        for j in range(Sn_size):
-            h = (Sn_rlat_pts[j] - Sn_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + Sn_rlat_pts[i], kpoint + Sn_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/Sn_lat_const)**2):
-                H[i,j] = Sn_pff[0]*np.cos(np.dot(h,Sn_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/Sn_lat_const)**2):
-                H[i,j] = Sn_pff[2]*np.cos(np.dot(h,Sn_tau))
-            else:
-                continue
-    if matrix:
-        return H*Ry_to_eV # - Sn_shift
-    else:
-        return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - Sn_shift
-
+Sn_tau = [Sn_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
+Sn_PP = CohenEmpiricalPP(Sn_lattice, Sn_spff, Sn_apff, Sn_r, Sn_tau)
 
 #### Pseudopotential of GaP ####
 GaP_lat_centering = "face"
 GaP_lat_const = 5.44*angstrom_to_Bohr # the lattice constant in Bohr
-GaP_lat_const_list = [GaP_lat_const]*3
+GaP_lat_consts = [GaP_lat_const]*3
 GaP_lat_angles = [np.pi/2]*3
-GaP_lat_vecs = make_ptvecs(GaP_lat_centering, GaP_lat_const_list,
-                             GaP_lat_angles)
-GaP_rlat_vecs = make_rptvecs(GaP_lat_vecs)
-GaP_tau = GaP_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
+GaP_lattice = Lattice(GaP_lat_centering, GaP_lat_consts, GaP_lat_angles)
 
-# The pseudopotential form factors of GaP
-sGaP_pff =   [-0.22, 0.03, 0.07] # symmetric
-aGaP_pff =  [0.12, 0.07, 0.02] # anti-symmetric
-
-
-# The cutoff energy for the fourier expansion of wavefunction
 GaP_r = 11.*(2*np.pi/GaP_lat_const)**2
-GaP_rlat_pts = sphere_pts(GaP_rlat_vecs, GaP_r, [0,0,0]) # reciprocal lattice points
-GaP_size = len(GaP_rlat_pts)
-# GaP_shift = 10.4864461
-
-def GaP_PP(kpoint, neigvals):
-    """Find the eigenvalues of a Hamiltonian matrix built to match the
-    band structure of GaP.
-    
-    Args:
-        kpoint (list or numpy.ndarray): a point in k-space.
-        neigvals (int): the number of returned eigenvalues in increasing
-            order.
-        
-    Returns:
-        eigvals (np.ndarray): the eigenvalues of the Hamiltonian matrix.
-    """
-
-    # Initialize the Hamiltonian.
-    H = np.zeros((GaP_size, GaP_size),dtype=complex)
-
-    # Populate the Hamiltonian.
-    for i in range(GaP_size):
-        for j in range(i + 1):
-            h = (GaP_rlat_pts[j] - GaP_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + GaP_rlat_pts[i], kpoint + GaP_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/GaP_lat_const)**2):
-                H[i,j] = sGaP_pff[0]*np.cos(np.dot(h,GaP_tau)) + (
-                    1j*aGaP_pff[0]*np.sin(np.dot(h,GaP_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/GaP_lat_const)**2):
-                H[i,j] = 1j*GaP_pff[0]*np.cos(np.dot(h,GaP_tau))
-            if np.isclose(np.dot(h,h), 8*(2*np.pi/GaP_lat_const)**2):
-                H[i,j] = GaP_pff[1]*np.cos(np.dot(h,GaP_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/GaP_lat_const)**2):
-                H[i,j] = sGaP_pff[2]*np.cos(np.dot(h,GaP_tau)) + (
-                    1j*aGaP_pff[2]*np.sin(np.dot(h,GaP_tau)))
-            else:
-                continue
-            
-    return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - GaP_shift
-
-def customGaP_PP(kpoint, neigvals, GaP_cutoff, shift=True, matrix=False):
-    """Evaluate a GaP pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Cohen.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Al_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        GaP_rlat_pts = sphere_pts(GaP_rlat_vecs, GaP_r, kpoint) # reciprocal lattice points
-    else:
-        GaP_rlat_pts = sphere_pts(GaP_rlat_vecs, GaP_r, [0,0,0]) # reciprocal lattice points
-
-    GaP_size = len(GaP_rlat_pts)
-    H = np.zeros((GaP_size, GaP_size),dtype=complex)
-    
-    for i in range(GaP_size):
-        for j in range(GaP_size):
-            h = (GaP_rlat_pts[j] - GaP_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + GaP_rlat_pts[i], kpoint + GaP_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/GaP_lat_const)**2):
-                H[i,j] = sGaP_pff[0]*np.cos(np.dot(h,GaP_tau)) + (
-                    1j*aGaP_pff[0]*np.sin(np.dot(h,GaP_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/GaP_lat_const)**2):
-                H[i,j] = GaP_pff[0]*np.cos(np.dot(h,GaP_tau))
-            if np.isclose(np.dot(h,h), 8*(2*np.pi/GaP_lat_const)**2):
-                H[i,j] = GaP_pff[1]*np.cos(np.dot(h,GaP_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/GaP_lat_const)**2):
-                H[i,j] = sGaP_pff[2]*np.cos(np.dot(h,GaP_tau)) + (
-                    1j*aGaP_pff[2]*np.sin(np.dot(h,GaP_tau)))
-            else:
-                continue
-    if matrix:
-        return H*Ry_to_eV # - GaP_shift
-    else:
-        return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - GaP_shift    
+GaP_tau = [GaP_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
+GaP_PP = CohenEmpiricalPP(GaP_lattice, GaP_spff, GaP_apff, GaP_r, GaP_tau)
 
 #### Pseudopotential of GaAs ####
 GaAs_lat_centering = "face"
 GaAs_lat_const = 5.64*angstrom_to_Bohr # the lattice constant in Bohr
-GaAs_lat_const_list = [GaAs_lat_const]*3
+GaAs_lat_consts = [GaAs_lat_const]*3
 GaAs_lat_angles = [np.pi/2]*3
-GaAs_lat_vecs = make_ptvecs(GaAs_lat_centering, GaAs_lat_const_list,
-                              GaAs_lat_angles)
-GaAs_rlat_vecs = make_rptvecs(GaAs_lat_vecs)
-GaAs_tau = GaAs_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
+GaAs_lattice = Lattice(GaAs_lat_centering, GaAs_lat_consts, GaAs_lat_angles)
 
-# The pseudopotential form factors of GaAs
-sGaAs_pff =   [-0.23, 0.01, 0.06] # symmetric
-aGaAs_pff =  [0.07, 0.05, 0.01] # anti-symmetric
-
-
-# The cutoff energy for the fourier expansion of wavefunction
 GaAs_r = 11.*(2*np.pi/GaAs_lat_const)**2
-GaAs_rlat_pts = sphere_pts(GaAs_rlat_vecs, GaAs_r, [0,0,0]) # reciprocal lattice points
-GaAs_size = len(GaAs_rlat_pts)
-# GaAs_shift = 10.4864461
-
-def GaAs_PP(kpoint, neigvals):
-    """Find the eigenvalues of a Hamiltonian matrix built to match the
-    band structure of GaAs.
-    
-    Args:
-        kpoint (list or numpy.ndarray): a point in k-space.
-        neigvals (int): the number of returned eigenvalues in increasing
-            order.
-        
-    Returns:
-        eigvals (np.ndarray): the eigenvalues of the Hamiltonian matrix.
-    """
-
-    # Initialize the Hamiltonian.
-    H = np.zeros((GaAs_size, GaAs_size),dtype=complex)
-
-    # Populate the Hamiltonian.
-    for i in range(GaAs_size):
-        for j in range(i + 1):
-            h = (GaAs_rlat_pts[j] - GaAs_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + GaAs_rlat_pts[i], kpoint + GaAs_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/GaAs_lat_const)**2):
-                H[i,j] = sGaAs_pff[0]*np.cos(np.dot(h,GaAs_tau)) + (
-                    1j*aGaAs_pff[0]*np.sin(np.dot(h,GaAs_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/GaAs_lat_const)**2):
-                H[i,j] = GaAs_pff[0]*np.cos(np.dot(h,GaAs_tau))
-            if np.isclose(np.dot(h,h), 8*(2*np.pi/GaAs_lat_const)**2):
-                H[i,j] = GaAs_pff[1]*np.cos(np.dot(h,GaAs_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/GaAs_lat_const)**2):
-                H[i,j] = sGaAs_pff[2]*np.cos(np.dot(h,GaAs_tau)) + (
-                    1j*aGaAs_pff[2]*np.sin(np.dot(h,GaAs_tau)))
-            else:
-                continue
-            
-    return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - GaAs_shift
-
-def customGaAs_PP(kpoint, neigvals, GaAs_cutoff, shift=True, matrix=False):
-    """Evaluate a GaAs pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Cohen.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Al_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        GaAs_rlat_pts = sphere_pts(GaAs_rlat_vecs, GaAs_r, kpoint) # reciprocal lattice points
-    else:
-        GaAs_rlat_pts = sphere_pts(GaAs_rlat_vecs, GaAs_r, [0,0,0]) # reciprocal lattice points
-
-    GaAs_size = len(GaAs_rlat_pts)
-    H = np.zeros((GaAs_size, GaAs_size),dtype=complex)
-    
-    for i in range(GaAs_size):
-        for j in range(GaAs):
-            h = (GaAs_rlat_pts[j] - GaAs_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + GaAs_rlat_pts[i], kpoint + GaAs_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/GaAs_lat_const)**2):
-                H[i,j] = sGaAs_pff[0]*np.cos(np.dot(h,GaAs_tau)) + (
-                    1j*aGaAs_pff[0]*np.sin(np.dot(h,GaAs_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/GaAs_lat_const)**2):
-                H[i,j] = GaAs_pff[0]*np.cos(np.dot(h,GaAs_tau))
-            if np.isclose(np.dot(h,h), 8*(2*np.pi/GaAs_lat_const)**2):
-                H[i,j] = GaAs_pff[1]*np.cos(np.dot(h,GaAs_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/GaAs_lat_const)**2):
-                H[i,j] = sGaAs_pff[2]*np.cos(np.dot(h,GaAs_tau)) + (
-                    1j*aGaAs_pff[2]*np.sin(np.dot(h,GaAs_tau)))
-            else:
-                continue
-    if matrix:
-        return H*Ry_to_eV # - GaAs_shift
-    else:
-        return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - GaAs_shift
+GaAs_tau = [GaAs_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
+GaAs_PP = CohenEmpiricalPP(GaAs_lattice, GaAs_spff, GaAs_apff, GaAs_r, GaAs_tau)
 
 #### Pseudopotential of AlSb ####
 AlSb_lat_centering = "face"
 AlSb_lat_const = 6.13*angstrom_to_Bohr # the lattice constant in Bohr
-AlSb_lat_const_list = [AlSb_lat_const]*3
+AlSb_lat_consts = [AlSb_lat_const]*3
 AlSb_lat_angles = [np.pi/2]*3
-AlSb_lat_vecs = make_ptvecs(AlSb_lat_centering, AlSb_lat_const_list,
-                              AlSb_lat_angles)
-AlSb_rlat_vecs = make_rptvecs(AlSb_lat_vecs)
-AlSb_tau = AlSb_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
+AlSb_lattice = Lattice(AlSb_lat_centering, AlSb_lat_consts, AlSb_lat_angles)
 
-# The pseudopotential form factors of AlSb
-sAlSb_pff =   [-0.21, 0.02, 0.06] # symmetric
-aAlSb_pff =  [0.06, 0.04, 0.02] # anti-symmetric
-
-
-# The cutoff energy for the fourier expansion of wavefunction
 AlSb_r = 11.*(2*np.pi/AlSb_lat_const)**2
-AlSb_rlat_pts = sphere_pts(AlSb_rlat_vecs, AlSb_r, [0,0,0]) # reciprocal lattice points
-AlSb_size = len(AlSb_rlat_pts)
-
-def AlSb_PP(kpoint, neigvals):
-    """Find the eigenvalues of a Hamiltonian matrix built to match the
-    band structure of AlSb.
-    
-    Args:
-        kpoint (list or numpy.ndarray): a point in k-space.
-        neigvals (int): the number of returned eigenvalues in increasing
-            order.
-        
-    Returns:
-        eigvals (np.ndarray): the eigenvalues of the Hamiltonian matrix.
-    """
-
-    # Initialize the Hamiltonian.
-    H = np.zeros((AlSb_size, AlSb_size),dtype=complex)
-
-    # Populate the Hamiltonian.
-    for i in range(AlSb_size):
-        for j in range(i + 1):
-            h = (AlSb_rlat_pts[j] - AlSb_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + AlSb_rlat_pts[i], kpoint + AlSb_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/AlSb_lat_const)**2):
-                H[i,j] = sAlSb_pff[0]*np.cos(np.dot(h,AlSb_tau)) + (
-                    1j*aAlSb_pff[0]*np.sin(np.dot(h,AlSb_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/AlSb_lat_const)**2):
-                H[i,j] = AlSb_pff[0]*np.cos(np.dot(h,AlSb_tau))
-            if np.isclose(np.dot(h,h), 8*(2*np.pi/AlSb_lat_const)**2):
-                H[i,j] = AlSb_pff[1]*np.cos(np.dot(h,AlSb_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/AlSb_lat_const)**2):
-                H[i,j] = sAlSb_pff[2]*np.cos(np.dot(h,AlSb_tau)) + (
-                    1j*aAlSb_pff[2]*np.sin(np.dot(h,AlSb_tau)))
-            else:
-                continue
-            
-    return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - AlSb_shift
-
-def customAlSb_PP(kpoint, neigvals, AlSb_cutoff, shift=True, matrix=False):
-    """Evaluate a AlSb pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Cohen.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Al_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        AlSb_rlat_pts = sphere_pts(AlSb_rlat_vecs, AlSb_r, kpoint) # reciprocal lattice points
-    else:
-        AlSb_rlat_pts = sphere_pts(AlSb_rlat_vecs, AlSb_r, [0,0,0]) # reciprocal lattice points
-
-    AlSb_size = len(AlSb_rlat_pts)
-    H = np.zeros((AlSb_size, AlSb_size),dtype=complex)
-    
-    for i in range(AlSb_size):
-        for j in range(AlSb_size):
-            h = (AlSb_rlat_pts[j] - AlSb_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + AlSb_rlat_pts[i], kpoint + AlSb_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/AlSb_lat_const)**2):
-                H[i,j] = sAlSb_pff[0]*np.cos(np.dot(h,AlSb_tau)) + (
-                    1j*aAlSb_pff[0]*np.sin(np.dot(h,AlSb_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/AlSb_lat_const)**2):
-                H[i,j] = AlSb_pff[0]*np.cos(np.dot(h,AlSb_tau))
-            if np.isclose(np.dot(h,h), 8*(2*np.pi/AlSb_lat_const)**2):
-                H[i,j] = AlSb_pff[1]*np.cos(np.dot(h,AlSb_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/AlSb_lat_const)**2):
-                H[i,j] = sAlSb_pff[2]*np.cos(np.dot(h,AlSb_tau)) + (
-                    1j*aAlSb_pff[2]*np.sin(np.dot(h,AlSb_tau)))
-            else:
-                continue
-    if matrix:
-        return H*Ry_to_eV # - AlSb_shift
-    else:
-        return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - AlSb_shift    
+AlSb_tau = [AlSb_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
+AlSb_PP = CohenEmpiricalPP(AlSb_lattice, AlSb_spff, AlSb_apff, AlSb_r, AlSb_tau)
 
 #### Pseudopotential of InP ####
 InP_lat_centering = "face"
 InP_lat_const = 5.86*angstrom_to_Bohr # the lattice constant in Bohr
-InP_lat_const_list = [InP_lat_const]*3
+InP_lat_consts = [InP_lat_const]*3
 InP_lat_angles = [np.pi/2]*3
-InP_lat_vecs = make_ptvecs(InP_lat_centering, InP_lat_const_list,
-                             InP_lat_angles)
-InP_rlat_vecs = make_rptvecs(InP_lat_vecs)
-InP_tau = InP_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
+InP_lattice = Lattice(InP_lat_centering, InP_lat_consts, InP_lat_angles)
 
-# The pseudopotential form factors of InP
-sInP_pff =   [-0.23, 0.01, 0.06] # symmetric
-aInP_pff =  [0.07, 0.05, 0.01] # anti-symmetric
-
-
-# The cutoff energy for the fourier expansion of wavefunction
 InP_r = 11.*(2*np.pi/InP_lat_const)**2
-InP_rlat_pts = sphere_pts(InP_rlat_vecs, InP_r, [0,0,0]) # reciprocal lattice points
-InP_size = len(InP_rlat_pts)
-
-def InP_PP(kpoint, neigvals):
-    """Find the eigenvalues of a Hamiltonian matrix built to match the
-    band structure of InP.
-    
-    Args:
-        kpoint (list or numpy.ndarray): a point in k-space.
-        neigvals (int): the number of returned eigenvalues in increasing
-            order.
-        
-    Returns:
-        eigvals (np.ndarray): the eigenvalues of the Hamiltonian matrix.
-    """
-
-    # Initialize the Hamiltonian.
-    H = np.zeros((InP_size, InP_size),dtype=complex)
-
-    # Populate the Hamiltonian.
-    for i in range(InP_size):
-        for j in range(i + 1):
-            h = (InP_rlat_pts[j] - InP_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + InP_rlat_pts[i], kpoint + InP_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/InP_lat_const)**2):
-                H[i,j] = sInP_pff[0]*np.cos(np.dot(h,InP_tau)) + (
-                    1j*aInP_pff[0]*np.sin(np.dot(h,InP_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/InP_lat_const)**2):
-                H[i,j] = InP_pff[0]*np.cos(np.dot(h,InP_tau))
-            if np.isclose(np.dot(h,h), 8*(2*np.pi/InP_lat_const)**2):
-                H[i,j] = InP_pff[1]*np.cos(np.dot(h,InP_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/InP_lat_const)**2):
-                H[i,j] = sInP_pff[2]*np.cos(np.dot(h,InP_tau)) + (
-                    1j*aInP_pff[2]*np.sin(np.dot(h,InP_tau)))
-            else:
-                continue
-            
-    return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - InP_shift
-
-def customInP_PP(kpoint, neigvals, InP_cutoff, shift=True, matrix=False):
-    """Evaluate a InP pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Cohen.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Al_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        InP_rlat_pts = sphere_pts(InP_rlat_vecs, InP_r, kpoint) # reciprocal lattice points
-    else:
-        InP_rlat_pts = sphere_pts(InP_rlat_vecs, InP_r, [0,0,0]) # reciprocal lattice points
-
-    InP_size = len(InP_rlat_pts)
-    H = np.zeros((InP_size, InP_size),dtype=complex)
-    
-    for i in range(InP_size):
-        for j in range(InP_size):
-            h = (InP_rlat_pts[j] - InP_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + InP_rlat_pts[i], kpoint + InP_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/InP_lat_const)**2):
-                H[i,j] = sInP_pff[0]*np.cos(np.dot(h,InP_tau)) + (
-                    1j*aInP_pff[0]*np.sin(np.dot(h,InP_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/InP_lat_const)**2):
-                H[i,j] = InP_pff[0]*np.cos(np.dot(h,InP_tau))
-            if np.isclose(np.dot(h,h), 8*(2*np.pi/InP_lat_const)**2):
-                H[i,j] = InP_pff[1]*np.cos(np.dot(h,InP_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/InP_lat_const)**2):
-                H[i,j] = sInP_pff[2]*np.cos(np.dot(h,InP_tau)) + (
-                    1j*aInP_pff[2]*np.sin(np.dot(h,InP_tau)))
-            else:
-                continue
-    if matrix:
-        return H*Ry_to_eV # - InP_shift
-    else:
-        return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - InP_shift    
+InP_tau = [InP_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
+InP_PP = CohenEmpiricalPP(InP_lattice, InP_spff, InP_apff, InP_r, InP_tau)
 
 #### Pseudopotential of GaSb ####
 GaSb_lat_centering = "face"
 GaSb_lat_const = 6.12*angstrom_to_Bohr # the lattice constant in Bohr
-GaSb_lat_const_list = [GaSb_lat_const]*3
+GaSb_lat_consts = [GaSb_lat_const]*3
 GaSb_lat_angles = [np.pi/2]*3
-GaSb_lat_vecs = make_ptvecs(GaSb_lat_centering, GaSb_lat_const_list,
-                              GaSb_lat_angles)
-GaSb_rlat_vecs = make_rptvecs(GaSb_lat_vecs)
-GaSb_tau = GaSb_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
+GaSb_lattice = Lattice(GaSb_lat_centering, GaSb_lat_consts, GaSb_lat_angles)
 
-# The pseudopotential form factors of GaSb
-sGaSb_pff =   [-0.22, 0.00, 0.05] # symmetric
-aGaSb_pff =  [0.06, 0.05, 0.01] # anti-symmetric
-
-
-# The cutoff energy for the fourier expansion of wavefunction
 GaSb_r = 11.*(2*np.pi/GaSb_lat_const)**2
-GaSb_rlat_pts = sphere_pts(GaSb_rlat_vecs, GaSb_r, [0,0,0]) # reciprocal lattice points
-GaSb_size = len(GaSb_rlat_pts)
-
-def GaSb_PP(kpoint, neigvals):
-    """Find the eigenvalues of a Hamiltonian matrix built to match the
-    band structure of GaSb.
-    
-    Args:
-        kpoint (list or numpy.ndarray): a point in k-space.
-        neigvals (int): the number of returned eigenvalues in increasing
-            order.
-        
-    Returns:
-        eigvals (np.ndarray): the eigenvalues of the Hamiltonian matrix.
-    """
-
-    # Initialize the Hamiltonian.
-    H = np.zeros((GaSb_size, GaSb_size),dtype=complex)
-
-    # Populate the Hamiltonian.
-    for i in range(GaSb_size):
-        for j in range(i + 1):
-            h = (GaSb_rlat_pts[j] - GaSb_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + GaSb_rlat_pts[i], kpoint + GaSb_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/GaSb_lat_const)**2):
-                H[i,j] = sGaSb_pff[0]*np.cos(np.dot(h,GaSb_tau)) + (
-                    1j*aGaSb_pff[0]*np.sin(np.dot(h,GaSb_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/GaSb_lat_const)**2):
-                H[i,j] = GaSb_pff[0]*np.cos(np.dot(h,GaSb_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/GaSb_lat_const)**2):
-                H[i,j] = sGaSb_pff[2]*np.cos(np.dot(h,GaSb_tau)) + (
-                    1j*aGaSb_pff[2]*np.sin(np.dot(h,GaSb_tau)))
-            else:
-                continue
-            
-    return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - GaSb_shift
-
-def customGaSb_PP(kpoint, neigvals, GaSb_cutoff, shift=True, matrix=False):
-    """Evaluate a GaSb pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Cohen.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Al_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        GaSb_rlat_pts = sphere_pts(GaSb_rlat_vecs, GaSb_r, kpoint) # reciprocal lattice points
-    else:
-        GaSb_rlat_pts = sphere_pts(GaSb_rlat_vecs, GaSb_r, [0,0,0]) # reciprocal lattice points
-
-    GaSb_size = len(GaSb_rlat_pts)
-    H = np.zeros((GaSb_size, GaSb_size),dtype=complex)
-    
-    for i in range(GaSb_size):
-        for j in range(GaSb_size):
-            h = (GaSb_rlat_pts[j] - GaSb_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + GaSb_rlat_pts[i], kpoint + GaSb_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/GaSb_lat_const)**2):
-                H[i,j] = sGaSb_pff[0]*np.cos(np.dot(h,GaSb_tau)) + (
-                    1j*aGaSb_pff[0]*np.sin(np.dot(h,GaSb_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/GaSb_lat_const)**2):
-                H[i,j] = GaSb_pff[0]*np.cos(np.dot(h,GaSb_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/GaSb_lat_const)**2):
-                H[i,j] = sGaSb_pff[2]*np.cos(np.dot(h,GaSb_tau)) + (
-                    1j*aGaSb_pff[2]*np.sin(np.dot(h,GaSb_tau)))
-            else:
-                continue
-    if matrix:
-        return H*Ry_to_eV # - GaSb_shift
-    else:
-        return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - GaSb_shift    
+GaSb_tau = [GaSb_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
+GaSb_PP = CohenEmpiricalPP(GaSb_lattice, GaSb_spff, GaSb_apff, GaSb_r, GaSb_tau)
 
 #### Pseudopotential of InAs ####
 InAs_lat_centering = "face"
 InAs_lat_const = 6.04*angstrom_to_Bohr # the lattice constant in Bohr
-InAs_lat_const_list = [InAs_lat_const]*3
+InAs_lat_consts = [InAs_lat_const]*3
 InAs_lat_angles = [np.pi/2]*3
-InAs_lat_vecs = make_ptvecs(InAs_lat_centering, InAs_lat_const_list,
-                              InAs_lat_angles)
-InAs_rlat_vecs = make_rptvecs(InAs_lat_vecs)
-InAs_tau = InAs_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
+InAs_lattice = Lattice(InAs_lat_centering, InAs_lat_consts, InAs_lat_angles)
 
-# The pseudopotential form factors of InAs
-sInAs_pff =   [-0.22, 0.00, 0.05] # symmetric
-aInAs_pff =  [0.08, 0.05, 0.03] # anti-symmetric
-
-# The cutoff energy for the fourier expansion of wavefunction
 InAs_r = 11.*(2*np.pi/InAs_lat_const)**2
-InAs_rlat_pts = sphere_pts(InAs_rlat_vecs, InAs_r, [0,0,0]) # reciprocal lattice points
-InAs_size = len(InAs_rlat_pts)
-
-def InAs_PP(kpoint, neigvals):
-    """Find the eigenvalues of a Hamiltonian matrix built to match the
-    band structure of InAs.
-    
-    Args:
-        kpoint (list or numpy.ndarray): a point in k-space.
-        neigvals (int): the number of returned eigenvalues in increasing
-            order.
-        
-    Returns:
-        eigvals (np.ndarray): the eigenvalues of the Hamiltonian matrix.
-    """
-
-    # Initialize the Hamiltonian.
-    H = np.zeros((InAs_size, InAs_size),dtype=complex)
-
-    # Populate the Hamiltonian.
-    for i in range(InAs_size):
-        for j in range(i + 1):
-            h = (InAs_rlat_pts[j] - InAs_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + InAs_rlat_pts[i], kpoint + InAs_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/InAs_lat_const)**2):
-                H[i,j] = sInAs_pff[0]*np.cos(np.dot(h,InAs_tau)) + (
-                    1j*aInAs_pff[0]*np.sin(np.dot(h,InAs_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/InAs_lat_const)**2):
-                H[i,j] = InAs_pff[0]*np.cos(np.dot(h,InAs_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/InAs_lat_const)**2):
-                H[i,j] = sInAs_pff[2]*np.cos(np.dot(h,InAs_tau)) + (
-                    1j*aInAs_pff[2]*np.sin(np.dot(h,InAs_tau)))
-            else:
-                continue
-            
-    return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - InAs_shift
-
-def customInAs_PP(kpoint, neigvals, InAs_cutoff, shift=True, matrix=False):
-    """Evaluate a InAs pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Cohen.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Al_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        InAs_rlat_pts = sphere_pts(InAs_rlat_vecs, InAs_r, kpoint) # reciprocal lattice points
-    else:
-        InAs_rlat_pts = sphere_pts(InAs_rlat_vecs, InAs_r, [0,0,0]) # reciprocal lattice points
-
-    InAs_size = len(InAs_rlat_pts)
-    H = np.zeros((InAs_size, InAs_size),dtype=complex)
-    
-    for i in range(InAs_size):
-        for j in range(InAs_size):
-            h = (InAs_rlat_pts[j] - InAs_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + InAs_rlat_pts[i], kpoint + InAs_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/InAs_lat_const)**2):
-                H[i,j] = sInAs_pff[0]*np.cos(np.dot(h,InAs_tau)) + (
-                    1j*aInAs_pff[0]*np.sin(np.dot(h,InAs_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/InAs_lat_const)**2):
-                H[i,j] = InAs_pff[0]*np.cos(np.dot(h,InAs_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/InAs_lat_const)**2):
-                H[i,j] = sInAs_pff[2]*np.cos(np.dot(h,InAs_tau)) + (
-                    1j*aInAs_pff[2]*np.sin(np.dot(h,InAs_tau)))
-            else:
-                continue
-    if matrix:
-        return H*Ry_to_eV # - InAs_shift
-    else:
-        return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - InAs_shift    
+InAs_tau = [InAs_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
+InAs_PP = CohenEmpiricalPP(InAs_lattice, InAs_spff, InAs_apff, InAs_r, InAs_tau)
 
 #### Pseudopotential of InSb ####
 InSb_lat_centering = "face"
 InSb_lat_const = 6.48*angstrom_to_Bohr # the lattice constant in Bohr
-InSb_lat_const_list = [InSb_lat_const]*3
+InSb_lat_consts = [InSb_lat_const]*3
 InSb_lat_angles = [np.pi/2]*3
-InSb_lat_vecs = make_ptvecs(InSb_lat_centering, InSb_lat_const_list,
-                              InSb_lat_angles)
-InSb_rlat_vecs = make_rptvecs(InSb_lat_vecs)
-InSb_tau = InSb_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
+InSb_lattice = Lattice(InSb_lat_centering, InSb_lat_consts, InSb_lat_angles)
 
-# The pseudopotential form factors of InSb
-sInSb_pff =   [-0.20, 0.00, 0.04] # symmetric
-aInSb_pff =  [0.06, 0.05, 0.01] # anti-symmetric
-
-# The cutoff energy for the fourier expansion of wavefunction
 InSb_r = 11.*(2*np.pi/InSb_lat_const)**2
-InSb_rlat_pts = sphere_pts(InSb_rlat_vecs, InSb_r, [0,0,0]) # reciprocal lattice points
-InSb_size = len(InSb_rlat_pts)
-
-def InSb_PP(kpoint, neigvals):
-    """Find the eigenvalues of a Hamiltonian matrix built to match the
-    band structure of InSb.
-    
-    Args:
-        kpoint (list or numpy.ndarray): a point in k-space.
-        neigvals (int): the number of returned eigenvalues in increasing
-            order.
-        
-    Returns:
-        eigvals (np.ndarray): the eigenvalues of the Hamiltonian matrix.
-    """
-
-    # Initialize the Hamiltonian.
-    H = np.zeros((InSb_size, InSb_size),dtype=complex)
-
-    # Populate the Hamiltonian.
-    for i in range(InSb_size):
-        for j in range(i + 1):
-            h = (InSb_rlat_pts[j] - InSb_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + InSb_rlat_pts[i], kpoint + InSb_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/InSb_lat_const)**2):
-                H[i,j] = sInSb_pff[0]*np.cos(np.dot(h,InSb_tau)) + (
-                    1j*aInSb_pff[0]*np.sin(np.dot(h,InSb_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/InSb_lat_const)**2):
-                H[i,j] = InSb_pff[0]*np.cos(np.dot(h,InSb_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/InSb_lat_const)**2):
-                H[i,j] = sInSb_pff[2]*np.cos(np.dot(h,InSb_tau)) + (
-                    1j*aInSb_pff[2]*np.sin(np.dot(h,InSb_tau)))
-            else:
-                continue
-            
-    return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - InSb_shift
-
-def customInSb_PP(kpoint, neigvals, InSb_cutoff, shift=True, matrix=False):
-    """Evaluate a InSb pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Cohen.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Al_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        InSb_rlat_pts = sphere_pts(InSb_rlat_vecs, InSb_r, kpoint) # reciprocal lattice points
-    else:
-        InSb_rlat_pts = sphere_pts(InSb_rlat_vecs, InSb_r, [0,0,0]) # reciprocal lattice points
-
-    InSb_size = len(InSb_rlat_pts)
-    H = np.zeros((InSb_size, InSb_size),dtype=complex)
-    
-    for i in range(InSb_size):
-        for j in range(InSb_size):
-            h = (InSb_rlat_pts[j] - InSb_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + InSb_rlat_pts[i], kpoint + InSb_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/InSb_lat_const)**2):
-                H[i,j] = sInSb_pff[0]*np.cos(np.dot(h,InSb_tau)) + (
-                    1j*aInSb_pff[0]*np.sin(np.dot(h,InSb_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/InSb_lat_const)**2):
-                H[i,j] = InSb_pff[0]*np.cos(np.dot(h,InSb_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/InSb_lat_const)**2):
-                H[i,j] = sInSb_pff[2]*np.cos(np.dot(h,InSb_tau)) + (
-                    1j*aInSb_pff[2]*np.sin(np.dot(h,InSb_tau)))
-            else:
-                continue
-    if matrix:
-        return H*Ry_to_eV # - InSb_shift
-    else:
-        return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - InSb_shift    
+InSb_tau = [InSb_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
+InSb_PP = CohenEmpiricalPP(InSb_lattice, InSb_spff, InSb_apff, InSb_r, InSb_tau)
 
 #### Pseudopotential of ZnS ####
 ZnS_lat_centering = "face"
 ZnS_lat_const = 5.41*angstrom_to_Bohr # the lattice constant in Bohr
-ZnS_lat_const_list = [ZnS_lat_const]*3
+ZnS_lat_consts = [ZnS_lat_const]*3
 ZnS_lat_angles = [np.pi/2]*3
-ZnS_lat_vecs = make_ptvecs(ZnS_lat_centering, ZnS_lat_const_list,
-                             ZnS_lat_angles)
-ZnS_rlat_vecs = make_rptvecs(ZnS_lat_vecs)
-ZnS_tau = ZnS_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
+ZnS_lattice = Lattice(ZnS_lat_centering, ZnS_lat_consts, ZnS_lat_angles)
 
-# The pseudopotential form factors of ZnS
-sZnS_pff =   [-0.22, 0.03, 0.07] # symmetric
-aZnS_pff =  [0.24, 0.14, 0.04] # anti-symmetric
-
-# The cutoff energy for the fourier expansion of wavefunction
 ZnS_r = 11.*(2*np.pi/ZnS_lat_const)**2
-ZnS_rlat_pts = sphere_pts(ZnS_rlat_vecs, ZnS_r, [0,0,0]) # reciprocal lattice points
-ZnS_size = len(ZnS_rlat_pts)
-
-def ZnS_PP(kpoint, neigvals):
-    """Find the eigenvalues of a Hamiltonian matrix built to match the
-    band structure of ZnS.
-    
-    Args:
-        kpoint (list or numpy.ndarray): a point in k-space.
-        neigvals (int): the number of returned eigenvalues in increasing
-            order.
-        
-    Returns:
-        eigvals (np.ndarray): the eigenvalues of the Hamiltonian matrix.
-    """
-
-    # Initialize the Hamiltonian.
-    H = np.zeros((ZnS_size, ZnS_size),dtype=complex)
-
-    # Populate the Hamiltonian.
-    for i in range(ZnS_size):
-        for j in range(i + 1):
-            h = (ZnS_rlat_pts[j] - ZnS_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + ZnS_rlat_pts[i], kpoint + ZnS_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/ZnS_lat_const)**2):
-                H[i,j] = sZnS_pff[0]*np.cos(np.dot(h,ZnS_tau)) + (
-                    1j*aZnS_pff[0]*np.sin(np.dot(h,ZnS_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/ZnS_lat_const)**2):
-                H[i,j] = ZnS_pff[0]*np.cos(np.dot(h,ZnS_tau))
-            if np.isclose(np.dot(h,h), 8*(2*np.pi/ZnS_lat_const)**2):
-                H[i,j] = ZnS_pff[1]*np.cos(np.dot(h,ZnS_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/ZnS_lat_const)**2):
-                H[i,j] = sZnS_pff[2]*np.cos(np.dot(h,ZnS_tau)) + (
-                    1j*aZnS_pff[2]*np.sin(np.dot(h,ZnS_tau)))
-            else:
-                continue
-            
-    return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - ZnS_shift
-
-def customZnS_PP(kpoint, neigvals, ZnS_cutoff, shift=True, matrix=False):
-    """Evaluate a ZnS pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Cohen.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Al_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        ZnS_rlat_pts = sphere_pts(ZnS_rlat_vecs, ZnS_r, kpoint) # reciprocal lattice points
-    else:
-        ZnS_rlat_pts = sphere_pts(ZnS_rlat_vecs, ZnS_r, [0,0,0]) # reciprocal lattice points
-
-    ZnS_size = len(ZnS_rlat_pts)
-    H = np.zeros((ZnS_size, ZnS_size),dtype=complex)
-    
-    for i in range(ZnS_size):
-        for j in range(ZnS_size):
-            h = (ZnS_rlat_pts[j] - ZnS_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + ZnS_rlat_pts[i], kpoint + ZnS_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/ZnS_lat_const)**2):
-                H[i,j] = sZnS_pff[0]*np.cos(np.dot(h,ZnS_tau)) + (
-                    1j*aZnS_pff[0]*np.sin(np.dot(h,ZnS_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/ZnS_lat_const)**2):
-                H[i,j] = ZnS_pff[0]*np.cos(np.dot(h,ZnS_tau))
-            if np.isclose(np.dot(h,h), 8*(2*np.pi/ZnS_lat_const)**2):
-                H[i,j] = ZnS_pff[1]*np.cos(np.dot(h,ZnS_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/ZnS_lat_const)**2):
-                H[i,j] = sZnS_pff[2]*np.cos(np.dot(h,ZnS_tau)) + (
-                    1j*aZnS_pff[2]*np.sin(np.dot(h,ZnS_tau)))
-            else:
-                continue
-    if matrix:
-        return H*Ry_to_eV # - ZnS_shift
-    else:
-        return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - ZnS_shift    
+ZnS_tau = [ZnS_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
+ZnS_PP = CohenEmpiricalPP(ZnS_lattice, ZnS_spff, ZnS_apff, ZnS_r, ZnS_tau)
 
 #### Pseudopotential of ZnSe ####
 ZnSe_lat_centering = "face"
 ZnSe_lat_const = 5.65*angstrom_to_Bohr # the lattice constant in Bohr
-ZnSe_lat_const_list = [ZnSe_lat_const]*3
+ZnSe_lat_consts = [ZnSe_lat_const]*3
 ZnSe_lat_angles = [np.pi/2]*3
-ZnSe_lat_vecs = make_ptvecs(ZnSe_lat_centering, ZnSe_lat_const_list,
-                              ZnSe_lat_angles)
-ZnSe_rlat_vecs = make_rptvecs(ZnSe_lat_vecs)
-ZnSe_tau = ZnSe_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
+ZnSe_lattice = Lattice(ZnSe_lat_centering, ZnSe_lat_consts, ZnSe_lat_angles)
 
-# The pseudopotential form factors of ZnSe
-sZnSe_pff =   [-0.23, 0.01, 0.06] # symmetric
-aZnSe_pff =  [0.18, 0.12, 0.03] # anti-symmetric
-
-# The cutoff energy for the fourier expansion of wavefunction
 ZnSe_r = 11.*(2*np.pi/ZnSe_lat_const)**2
-ZnSe_rlat_pts = sphere_pts(ZnSe_rlat_vecs, ZnSe_r, [0,0,0]) # reciprocal lattice points
-ZnSe_size = len(ZnSe_rlat_pts)
-
-def ZnSe_PP(kpoint, neigvals):
-    """Find the eigenvalues of a Hamiltonian matrix built to match the
-    band structure of ZnSe.
-    
-    Args:
-        kpoint (list or numpy.ndarray): a point in k-space.
-        neigvals (int): the number of returned eigenvalues in increasing
-            order.
-        
-    Returns:
-        eigvals (np.ndarray): the eigenvalues of the Hamiltonian matrix.
-    """
-
-    # Initialize the Hamiltonian.
-    H = np.zeros((ZnSe_size, ZnSe_size),dtype=complex)
-
-    # Populate the Hamiltonian.
-    for i in range(ZnSe_size):
-        for j in range(i + 1):
-            h = (ZnSe_rlat_pts[j] - ZnSe_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + ZnSe_rlat_pts[i], kpoint + ZnSe_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/ZnSe_lat_const)**2):
-                H[i,j] = sZnSe_pff[0]*np.cos(np.dot(h,ZnSe_tau)) + (
-                    1j*aZnSe_pff[0]*np.sin(np.dot(h,ZnSe_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/ZnSe_lat_const)**2):
-                H[i,j] = ZnSe_pff[0]*np.cos(np.dot(h,ZnSe_tau))
-            if np.isclose(np.dot(h,h), 8*(2*np.pi/ZnSe_lat_const)**2):
-                H[i,j] = ZnSe_pff[1]*np.cos(np.dot(h,ZnSe_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/ZnSe_lat_const)**2):
-                H[i,j] = sZnSe_pff[2]*np.cos(np.dot(h,ZnSe_tau)) + (
-                    1j*aZnSe_pff[2]*np.sin(np.dot(h,ZnSe_tau)))
-            else:
-                continue
-            
-    return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - ZnSe_shift
-
-def customZnSe_PP(kpoint, neigvals, ZnSe_cutoff, shift=True, matrix=False):
-    """Evaluate a ZnSe pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Cohen.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Al_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        ZnSe_rlat_pts = sphere_pts(ZnSe_rlat_vecs, ZnSe_r, kpoint) # reciprocal lattice points
-    else:
-        ZnSe_rlat_pts = sphere_pts(ZnSe_rlat_vecs, ZnSe_r, [0,0,0]) # reciprocal lattice points
-
-    ZnSe_size = len(ZnSe_rlat_pts)
-    H = np.zeros((ZnSe_size, ZnSe_size),dtype=complex)
-    
-    for i in range(ZnSe_size):
-        for j in range(ZnSe_size):
-            h = (ZnSe_rlat_pts[j] - ZnSe_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + ZnSe_rlat_pts[i], kpoint + ZnSe_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/ZnSe_lat_const)**2):
-                H[i,j] = sZnSe_pff[0]*np.cos(np.dot(h,ZnSe_tau)) + (
-                    1j*aZnSe_pff[0]*np.sin(np.dot(h,ZnSe_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/ZnSe_lat_const)**2):
-                H[i,j] = ZnSe_pff[0]*np.cos(np.dot(h,ZnSe_tau))
-            if np.isclose(np.dot(h,h), 8*(2*np.pi/ZnSe_lat_const)**2):
-                H[i,j] = ZnSe_pff[1]*np.cos(np.dot(h,ZnSe_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/ZnSe_lat_const)**2):
-                H[i,j] = sZnSe_pff[2]*np.cos(np.dot(h,ZnSe_tau)) + (
-                    1j*aZnSe_pff[2]*np.sin(np.dot(h,ZnSe_tau)))
-            else:
-                continue
-    if matrix:
-        return H*Ry_to_eV # - ZnSe_shift
-    else:
-        return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - ZnSe_shift    
+ZnSe_tau = [ZnSe_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
+ZnSe_PP = CohenEmpiricalPP(ZnSe_lattice, ZnSe_spff, ZnSe_apff, ZnSe_r, ZnSe_tau)
 
 #### Pseudopotential of ZnTe ####
 ZnTe_lat_centering = "face"
 ZnTe_lat_const = 6.07*angstrom_to_Bohr # the lattice constant in Bohr
-ZnTe_lat_const_list = [ZnTe_lat_const]*3
+ZnTe_lat_consts = [ZnTe_lat_const]*3
 ZnTe_lat_angles = [np.pi/2]*3
-ZnTe_lat_vecs = make_ptvecs(ZnTe_lat_centering, ZnTe_lat_const_list,
-                              ZnTe_lat_angles)
-ZnTe_rlat_vecs = make_rptvecs(ZnTe_lat_vecs)
-ZnTe_tau = ZnTe_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
+ZnTe_lattice = Lattice(ZnTe_lat_centering, ZnTe_lat_consts, ZnTe_lat_angles)
 
-# The pseudopotential form factors of ZnTe
-sZnTe_pff =   [-0.22, 0.00, 0.05] # symmetric
-aZnTe_pff =  [0.13, 0.10, 0.01] # anti-symmetric
-
-# The cutoff energy for the fourier expansion of wavefunction
 ZnTe_r = 11.*(2*np.pi/ZnTe_lat_const)**2
-ZnTe_rlat_pts = sphere_pts(ZnTe_rlat_vecs, ZnTe_r, [0,0,0]) # reciprocal lattice points
-ZnTe_size = len(ZnTe_rlat_pts)
-
-def ZnTe_PP(kpoint, neigvals):
-    """Find the eigenvalues of a Hamiltonian matrix built to match the
-    band structure of ZnTe.
-    
-    Args:
-        kpoint (list or numpy.ndarray): a point in k-space.
-        neigvals (int): the number of returned eigenvalues in increasing
-            order.
-        
-    Returns:
-        eigvals (np.ndarray): the eigenvalues of the Hamiltonian matrix.
-    """
-
-    # Initialize the Hamiltonian.
-    H = np.zeros((ZnTe_size, ZnTe_size),dtype=complex)
-
-    # Populate the Hamiltonian.
-    for i in range(ZnTe_size):
-        for j in range(i + 1):
-            h = (ZnTe_rlat_pts[j] - ZnTe_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + ZnTe_rlat_pts[i], kpoint + ZnTe_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/ZnTe_lat_const)**2):
-                H[i,j] = sZnTe_pff[0]*np.cos(np.dot(h,ZnTe_tau)) + (
-                    1j*aZnTe_pff[0]*np.sin(np.dot(h,ZnTe_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/ZnTe_lat_const)**2):
-                H[i,j] = ZnTe_pff[0]*np.cos(np.dot(h,ZnTe_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/ZnTe_lat_const)**2):
-                H[i,j] = sZnTe_pff[2]*np.cos(np.dot(h,ZnTe_tau)) + (
-                    1j*aZnTe_pff[2]*np.sin(np.dot(h,ZnTe_tau)))
-            else:
-                continue
-            
-    return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - ZnTe_shift
-
-def customZnTe_PP(kpoint, neigvals, ZnTe_cutoff, shift=True, matrix=False):
-    """Evaluate a ZnTe pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Cohen.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Al_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        ZnTe_rlat_pts = sphere_pts(ZnTe_rlat_vecs, ZnTe_r, kpoint) # reciprocal lattice points
-    else:
-        ZnTe_rlat_pts = sphere_pts(ZnTe_rlat_vecs, ZnTe_r, [0,0,0]) # reciprocal lattice points
-
-    ZnTe_size = len(ZnTe_rlat_pts)
-    H = np.zeros((ZnTe_size, ZnTe_size),dtype=complex)
-    
-    for i in range(ZnTe_size):
-        for j in range(ZnTe_size):
-            h = (ZnTe_rlat_pts[j] - ZnTe_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + ZnTe_rlat_pts[i], kpoint + ZnTe_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/ZnTe_lat_const)**2):
-                H[i,j] = sZnTe_pff[0]*np.cos(np.dot(h,ZnTe_tau)) + (
-                    1j*aZnTe_pff[0]*np.sin(np.dot(h,ZnTe_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/ZnTe_lat_const)**2):
-                H[i,j] = ZnTe_pff[0]*np.cos(np.dot(h,ZnTe_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/ZnTe_lat_const)**2):
-                H[i,j] = sZnTe_pff[2]*np.cos(np.dot(h,ZnTe_tau)) + (
-                    1j*aZnTe_pff[2]*np.sin(np.dot(h,ZnTe_tau)))
-            else:
-                continue
-    if matrix:
-        return H*Ry_to_eV # - ZnTe_shift
-    else:
-        return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - ZnTe_shift    
+ZnTe_tau = [ZnTe_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
+ZnTe_PP = CohenEmpiricalPP(ZnTe_lattice, ZnTe_spff, ZnTe_apff, ZnTe_r, ZnTe_tau)
 
 #### Pseudopotential of CdTe ####
 CdTe_lat_centering = "face"
 CdTe_lat_const = 6.07*angstrom_to_Bohr # the lattice constant in Bohr
-CdTe_lat_const_list = [CdTe_lat_const]*3
+CdTe_lat_consts = [CdTe_lat_const]*3
 CdTe_lat_angles = [np.pi/2]*3
-CdTe_lat_vecs = make_ptvecs(CdTe_lat_centering, CdTe_lat_const_list,
-                              CdTe_lat_angles)
-CdTe_rlat_vecs = make_rptvecs(CdTe_lat_vecs)
-CdTe_tau = CdTe_lat_const/8.*np.array([1,1,1]) # one atomic basis vector
+CdTe_lattice = Lattice(CdTe_lat_centering, CdTe_lat_consts, CdTe_lat_angles)
 
-# The pseudopotential form factors of CdTe
-sCdTe_pff =   [-0.20, 0.00, 0.04] # symmetric
-aCdTe_pff =  [0.15, 0.09, 0.04] # anti-symmetric
-
-# The cutoff energy for the fourier expansion of wavefunction
 CdTe_r = 11.*(2*np.pi/CdTe_lat_const)**2
-CdTe_rlat_pts = sphere_pts(CdTe_rlat_vecs, CdTe_r, [0,0,0]) # reciprocal lattice points
-CdTe_size = len(CdTe_rlat_pts)
+CdTe_tau = [CdTe_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
+CdTe_PP = CohenEmpiricalPP(CdTe_lattice, CdTe_spff, CdTe_apff, CdTe_r, CdTe_tau)
 
-def CdTe_PP(kpoint, neigvals):
-    """Find the eigenvalues of a Hamiltonian matrix built to match the
-    band structure of CdTe.
-    
-    Args:
-        kpoint (list or numpy.ndarray): a point in k-space.
-        neigvals (int): the number of returned eigenvalues in increasing
-            order.
-        
-    Returns:
-        eigvals (np.ndarray): the eigenvalues of the Hamiltonian matrix.
-    """
+# The end of Cohen's 14 pseudopotentials with diamond or zinc-blende structure.
 
-    # Initialize the Hamiltonian.
-    H = np.zeros((CdTe_size, CdTe_size),dtype=complex)
+# The following pseudopotentials come from: 
+#Cohen, Marvin L., and Volker Heine. "The fitting of pseudopotentials to
+# experimental data and their subsequent application." Solid state physics 24
+# (1970): 37-248. APA
 
-    # Populate the Hamiltonian.
-    for i in range(CdTe_size):
-        for j in range(i + 1):
-            h = (CdTe_rlat_pts[j] - CdTe_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + CdTe_rlat_pts[i], kpoint + CdTe_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/CdTe_lat_const)**2):
-                H[i,j] = sCdTe_pff[0]*np.cos(np.dot(h,CdTe_tau)) + (
-                    1j*aCdTe_pff[0]*np.sin(np.dot(h,CdTe_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/CdTe_lat_const)**2):
-                H[i,j] = CdTe_pff[0]*np.cos(np.dot(h,CdTe_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/CdTe_lat_const)**2):
-                H[i,j] = sCdTe_pff[2]*np.cos(np.dot(h,CdTe_tau)) + (
-                    1j*aCdTe_pff[2]*np.sin(np.dot(h,CdTe_tau)))
-            else:
-                continue
-            
-    return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - CdTe_shift
+#### Pseudopotential of Al ####
+Al_centering_type = "face"
+Al_lat_const = 4.05*angstrom_to_Bohr
+Al_lat_consts = [Al_lat_const]*3
+Al_lat_angles = [np.pi/2]*3
+Al_lattice = Lattice(Al_centering_type, Al_lat_consts, Al_lat_angles)
 
-def customCdTe_PP(kpoint, neigvals, CdTe_cutoff, shift=True, matrix=False):
-    """Evaluate a CdTe pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Cohen.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Al_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        CdTe_rlat_pts = sphere_pts(CdTe_rlat_vecs, CdTe_r, kpoint) # reciprocal lattice points
-    else:
-        CdTe_rlat_pts = sphere_pts(CdTe_rlat_vecs, CdTe_r, [0,0,0]) # reciprocal lattice points
-
-    CdTe_size = len(CdTe_rlat_pts)
-    H = np.zeros((CdTe_size, CdTe_size),dtype=complex)
-    
-    for i in range(CdTe_size):
-        for j in range(CdTe_size):
-            h = (CdTe_rlat_pts[j] - CdTe_rlat_pts[i])
-            if i == j:
-                H[i,j] = np.dot(kpoint + CdTe_rlat_pts[i], kpoint + CdTe_rlat_pts[i])
-            if np.isclose(np.dot(h,h), 3*(2*np.pi/CdTe_lat_const)**2):
-                H[i,j] = sCdTe_pff[0]*np.cos(np.dot(h,CdTe_tau)) + (
-                    1j*aCdTe_pff[0]*np.sin(np.dot(h,CdTe_tau)))
-            if np.isclose(np.dot(h,h), 4*(2*np.pi/CdTe_lat_const)**2):
-                H[i,j] = CdTe_pff[0]*np.cos(np.dot(h,CdTe_tau))
-            if np.isclose(np.dot(h,h), 11*(2*np.pi/CdTe_lat_const)**2):
-                H[i,j] = sCdTe_pff[2]*np.cos(np.dot(h,CdTe_tau)) + (
-                    1j*aCdTe_pff[2]*np.sin(np.dot(h,CdTe_tau)))
-            else:
-                continue
-    if matrix:
-        return H*Ry_to_eV # - CdTe_shift
-    else:
-        return np.linalg.eigvalsh(H)[:neigvals]*Ry_to_eV # - CdTe_shift
+Al_pff = [0.0179, 0.0562]
+Al_cutoff = 4*(2*np.pi/Al_lat_const)**2
+Al_atomic_basis = [[0.,0.,0.]]
+Al_PP = EmpiricalPP(Al_lattice, Al_pff, Al_cutoff, Al_atomic_basis)
 
 #### Pseudopotential of Li ####
-
-# Define the pseudopotential form factors taken from Ashcroft for Li.
-Li_pff = [0.11]
+Li_centering_type = "body"
 Li_lat_const = 2.968*angstrom_to_Bohr
-Li_lat_const_list = [Li_lat_const]*3
-Li_lat_centering = "body"
+Li_lat_consts = [Li_lat_const]*3
 Li_lat_angles = [np.pi/2]*3
-Li_lat_vecs = make_ptvecs(Li_lat_centering, Li_lat_const_list, Li_lat_angles)
-Li_rlat_vecs = make_rptvecs(Li_lat_vecs)
-Li_cutoff = 2*(2*np.pi/Li_lat_const)**2
-Li_rlat_pts = sphere_pts(Li_rlat_vecs, Li_cutoff, [0,0,0])
+Li_lattice = Lattice(Li_centering_type, Li_lat_consts, Li_lat_angles)
 
-# The number of contributing reciprocal lattice points determines the size
-# of the Hamiltonian.
-Li_size = len(Li_rlat_pts)
-
-# Li_shift = 10.65942710893091139
-
-def Li_PP(kpoint,neigvals):
-    """Evaluate an Li pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from 
-    `Ashcroft <http://journals.aps.org/pr/abstract/10.1103/PhysRev.116.555`_.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian at the provided
-        k-point.
-    """
-    # Initialize the Li Hamiltonian.
-    Li_H = np.zeros([Li_size, Li_size])
-    
-    # Construct the Li Hamiltonian.
-    for i in range(Li_size):
-        k1 = np.asarray(Li_rlat_pts[i])
-        for j in range(i + 1):
-            k2 = np.asarray(Li_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Li_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 2*(2*np.pi/Li_lat_const)**2) == True:
-                Li_H[i,j] = Li_pff[0]
-            else:
-                continue
-    return np.sort(np.linalg.eigvalsh(Li_H))[:neigvals]*Ry_to_eV # - Li_shift
-
-def customLi_PP(kpoint, neigvals, Li_cutoff=21*(2*np.pi/Li_lat_const)**2,
-               shift=True, matrix=False):
-    """Evaluate an Li pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Ashcroft.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Li_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        Li_rlat_pts = sphere_pts(Li_rlat_vecs, Li_cutoff, kpoint)
-    else:
-        Li_rlat_pts = sphere_pts(Li_rlat_vecs, Li_cutoff, [0,0,0])
-    Li_size = len(Li_rlat_pts)
-
-    # Initialize the Li Hamiltonian.
-    Li_H = np.zeros([Li_size, Li_size])
-    
-    # Populate the Li Hamiltonian.
-    for i in range(Li_size):
-        k1 = np.asarray(Li_rlat_pts[i])
-        for j in range(Li_size):
-            k2 = np.asarray(Li_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Li_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 2*(2*np.pi/Li_lat_const)**2) == True:
-                Li_H[i,j] = Li_pff[0]
-            else:
-                continue
-    if matrix:
-        return Li_H*Ry_to_eV # - Li_shift
-    else:
-        return np.sort(np.linalg.eigvalsh(Li_H))[:neigvals]*Ry_to_eV # - Li_shift
+Li_pff = [0.11, 0.0]
+Li_cutoff = 4*(2*np.pi/Li_lat_const)**2
+Li_atomic_basis = [[0.,0.,0.]]
+Li_PP = EmpiricalPP(Li_lattice, Li_pff, Li_cutoff, Li_atomic_basis)
 
 #### Pseudopotential of Na ####
-
-# Define the pseudopotential form factors taken from Ashcroft for Na.
-Na_pff = [0.0158]
+Na_centering_type = "body"
 Na_lat_const = 3.633*angstrom_to_Bohr
-Na_lat_const_list = [Na_lat_const]*3
-Na_lat_centering = "body"
+Na_lat_consts = [Na_lat_const]*3
 Na_lat_angles = [np.pi/2]*3
-Na_lat_vecs = make_ptvecs(Na_lat_centering, Na_lat_const_list, Na_lat_angles)
-Na_rlat_vecs = make_rptvecs(Na_lat_vecs)
+Na_lattice = Lattice(Na_centering_type, Na_lat_consts, Na_lat_angles)
+
+Na_pff = [0.0158]
 Na_cutoff = 2*(2*np.pi/Na_lat_const)**2
-Na_rlat_pts = sphere_pts(Na_rlat_vecs, Na_cutoff, [0,0,0])
-
-# The number of contributing reciprocal lattice points determines the size
-# of the Hamiltonian.
-Na_size = len(Na_rlat_pts)
-
-# Na_shift = 10.65942710893091139
-
-def Na_PP(kpoint,neigvals):
-    """Evaluate an Na pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from 
-    `Ashcroft <http://journals.aps.org/pr/abstract/10.1103/PhysRev.116.555`_.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian at the provided
-        k-point.
-    """
-    # Initialize the Na Hamiltonian.
-    Na_H = np.zeros([Na_size, Na_size])
-    
-    # Construct the Na Hamiltonian.
-    for i in range(Na_size):
-        k1 = np.asarray(Na_rlat_pts[i])
-        for j in range(i + 1):
-            k2 = np.asarray(Na_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Na_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 2*(2*np.pi/Na_lat_const)**2) == True:
-                Na_H[i,j] = Na_pff[0]
-            else:
-                continue
-    return np.sort(np.linalg.eigvalsh(Na_H))[:neigvals]*Ry_to_eV # - Na_shift
-
-def customNa_PP(kpoint, neigvals, Na_cutoff=21*(2*np.pi/Na_lat_const)**2,
-               shift=True, matrix=False):
-    """Evaluate an Na pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Ashcroft.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Na_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        Na_rlat_pts = sphere_pts(Na_rlat_vecs, Na_cutoff, kpoint)
-    else:
-        Na_rlat_pts = sphere_pts(Na_rlat_vecs, Na_cutoff, [0,0,0])
-    Na_size = len(Na_rlat_pts)
-
-    # Initialize the Na Hamiltonian.
-    Na_H = np.zeros([Na_size, Na_size])
-    
-    # Populate the Na Hamiltonian.
-    for i in range(Na_size):
-        k1 = np.asarray(Na_rlat_pts[i])
-        for j in range(Na_size):
-            k2 = np.asarray(Na_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Na_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 2*(2*np.pi/Na_lat_const)**2) == True:
-                Na_H[i,j] = Na_pff[0]
-            else:
-                continue
-    if matrix:
-        return Na_H*Ry_to_eV # - Na_shift
-    else:
-        return np.sort(np.linalg.eigvalsh(Na_H))[:neigvals]*Ry_to_eV # - Na_shift    
+Na_atomic_basis = [[0.]*3]
+Na_PP = EmpiricalPP(Na_lattice, Na_pff, Na_cutoff, Na_atomic_basis)
     
 #### Pseudopotential of K ####
-
-# Define the pseudopotential form factors taken from Ashcroft for K.
-K_pff = [0.0075, -0.009]
+K_centering_type = "body"
 K_lat_const = 9.873*angstrom_to_Bohr
-K_lat_const_list = [K_lat_const]*3
-K_lat_centering = "body"
+K_lat_consts = [K_lat_const]*3
 K_lat_angles = [np.pi/2]*3
-K_lat_vecs = make_ptvecs(K_lat_centering, K_lat_const_list, K_lat_angles)
-K_rlat_vecs = make_rptvecs(K_lat_vecs)
+K_lattice = Lattice(K_centering_type, K_lat_consts, K_lat_angles)
+
+K_pff = [0.0075, -0.009]
 K_cutoff = 4*(2*np.pi/K_lat_const)**2
-K_rlat_pts = sphere_pts(K_rlat_vecs, K_cutoff, [0,0,0])
+K_atomic_basis = [[0.]*3]
+K_PP = EmpiricalPP(K_lattice, K_pff, K_cutoff, K_atomic_basis)
 
-# The number of contributing reciprocal lattice points determines the size
-# of the Hamiltonian.
-K_size = len(K_rlat_pts)
-
-# K_shift = 10.65942710893091139
-
-def K_PP(kpoint,neigvals):
-    """Evaluate an K pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from 
-    `Ashcroft <http://journals.aps.org/pr/abstract/10.1103/PhysRev.116.555`_.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian at the provided
-        k-point.
-    """
-    # Initialize the K Hamiltonian.
-    K_H = np.zeros([K_size, K_size])
-    
-    # Construct the K Hamiltonian.
-    for i in range(K_size):
-        k1 = np.asarray(K_rlat_pts[i])
-        for j in range(i + 1):
-            k2 = np.asarray(K_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                K_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 2*(2*np.pi/K_lat_const)**2) == True:
-                K_H[i,j] = K_pff[0]
-            elif np.isclose(n2, 4*(2*np.pi/K_lat_const)**2) == True:
-                K_H[i,j] = K_pff[1]
-            else:
-                continue
-    return np.sort(np.linalg.eigvalsh(K_H))[:neigvals]*Ry_to_eV # - K_shift
-
-def customK_PP(kpoint, neigvals, K_cutoff=21*(2*np.pi/K_lat_const)**2,
-               shift=True, matrix=False):
-    """Evaluate an K pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Ashcroft.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        K_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        K_rlat_pts = sphere_pts(K_rlat_vecs, K_cutoff, kpoint)
-    else:
-        K_rlat_pts = sphere_pts(K_rlat_vecs, K_cutoff, [0,0,0])
-    K_size = len(K_rlat_pts)
-
-    # Initialize the K Hamiltonian.
-    K_H = np.zeros([K_size, K_size])
-    
-    # Populate the K Hamiltonian.
-    for i in range(K_size):
-        k1 = np.asarray(K_rlat_pts[i])
-        for j in range(K_size):
-            k2 = np.asarray(K_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                K_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 2*(2*np.pi/K_lat_const)**2) == True:
-                K_H[i,j] = K_pff[0]
-            elif np.isclose(n2, 4*(2*np.pi/K_lat_const)**2) == True:
-                K_H[i,j] = K_pff[1]
-            else:
-                continue
-    if matrix:
-        return K_H*Ry_to_eV # - K_shift
-    else:
-        return np.sort(np.linalg.eigvalsh(K_H))[:neigvals]*Ry_to_eV # - K_shift
-
-    
 #### Pseudopotential of Rb ####
-
-# Define the pseudopotential form factors taken from Ashcroft for Rb.
-Rb_pff = [-0.002]
+Rb_centering_type = "body"
 Rb_lat_const = 5.585*angstrom_to_Bohr
-Rb_lat_const_list = [Rb_lat_const]*3
-Rb_lat_centering = "body"
+Rb_lat_consts = [Rb_lat_const]*3
 Rb_lat_angles = [np.pi/2]*3
-Rb_lat_vecs = make_ptvecs(Rb_lat_centering, Rb_lat_const_list, Rb_lat_angles)
-Rb_rlat_vecs = make_rptvecs(Rb_lat_vecs)
+Rb_lattice = Lattice(Rb_centering_type, Rb_lat_consts, Rb_lat_angles)
+
+Rb_pff = [-0.002]
 Rb_cutoff = 2*(2*np.pi/Rb_lat_const)**2
-Rb_rlat_pts = sphere_pts(Rb_rlat_vecs, Rb_cutoff, [0,0,0])
+Rb_atomic_basis = [[0.]*3]
+Rb_PP = EmpiricalPP(Rb_lattice, Rb_pff, Rb_cutoff, Rb_atomic_basis)
 
-# The number of contributing reciprocal lattice points determines the size
-# of the Hamiltonian.
-Rb_size = len(Rb_rlat_pts)
-
-# Rb_shift = 10.65942710893091139
-
-def Rb_PP(kpoint,neigvals):
-    """Evaluate an Rb pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from 
-    `Ashcroft <http://journals.aps.org/pr/abstract/10.1103/PhysRev.116.555`_.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian at the provided
-        k-point.
-    """
-    # Initialize the Rb Hamiltonian.
-    Rb_H = np.zeros([Rb_size, Rb_size])
-    
-    # Construct the Rb Hamiltonian.
-    for i in range(Rb_size):
-        k1 = np.asarray(Rb_rlat_pts[i])
-        for j in range(i + 1):
-            k2 = np.asarray(Rb_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Rb_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 2*(2*np.pi/Rb_lat_const)**2) == True:
-                Rb_H[i,j] = Rb_pff[0]
-            else:
-                continue
-    return np.sort(np.linalg.eigvalsh(Rb_H))[:neigvals]*Ry_to_eV # - Rb_shift
-
-def customRb_PP(kpoint, neigvals, Rb_cutoff=21*(2*np.pi/Rb_lat_const)**2,
-               shift=True, matrix=False):
-    """Evaluate an Rb pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Ashcroft.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Rb_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        Rb_rlat_pts = sphere_pts(Rb_rlat_vecs, Rb_cutoff, kpoint)
-    else:
-        Rb_rlat_pts = sphere_pts(Rb_rlat_vecs, Rb_cutoff, [0,0,0])
-    Rb_size = len(Rb_rlat_pts)
-
-    # Initialize the Rb Hamiltonian.
-    Rb_H = np.zeros([Rb_size, Rb_size])
-    
-    # Populate the Rb Hamiltonian.
-    for i in range(Rb_size):
-        k1 = np.asarray(Rb_rlat_pts[i])
-        for j in range(Rb_size):
-            k2 = np.asarray(Rb_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Rb_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 2*(2*np.pi/Rb_lat_const)**2) == True:
-                Rb_H[i,j] = Rb_pff[0]
-            else:
-                continue
-    if matrix:
-        return Rb_H*Ry_to_eV # - Rb_shift
-    else:
-        return np.sort(np.linalg.eigvalsh(Rb_H))[:neigvals]*Ry_to_eV # - Rb_shift
-
-    
 #### Pseudopotential of Cs ####
-
-# Define the pseudopotential form factors taken from Ashcroft for Cs.
-Cs_pff = [-0.03]
+Cs_centering_type = "body"
 Cs_lat_const = 6.141*angstrom_to_Bohr
-Cs_lat_const_list = [Cs_lat_const]*3
-Cs_lat_centering = "body"
+Cs_lat_consts = [Cs_lat_const]*3
 Cs_lat_angles = [np.pi/2]*3
-Cs_lat_vecs = make_ptvecs(Cs_lat_centering, Cs_lat_const_list, Cs_lat_angles)
-Cs_rlat_vecs = make_rptvecs(Cs_lat_vecs)
+Cs_lattice = Lattice(Cs_centering_type, Cs_lat_consts, Cs_lat_angles)
+
+Cs_pff = [-0.03]
 Cs_cutoff = 2*(2*np.pi/Cs_lat_const)**2
-Cs_rlat_pts = sphere_pts(Cs_rlat_vecs, Cs_cutoff, [0,0,0])
-
-# The number of contributing reciprocal lattice points determines the size
-# of the Hamiltonian.
-Cs_size = len(Cs_rlat_pts)
-
-# Cs_shift = 10.65942710893091139
-
-def Cs_PP(kpoint,neigvals):
-    """Evaluate an Cs pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from 
-    `Ashcroft <http://journals.aps.org/pr/abstract/10.1103/PhysRev.116.555`_.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian at the provided
-        k-point.
-    """
-    # Initialize the Cs Hamiltonian.
-    Cs_H = np.zeros([Cs_size, Cs_size])
-    
-    # Construct the Cs Hamiltonian.
-    for i in range(Cs_size):
-        k1 = np.asarray(Cs_rlat_pts[i])
-        for j in range(i + 1):
-            k2 = np.asarray(Cs_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Cs_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 2*(2*np.pi/Cs_lat_const)**2) == True:
-                Cs_H[i,j] = Cs_pff[0]
-            else:
-                continue
-    return np.sort(np.linalg.eigvalsh(Cs_H))[:neigvals]*Ry_to_eV # - Cs_shift
-
-def customCs_PP(kpoint, neigvals, Cs_cutoff=21*(2*np.pi/Cs_lat_const)**2,
-               shift=True, matrix=False):
-    """Evaluate an Cs pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Ashcroft.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Cs_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        Cs_rlat_pts = sphere_pts(Cs_rlat_vecs, Cs_cutoff, kpoint)
-    else:
-        Cs_rlat_pts = sphere_pts(Cs_rlat_vecs, Cs_cutoff, [0,0,0])
-    Cs_size = len(Cs_rlat_pts)
-
-    # Initialize the Cs Hamiltonian.
-    Cs_H = np.zeros([Cs_size, Cs_size])
-    
-    # Populate the Cs Hamiltonian.
-    for i in range(Cs_size):
-        k1 = np.asarray(Cs_rlat_pts[i])
-        for j in range(Cs_size):
-            k2 = np.asarray(Cs_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Cs_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 2*(2*np.pi/Cs_lat_const)**2) == True:
-                Cs_H[i,j] = Cs_pff[0]
-            else:
-                continue
-    if matrix:
-        return Cs_H*Ry_to_eV # - Cs_shift
-    else:
-        return np.sort(np.linalg.eigvalsh(Cs_H))[:neigvals]*Ry_to_eV # - Cs_shift
-
+Cs_atomic_basis = [[0.]*3]
+Cs_PP = EmpiricalPP(Cs_lattice, Cs_pff, Cs_cutoff, Cs_atomic_basis)
     
 #### Pseudopotential of Cu ####
-
-# Define the pseudopotential form factors taken from Ashcroft for Cu.
-Cu_pff = [0.282, 0.18]
+Cu_centering_type = "face"
 Cu_lat_const = 3.615*angstrom_to_Bohr
-Cu_lat_const_list = [Cu_lat_const]*3
-Cu_lat_centering = "face"
+Cu_lat_consts = [Cu_lat_const]*3
 Cu_lat_angles = [np.pi/2]*3
-Cu_lat_vecs = make_ptvecs(Cu_lat_centering, Cu_lat_const_list, Cu_lat_angles)
-Cu_rlat_vecs = make_rptvecs(Cu_lat_vecs)
+Cu_lattice = Lattice(Cu_centering_type, Cu_lat_consts, Cu_lat_angles)
+
+Cu_pff = [0.282, 0.18]
 Cu_cutoff = 4*(2*np.pi/Cu_lat_const)**2
-Cu_rlat_pts = sphere_pts(Cu_rlat_vecs, Cu_cutoff, [0,0,0])
-
-# The number of contributing reciprocal lattice points determines the size
-# of the Hamiltonian.
-Cu_size = len(Cu_rlat_pts)
-
-# Cu_shift = 10.65942710893091139
-
-def Cu_PP(kpoint,neigvals):
-    """Evaluate an Cu pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from 
-    `Ashcroft <http://journals.aps.org/pr/abstract/10.1103/PhysRev.116.555`_.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian at the provided
-        k-point.
-    """
-    # Initialize the Cu Hamiltonian.
-    Cu_H = np.zeros([Cu_size, Cu_size])
-    
-    # Construct the Cu Hamiltonian.
-    for i in range(Cu_size):
-        k1 = np.asarray(Cu_rlat_pts[i])
-        for j in range(i + 1):
-            k2 = np.asarray(Cu_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Cu_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 3*(2*np.pi/Cu_lat_const)**2) == True:
-                Cu_H[i,j] = Cu_pff[0]
-            elif np.isclose(n2, 4*(2*np.pi/Cu_lat_const)**2) == True:
-                Cu_H[i,j] = Cu_pff[1]
-            else:
-                continue
-    return np.sort(np.linalg.eigvalsh(Cu_H))[:neigvals]*Ry_to_eV # - Cu_shift
-
-def customCu_PP(kpoint, neigvals, Cu_cutoff=21*(2*np.pi/Cu_lat_const)**2,
-               shift=True, matrix=False):
-    """Evaluate an Cu pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Ashcroft.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Cu_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        Cu_rlat_pts = sphere_pts(Cu_rlat_vecs, Cu_cutoff, kpoint)
-    else:
-        Cu_rlat_pts = sphere_pts(Cu_rlat_vecs, Cu_cutoff, [0,0,0])
-    Cu_size = len(Cu_rlat_pts)
-
-    # Initialize the Cu Hamiltonian.
-    Cu_H = np.zeros([Cu_size, Cu_size])
-    
-    # Populate the Cu Hamiltonian.
-    for i in range(Cu_size):
-        k1 = np.asarray(Cu_rlat_pts[i])
-        for j in range(Cu_size):
-            k2 = np.asarray(Cu_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Cu_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 3*(2*np.pi/Cu_lat_const)**2) == True:
-                Cu_H[i,j] = Cu_pff[0]
-            elif np.isclose(n2, 4*(2*np.pi/Cu_lat_const)**2) == True:
-                Cu_H[i,j] = Cu_pff[1]
-            else:
-                continue
-    if matrix:
-        return Cu_H*Ry_to_eV # - Cu_shift
-    else:
-        return np.sort(np.linalg.eigvalsh(Cu_H))[:neigvals]*Ry_to_eV # - Cu_shift
-
+Cu_atomic_basis = [[0.]*3]
+Cu_PP = EmpiricalPP(Cu_lattice, Cu_pff, Cu_cutoff, Cu_atomic_basis)
 
 #### Pseudopotential of Ag ####
-
-# Define the pseudopotential form factors taken from Ashcroft for Ag.
-Ag_pff = [0.195, 0.121]
+Ag_centering_type = "face"
 Ag_lat_const = 4.0853*angstrom_to_Bohr
-Ag_lat_const_list = [Ag_lat_const]*3
-Ag_lat_centering = "face"
-Ag_lat_vecs = [np.pi/2]*3
-Ag_lat_vecs = make_ptvecs(Ag_lat_centering, Ag_lat_const_list, Ag_lat_vecs)
-Ag_rlat_vecs = make_rptvecs(Ag_lat_vecs)
+Ag_lat_consts = [Ag_lat_const]*3
+Ag_lat_angles = [np.pi/2]*3
+Ag_lattice = Lattice(Ag_centering_type, Ag_lat_consts, Ag_lat_angles)
+
+Ag_pff = [0.195, 0.121]
 Ag_cutoff = 4*(2*np.pi/Ag_lat_const)**2
-Ag_rlat_pts = sphere_pts(Ag_rlat_vecs, Ag_cutoff, [0,0,0])
-
-# The number of contributing reciprocal lattice points determines the size
-# of the Hamiltonian.
-Ag_size = len(Ag_rlat_pts)
-
-# Ag_shift = 10.65942710893091139
-
-def Ag_PP(kpoint,neigvals):
-    """Evaluate an Ag pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from 
-    `Ashcroft <http://journals.aps.org/pr/abstract/10.1103/PhysRev.116.555`_.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian at the provided
-        k-point.
-    """
-    # Initialize the Ag Hamiltonian.
-    Ag_H = np.zeros([Ag_size, Ag_size])
-    
-    # Construct the Ag Hamiltonian.
-    for i in range(Ag_size):
-        k1 = np.asarray(Ag_rlat_pts[i])
-        for j in range(i + 1):
-            k2 = np.asarray(Ag_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Ag_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 3*(2*np.pi/Ag_lat_const)**2) == True:
-                Ag_H[i,j] = Ag_pff[0]
-            elif np.isclose(n2, 4*(2*np.pi/Ag_lat_const)**2) == True:
-                Ag_H[i,j] = Ag_pff[1]
-            else:
-                continue
-    return np.sort(np.linalg.eigvalsh(Ag_H))[:neigvals]*Ry_to_eV # - Ag_shift
-
-def customAg_PP(kpoint, neigvals, Ag_cutoff=21*(2*np.pi/Ag_lat_const)**2,
-               shift=True, matrix=False):
-    """Evaluate an Ag pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Ashcroft.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Ag_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        Ag_rlat_pts = sphere_pts(Ag_rlat_vecs, Ag_cutoff, kpoint)
-    else:
-        Ag_rlat_pts = sphere_pts(Ag_rlat_vecs, Ag_cutoff, [0,0,0])
-    Ag_size = len(Ag_rlat_pts)
-
-    # Initialize the Ag Hamiltonian.
-    Ag_H = np.zeros([Ag_size, Ag_size])
-    
-    # Populate the Ag Hamiltonian.
-    for i in range(Ag_size):
-        k1 = np.asarray(Ag_rlat_pts[i])
-        for j in range(Ag_size):
-            k2 = np.asarray(Ag_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Ag_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 3*(2*np.pi/Ag_lat_const)**2) == True:
-                Ag_H[i,j] = Ag_pff[0]
-            elif np.isclose(n2, 4*(2*np.pi/Ag_lat_const)**2) == True:
-                Ag_H[i,j] = Ag_pff[1]
-            else:
-                continue
-    if matrix:
-        return Ag_H*Ry_to_eV # - Ag_shift
-    else:
-        return np.sort(np.linalg.eigvalsh(Ag_H))[:neigvals]*Ry_to_eV # - Ag_shift
-
+Ag_atomic_basis = [[0.]*3]
+Ag_PP = EmpiricalPP(Ag_lattice, Ag_pff, Ag_cutoff, Ag_atomic_basis)
 
 #### Pseudopotential of Au ####
-
-# Define the pseudopotential form factors taken from Ashcroft for Au.
-Au_pff = [0.252, 0.152]
+Au_centering_type = "face"
 Au_lat_const = 4.0782*angstrom_to_Bohr
-Au_lat_const_list = [Au_lat_const]*3
-Au_lat_centering = "face"
+Au_lat_consts = [Au_lat_const]*3
 Au_lat_angles = [np.pi/2]*3
-Au_lat_vecs = make_ptvecs(Au_lat_centering, Au_lat_const_list, Au_lat_angles)
-Au_rlat_vecs = make_rptvecs(Au_lat_vecs)
+Au_lattice = Lattice(Au_centering_type, Au_lat_consts, Au_lat_angles)
+
+Au_pff = [0.252, 0.152]
 Au_cutoff = 4*(2*np.pi/Au_lat_const)**2
-Au_rlat_pts = sphere_pts(Au_rlat_vecs, Au_cutoff, [0,0,0])
-
-# The number of contributing reciprocal lattice points determines the size
-# of the Hamiltonian.
-Au_size = len(Au_rlat_pts)
-
-# Au_shift = 10.65942710893091139
-
-def Au_PP(kpoint,neigvals):
-    """Evaluate an Au pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from 
-    `Ashcroft <http://journals.aps.org/pr/abstract/10.1103/PhysRev.116.555`_.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian at the provided
-        k-point.
-    """
-    # Initialize the Au Hamiltonian.
-    Au_H = np.zeros([Au_size, Au_size])
-    
-    # Construct the Au Hamiltonian.
-    for i in range(Au_size):
-        k1 = np.asarray(Au_rlat_pts[i])
-        for j in range(i + 1):
-            k2 = np.asarray(Au_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Au_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 3*(2*np.pi/Au_lat_const)**2) == True:
-                Au_H[i,j] = Au_pff[0]
-            elif np.isclose(n2, 4*(2*np.pi/Au_lat_const)**2) == True:
-                Au_H[i,j] = Au_pff[1]
-            else:
-                continue
-    return np.sort(np.linalg.eigvalsh(Au_H))[:neigvals]*Ry_to_eV # - Au_shift
-
-def customAu_PP(kpoint, neigvals, Au_cutoff=21*(2*np.pi/Au_lat_const)**2,
-               shift=True, matrix=False):
-    """Evaluate an Au pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Ashcroft.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Au_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        Au_rlat_pts = sphere_pts(Au_rlat_vecs, Au_cutoff, kpoint)
-    else:
-        Au_rlat_pts = sphere_pts(Au_rlat_vecs, Au_cutoff, [0,0,0])
-    Au_size = len(Au_rlat_pts)
-
-    # Initialize the Au Hamiltonian.
-    Au_H = np.zeros([Au_size, Au_size])
-    
-    # Populate the Au Hamiltonian.
-    for i in range(Au_size):
-        k1 = np.asarray(Au_rlat_pts[i])
-        for j in range(Au_size):
-            k2 = np.asarray(Au_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Au_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 3*(2*np.pi/Au_lat_const)**2) == True:
-                Au_H[i,j] = Au_pff[0]
-            elif np.isclose(n2, 4*(2*np.pi/Au_lat_const)**2) == True:
-                Au_H[i,j] = Au_pff[1]
-            else:
-                continue
-    if matrix:
-        return Au_H*Ry_to_eV # - Au_shift
-    else:
-        return np.sort(np.linalg.eigvalsh(Au_H))[:neigvals]*Ry_to_eV # - Au_shift
-    
+Au_atomic_basis = [[0.]*3]
+Au_PP = EmpiricalPP(Au_lattice, Au_pff, Au_cutoff, Au_atomic_basis)
 
 #### Pseudopotential of Pb ####
-
-# Define the pseudopotential form factors taken from Ashcroft for Pb.
-Pb_pff = [-0.084, -0.039]
+Pb_centering_type = "face"
 Pb_lat_const = 4.9508*angstrom_to_Bohr
-Pb_lat_const_list = [Pb_lat_const]*3
-Pb_lat_centering = "face"
+Pb_lat_consts = [Pb_lat_const]*3
 Pb_lat_angles = [np.pi/2]*3
-Pb_lat_vecs = make_ptvecs(Pb_lat_centering, Pb_lat_const_list, Pb_lat_angles)
-Pb_rlat_vecs = make_rptvecs(Pb_lat_vecs)
+Pb_lattice = Lattice(Pb_centering_type, Pb_lat_consts, Pb_lat_angles)
+
+Pb_pff = [-0.084, -0.039]
 Pb_cutoff = 4*(2*np.pi/Pb_lat_const)**2
-Pb_rlat_pts = sphere_pts(Pb_rlat_vecs, Pb_cutoff, [0,0,0])
-
-# The number of contributing reciprocal lattice points determines the size
-# of the Hamiltonian.
-Pb_size = len(Pb_rlat_pts)
-
-# Pb_shift = 10.65942710893091139
-
-def Pb_PP(kpoint,neigvals):
-    """Evaluate an Pb pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from 
-    `Ashcroft <http://journals.aps.org/pr/abstract/10.1103/PhysRev.116.555`_.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian at the provided
-        k-point.
-    """
-    # Initialize the Pb Hamiltonian.
-    Pb_H = np.zeros([Pb_size, Pb_size])
-    
-    # Construct the Pb Hamiltonian.
-    for i in range(Pb_size):
-        k1 = np.asarray(Pb_rlat_pts[i])
-        for j in range(i + 1):
-            k2 = np.asarray(Pb_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Pb_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 3*(2*np.pi/Pb_lat_const)**2) == True:
-                Pb_H[i,j] = Pb_pff[0]
-            elif np.isclose(n2, 4*(2*np.pi/Pb_lat_const)**2) == True:
-                Pb_H[i,j] = Pb_pff[1]
-            else:
-                continue
-    return np.sort(np.linalg.eigvalsh(Pb_H))[:neigvals]*Ry_to_eV # - Pb_shift
-
-def customPb_PP(kpoint, neigvals, Pb_cutoff=21*(2*np.pi/Pb_lat_const)**2,
-               shift=True, matrix=False):
-    """Evaluate an Pb pseudopotential at a given k-point. The pseudopotential
-    form factors were taken from Ashcroft.
-
-    Args:
-        kpoint (numpy.array): a sampling point in k-space.
-        neigvals (int): the number of eigenvalues returned
-        Pb_cutoff (float): the cutoff energy for the expansion. This value 
-            determines the size of the Hamiltonian.
-        shift (bool): if true, the basis expansion will include points centered
-            about the provided kpoint.
-        matrix (bool): if true, the Hamiltonian is returned instead of its
-            eigenvalues.
-
-    Return:
-        (numpy.array): the sorted eigenvalues of the Hamiltonian or the Hamiltonian
-            itself at the the provided k-point.
-    """
-
-    if shift:
-        Pb_rlat_pts = sphere_pts(Pb_rlat_vecs, Pb_cutoff, kpoint)
-    else:
-        Pb_rlat_pts = sphere_pts(Pb_rlat_vecs, Pb_cutoff, [0,0,0])
-    Pb_size = len(Pb_rlat_pts)
-
-    # Initialize the Pb Hamiltonian.
-    Pb_H = np.zeros([Pb_size, Pb_size])
-    
-    # Populate the Pb Hamiltonian.
-    for i in range(Pb_size):
-        k1 = np.asarray(Pb_rlat_pts[i])
-        for j in range(Pb_size):
-            k2 = np.asarray(Pb_rlat_pts[j])
-            n2 = norm(k2 - k1)**2
-            if i == j:
-                Pb_H[i,j] = np.dot(kpoint + k1, kpoint + k1)
-            elif np.isclose(n2, 3*(2*np.pi/Pb_lat_const)**2) == True:
-                Pb_H[i,j] = Pb_pff[0]
-            elif np.isclose(n2, 4*(2*np.pi/Pb_lat_const)**2) == True:
-                Pb_H[i,j] = Pb_pff[1]
-            else:
-                continue
-    if matrix:
-        return Pb_H*Ry_to_eV # - Pb_shift
-    else:
-        return np.sort(np.linalg.eigvalsh(Pb_H))[:neigvals]*Ry_to_eV # - Pb_shift    
+Pb_atomic_basis = [[0.]*3]
+Pb_PP = EmpiricalPP(Pb_lattice, Pb_pff, Pb_cutoff, Pb_atomic_basis)

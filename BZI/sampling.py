@@ -344,7 +344,7 @@ def make_grid(cell_vecs, grid_vecs, offset, cart=True):
         >>> grid_vecs = make_ptvecs(grid_centering, grid_consts, grid_angles)
         >>> offset = .5*numpy.sum(cell_vecs,1)
         >>> grid = make_grid(cell_vecs, grid_vecs, offset)
-    """
+    """    
     
     # Integer matrix
     N = np.dot(np.linalg.inv(grid_vecs), cell_vecs)
@@ -379,7 +379,7 @@ def make_grid(cell_vecs, grid_vecs, offset, cart=True):
                 for z1p in range(z1pl + 1, z1pu + 1):
                     z = np.dot(np.linalg.inv(U), [z1p,z2p,z3p])
                     pt = np.dot(grid_vecs, z)
-                    gpt = np.dot(np.linalg.inv(cell_vecs), pt)%1.
+                    gpt = np.round(np.dot(np.linalg.inv(cell_vecs), pt), 12)%1
                     grid.append(np.dot(cell_vecs, gpt) - offset)
         return grid
     else:
@@ -463,7 +463,7 @@ def sphere_pts(A,r2,offset=[0.,0.,0.]):
         grid (list): an array of grid coordinates in cartesian
             coordinates.
     """
-    
+
     # This is a parameter that should help deal with rounding error.
     eps = 1e-9
     offset = np.asarray(offset)
@@ -530,52 +530,68 @@ def large_sphere_pts(A,r2,offset=[0.,0.,0.]):
             continue                
     return grid
 
-# Wiley's code.
-def make_cell_points(lat_vecs, grid_vecs):
-    """Makes the points of a grid inside the volume of the lattice vectors.
-    
-    Args:
-        lat_vecs (numpy.ndarray): A matrix whose columns hold the basis vectors
-            of the lattice in Cartesian coordinates.
-        gridp_vecs (numpy.ndarray): A matrix whose columns hold the basis vectors
-            of the grid in Cartesian coordinates.
-            
-    Returns:
-        points (numpy.ndarray): The grid points inside the lattice expressed in
-            cartesian coordinates.
-    """
-    
-    diags = _get_HNF_diags(lat_vecs, grid_vecs)
-    
-    v1 = grid_vecs[:,0]
-    v2 = grid_vecs[:,1]
-    v3 = grid_vecs[:,2]
-    
-    points = []
-    for i in range(diags[0]):
-        for j in range(diags[1]):
-            for k in range(diags[2]):
-                points.append(np.dot(np.linalg.inv(lat_vecs),v1*i+v2*j+v3*k))
-                
-    points = np.array(points)%1
-    return points
+def make_cell_points(cell_vecs, grid_vecs, offset, cart=True):
+    """Sample within a parallelepiped using any regular grid.
 
-def _get_HNF_diags(lat_vecs, grid_vecs):
-    """Find the diagonals of the HNF that makes the grid vector's supercell form
-    the parent lattice.
-    
     Args:
-        lat_vecs (numpy.ndarray): The parent lattice vectors as columns of a 
-            matrix.
-        grid_vecs (numpy.ndarray): The grid vectors as columns of a matrix.
-        
+        cell_vecs (numpy.ndarray): the vectors defining the volume in which 
+            to sample. The vectors are the columns of the matrix.
+        grid_vecs (numpy.ndarray): the vectors that generate the grid as 
+            columns of a matrix..
+        offset: the offset of the coordinate system in Cartesian or lattice
+            coordinates.
+        cart (bool): if true, return the grid in Cartesian coordinates; other-
+            wise, return the grid in lattice coordinates. If cart == True, the
+            offset must be in Cartesian coordinates. If cart == False, the offset 
+            must be in lattice coordinates.
+
     Returns:
-        HNF_diags (list): The diagonals of the HNF.
+        grid (list): an array of sampling-point coordinates.
+
+    Examples:
+        >>> cell_centering = "face"
+        >>> cell_consts = [1.]*3
+        >>> cell_angles = [np.pi/2]*3
+        >>> cell_vecs = make_ptvecs(cell_centering, cell_consts, cell_angles)
+        >>> grid_centering = "base"
+        >>> grid_consts = [cell_const/140]*3
+        >>> grid_angles = [np.pi/2]*3
+        >>> grid_vecs = make_ptvecs(grid_centering, grid_consts, grid_angles)
+        >>> offset = .5*numpy.sum(cell_vecs,1)
+        >>> grid = make_grid(cell_vecs, grid_vecs, offset)
     """
-    
-    parent = lat_vecs
-    super_cell = np.transpose(np.linalg.inv(grid_vecs))
-    HNF = np.dot(np.linalg.inv(parent),super_cell)
-    HNF_diags = np.diagonal(HNF)
-    
-    return [int(i) for i in HNF_diags]
+
+    # Integer matrix
+    N = np.dot(np.linalg.inv(grid_vecs), cell_vecs)
+    # Check that N is an integer matrix.
+    for i in range(len(N[:,0])):
+        for j in range(len(N[0,:])):
+            if np.isclose(N[i,j]%1, 0) or np.isclose(N[i,j]%1, 1):
+                N[i,j] = int(np.round(N[i,j]))
+            else:
+                raise ValueError("The cell and grid vectors are incommensurate.")
+
+    # Loop through the diagonal of the HNF matrix.
+    H, U = HermiteNormalForm(N)
+    D = np.diag(H).astype(int)    
+    grid = []
+    if cart == True:
+        for i,j,k in product(range(D[0]), range(D[1]), range(D[2])):
+            # Find the point in Cartesian coordinates.
+            pt = np.dot(grid_vecs, [i,j,k])
+            # Put the point in lattice coordinates and move it to the 
+            # first unit cell.
+            pt = np.round(np.dot(pt, np.linalg.inv(cell_vecs)),12)%1
+            # Put the point back into Cartesian coordinates.
+            pt = np.dot(pt, cell_vecs) - offset
+            grid.append(pt)
+        return grid
+    else:
+        for i,j,k in product(range(D[0]), range(D[1]), range(D[2])):
+            # Find the point in cartesian coordinates.
+            pt = np.dot(grid_vecs, [i,j,k])
+            # Put the point in lattice coordinates and move it to the 
+            # first unit cell.
+            pt = np.round(np.dot(pt, np.linalg.inv(cell_vecs)),12)%1 - offset
+            grid.append(pt)
+        return grid

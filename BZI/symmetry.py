@@ -11,7 +11,6 @@ import copy
 from itertools import islice
 from phenum.symmetry import _get_lattice_pointGroup
 
-
 class Lattice(object):
     """Create a lattice.
 
@@ -65,7 +64,7 @@ class Lattice(object):
                                           lattice_angles)
         self.symmetry_paths = get_sympaths(centering_type, lattice_constants,
                                          lattice_angles)
-
+        
 # Define the symmetry points for a simple-cubic lattice in lattice coordinates.
 sc_sympts = {"G": [0. ,0., 0.],
               "R": [1./2, 1./2, 1./2],
@@ -1434,7 +1433,8 @@ def find_orbitals(mesh_car, cell_vecs, coord = "cart"):
     return mp_orbitals
 
 def find_full_orbitals(mesh_car, cell_vecs, coord = "cart"):
-    """ Find the complete orbitals of the points in a mesh.
+    """ Find the complete orbitals of the points in a mesh, including points
+    not contained in the mesh.
 
     Args:
         mesh_car (list): a list of mesh point positions in cartesian coordinates.
@@ -1483,7 +1483,7 @@ def find_full_orbitals(mesh_car, cell_vecs, coord = "cart"):
     return mp_orbitals
 
 def find_lattice_type(centering_type, lattice_constants, lattice_angles):
-    """Find the type of the Bravais lattice.
+    """Find the Bravais lattice type of the lattice.
 
     Args:
         centering_type (str): how points are centered in the conventional

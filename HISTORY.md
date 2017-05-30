@@ -28,3 +28,6 @@ Revision 0.0.3
 
 Revision 0.0.4
 - Add a class for the empirical pseudopotentials.
+- Add a simpler function for generating the points within a parallelepiped,
+  make_cell_points.
+- Rewrite pseudopotentials in compact form with far less repeated code.
