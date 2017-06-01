@@ -479,7 +479,7 @@ def sphere_pts(A,r2,offset=[0.,0.,0.]):
     for i in range(3):
         # Add 1 because the offset was rounded to the nearest lattice point.
         n[i] = int(np.ceil(np.linalg.norm(np.cross(A[:,(i+1)%3],A[:,(i+2)%3]))*r/V) + 1)
-
+        
     grid = []
     for i,j,k in product(range(-n[0] + oi[0], n[0] + oi[0]),
                          range(-n[1] + oi[1], n[1] + oi[1]),

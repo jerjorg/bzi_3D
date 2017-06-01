@@ -115,7 +115,7 @@ def simple_fl(PP, grid, neigvals, nvalence):
     
     C = ceil(nvalence*len(grid)/2)
     energies = np.array([])
-    for i,g in enumerate(grid):
+    for g in grid:
         energies = np.concatenate((energies, PP(g, neigvals)))
     return np.sort(energies)[C-1] # C -1 since python is zero based
 

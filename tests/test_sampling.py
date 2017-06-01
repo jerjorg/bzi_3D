@@ -58,48 +58,48 @@ def test_make_grid():
                                     included = True
                             assert included == True
 
-# def test_make_cell_points():
-#     """Verify the mesh satisfies various properties, such as verifying
-#     the neighbors of each point are withing the mesh as long as the 
-#     neighbors lie within the unit cell. Also verify none of the points
-#     lie outside the unit cell.
-#     """
+def test_make_cell_points():
+    """Verify the mesh satisfies various properties, such as verifying
+    the neighbors of each point are withing the mesh as long as the 
+    neighbors lie within the unit cell. Also verify none of the points
+    lie outside the unit cell.
+    """
 
-#     # At the moment it only tests the cubic lattices.
-#     mesh_center_list = ["prim", "face", "body"]
-#     mesh_constants = [1, 1.1, 12./11, .7]
-#     mesh_consts_list = [[m]*3 for m in mesh_constants]
-#     mesh_angles = [np.pi/2]*3
-#     cell_center_list = ["prim", "face", "body"]
-#     cell_constants = [2*np.sqrt(2)]
-#     cell_consts_list = [[c]*3 for c in cell_constants]
-#     cell_angles = [np.pi/2]*3
-#     offsets = [[0., 0., 0.], [1./2, 1./2, 1./2]]
+    # At the moment it only tests the cubic lattices.
+    mesh_center_list = ["prim", "face", "body"]
+    mesh_constants = [1, 1.1, 12./11, .7]
+    mesh_consts_list = [[m]*3 for m in mesh_constants]
+    mesh_angles = [np.pi/2]*3
+    cell_center_list = ["prim", "face", "body"]
+    cell_constants = [2*np.sqrt(2)]
+    cell_consts_list = [[c]*3 for c in cell_constants]
+    cell_angles = [np.pi/2]*3
+    offsets = [[0., 0., 0.], [1./2, 1./2, 1./2]]
     
-#     # for mesh_constant in mesh_constants:
-#     for mesh_consts in mesh_consts_list:
-#         for mesh_center in mesh_center_list:
-#             mesh_vectors = make_ptvecs(mesh_center, mesh_consts, mesh_angles)
-#             mesh_lengths = [np.linalg.norm(lv) for lv in mesh_vectors]
-#             for cell_consts in cell_consts_list:
-#                 for cell_center in cell_center_list:
-#                     cell_vectors = make_ptvecs(cell_center,
-#                                                cell_consts, cell_angles)
-#                     cell_lengths = [np.linalg.norm(cv) for cv in
-#                                         cell_vectors]
-#                     for offset in offsets:
-#                         mesh = make_cell_points(cell_vectors, mesh_vectors, offset)
-#                         large_mesh = make_large_mesh(cell_vectors,
-#                                                   mesh_vectors, offset)
+    # for mesh_constant in mesh_constants:
+    for mesh_consts in mesh_consts_list:
+        for mesh_center in mesh_center_list:
+            mesh_vectors = make_ptvecs(mesh_center, mesh_consts, mesh_angles)
+            mesh_lengths = [np.linalg.norm(lv) for lv in mesh_vectors]
+            for cell_consts in cell_consts_list:
+                for cell_center in cell_center_list:
+                    cell_vectors = make_ptvecs(cell_center,
+                                               cell_consts, cell_angles)
+                    cell_lengths = [np.linalg.norm(cv) for cv in
+                                        cell_vectors]
+                    for offset in offsets:
+                        mesh = make_cell_points(cell_vectors, mesh_vectors, offset)
+                        large_mesh = make_large_mesh(cell_vectors,
+                                                  mesh_vectors, offset)
                         
-#                         # Verify all the points in the cell for the large mesh
-#                         # are contained in mesh.
-#                         for lg in large_mesh[0]:
-#                             included = False
-#                             for g in mesh:
-#                                 if np.allclose(lg,g) == True:
-#                                     included = True
-#                             assert included == True
+                        # Verify all the points in the cell for the large mesh
+                        # are contained in mesh.
+                        for lg in large_mesh[0]:
+                            included = False
+                            for g in mesh:
+                                if np.allclose(lg,g) == True:
+                                    included = True
+                            assert included == True
 
                             
 def test_get_minmax_indices():

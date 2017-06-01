@@ -6,7 +6,7 @@ from numpy.linalg import norm
 import matplotlib.pyplot as plt
 import itertools
 from mpl_toolkits.mplot3d import Axes3D
-from BZI.pseudopots import ToyPP, W1
+from BZI.pseudopots import Toy_PP, W1
 from BZI.symmetry import (bcc_sympts, fcc_sympts, sc_sympts, make_ptvecs,
                           make_rptvecs, sym_path)
 
@@ -302,9 +302,9 @@ def plot_band_structure(materials_list, PPlist, PPargs_list, lattice, npts,
         start = np.sum(distances[:i])
         stop = np.sum(distances[:i+1])
         if i == (len(distances) - 1):
-            lines += list(np.linspace(start, stop, npts))            
+            lines += list(np.linspace(start, stop, npts))
         else:
-            lines += list(np.delete(np.linspace(start, stop, npts),-1))                
+            lines += list(np.delete(np.linspace(start, stop, npts),-1))
             
     # Store the energy eigenvalues in an nested array.
     nPP = len(PPlist)
@@ -534,7 +534,7 @@ def PlotVaspBandStructure(file_loc, material, lat_type, lat_consts, lat_angles,
         start = np.sum(sympt_dist[:i+1])
         stop = np.sum(sympt_dist[:i+2])
         if i == (nsympts - 2):
-            lines += list(np.linspace(start, stop, npts_path))            
+            lines += list(np.linspace(start, stop, npts_path))
         else:
             lines += list(np.delete(np.linspace(start, stop, npts_path),-1))
 

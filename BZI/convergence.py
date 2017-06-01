@@ -61,7 +61,7 @@ class Convergence(object):
 
     def compare_grids(self, answer, plot=False, save=False):
         self.answer = answer
-        if self.random == True:
+        if self.random:
             nm = len(self.grid_types)
             self.nspts = [[] for _ in range(nm + 1)]
             self.errors = [[] for _ in range(nm + 1)]
@@ -107,7 +107,7 @@ class Convergence(object):
             np.save("%s_errors" %self.pseudo_potential, self.errors)
             
         if plot:
-            if self.random == True:
+            if self.random:
                 plt.loglog(self.nspts[nm], self.errors[nm], label="random", color="orange")
             for i in range(len(self.grid_types)):
                 plt.loglog(self.nspts[i], self.errors[i], label=self.grid_types[i])

@@ -142,7 +142,7 @@ def gen(msg, level=1):
 def blank(n=1, level=2):
     """Prints a blank line to the terminal."""
     if will_print(level):
-        for i in range(n):
+        for _ in range(n):
             print("")
 
 def std(msg, level=1):

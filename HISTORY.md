@@ -31,3 +31,7 @@ Revision 0.0.4
 - Add a simpler function for generating the points within a parallelepiped,
   make_cell_points.
 - Rewrite pseudopotentials in compact form with far less repeated code.
+
+Revision 0.0.5
+- Add rougly 15 new pseudopotentials for simple, monatomic metals.
+- Add unit tests that plot the band structures of these metals.

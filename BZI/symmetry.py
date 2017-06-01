@@ -63,8 +63,8 @@ class Lattice(object):
         self.symmetry_points = get_sympts(centering_type, lattice_constants,
                                           lattice_angles)
         self.symmetry_paths = get_sympaths(centering_type, lattice_constants,
-                                         lattice_angles)
-        
+                                           lattice_angles)
+    
 # Define the symmetry points for a simple-cubic lattice in lattice coordinates.
 sc_sympts = {"G": [0. ,0., 0.],
               "R": [1./2, 1./2, 1./2],
@@ -1311,13 +1311,12 @@ def sym_path(lattice, npts):
         px = np.linspace(pxi,pxf,npts)
         py = np.linspace(pyi,pyf,npts)
         pz = np.linspace(pzi,pzf,npts)
-        ipath = [[px[i],py[i],pz[i]] for i in range(len(px))]
-        if i is 0:
+        ipath = [[px[j],py[j],pz[j]] for j in range(len(px))]
+        if i == 0:
             paths += ipath
         else:
-            del ipath[0]
+            del ipath[-1]
             paths += ipath
-
     return paths    
 
 def point_group(lat_vecs):
