@@ -6,7 +6,7 @@ from numpy.linalg import norm
 import matplotlib.pyplot as plt
 import itertools
 from mpl_toolkits.mplot3d import Axes3D
-from BZI.pseudopots import Toy_PP, W1
+# from BZI.pseudopots import Toy_PP, W1
 from BZI.symmetry import (bcc_sympts, fcc_sympts, sc_sympts, make_ptvecs,
                           make_rptvecs, sym_path)
 

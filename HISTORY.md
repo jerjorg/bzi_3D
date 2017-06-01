@@ -35,3 +35,6 @@ Revision 0.0.4
 Revision 0.0.5
 - Add rougly 15 new pseudopotentials for simple, monatomic metals.
 - Add unit tests that plot the band structures of these metals.
+- Remove rectangle_method function from integration since it relied on an
+  outdated sampling method.
+- Add number of valence electrons as an attribute to the pseudopotentials.
