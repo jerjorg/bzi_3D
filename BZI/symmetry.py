@@ -5,9 +5,10 @@ Materials Science 49.2 (2010): 299-312.
 """
 
 import numpy as np
-from numpy.linalg import norm
+import math
+from numpy.linalg import norm, inv
 import itertools
-import copy
+from copy import deepcopy
 from itertools import islice
 from phenum.symmetry import _get_lattice_pointGroup
 
@@ -48,6 +49,11 @@ class Lattice(object):
         symmetry_paths (list): a list of symmetry point pairs used when creating
             a band structure plot.
         type (str): the Bravais lattice type.
+        volume (float): the volume of the parallelepiped given by the three
+            lattice vectors
+        reciprocal_volume (float): the volume of the parallelepiped given by the three
+            reciprocal lattice vectors
+
     """
     
     def __init__(self, centering_type, lattice_constants, lattice_angles):
@@ -64,6 +70,8 @@ class Lattice(object):
                                           lattice_angles)
         self.symmetry_paths = get_sympaths(centering_type, lattice_constants,
                                            lattice_angles)
+        self.volume = np.linalg.det(self.vectors)
+        self.reciprocal_volume = np.linalg.det(self.reciprocal_vectors)
     
 # Define the symmetry points for a simple-cubic lattice in lattice coordinates.
 sc_sympts = {"G": [0. ,0., 0.],
@@ -1378,108 +1386,177 @@ def shells_list(vectors, lat_vecs):
     nested_shells = [shells(i, lat_vecs) for i in vectors]
     return np.array(list(itertools.chain(*nested_shells)))
 
-def find_orbitals(mesh_car, cell_vecs, coord = "cart"):
-    """ Find the partial orbitals of the points in a mesh, including only the
-    points that are in the mesh.
+def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False):
+    """ Find the partial orbitals of the points in a grid, including only the
+    points that are in the grid.
 
     Args:
-        mesh_car (list): a list of mesh point positions in Cartesian 
+        grid_car (numpy.ndarray): a list of grid point positions in Cartesian 
             coordinates.
-        cell_vecs (numpy.ndarray): the vectors that define the integration cell.
+        lat_vecs (numpy.ndarray): the vectors that define the integration cell.
         coord (str): a string that indicatese coordinate system of the points.
-            It can be in Cartesian ("cart") or lattice ("cell").
+            It can be in Cartesian ("cart") or lattice ("lat").
 
     Returns:
-        mp_orbitals (dict): the orbitals of the mesh points in a dictionary. 
+        gp_orbitals (dict): the orbitals of the grid points in a dictionary. 
             The keys of the dictionary are integer labels and the values are the
-            mesh points in the orbital.
+            grid points in the orbital.
     """
-
-    mesh_cell = [np.dot(np.linalg.inv(cell_vecs), mp) for mp in mesh_car]
-    mp_orbitals = {}
+    
+    # Put the grid in lattice coordinates.
+    grid_cell = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], 9)%1)
+    # Remove duplicates if necessary.    
+    if duplicates:
+        grid_copy = list(deepcopy(grid_cell))
+        grid_cell = []
+        while len(grid_copy) != 0:
+            gp = grid_copy.pop()
+            if any([np.allclose(gp, gc) for gc in grid_copy]):
+                continue
+            else:
+                grid_cell.append(gp)
+        
+    gp_orbitals = {}
     nirr_kpts = 0
-    mesh_copy = copy.deepcopy(mesh_cell)
-    pointgroup = point_group(cell_vecs)        
-    while mesh_copy != []:
-        # Grap a point and build its orbit but only include points from the mesh.
-        mp = mesh_copy.pop()
+    grid_copy = list(deepcopy(grid_cell))
+    pointgroup = point_group(lat_vecs)
+    pointgroup = [np.dot(np.dot(inv(lat_vecs), pg), lat_vecs) for pg in pointgroup]
+
+    while len(grid_copy) != 0:
+        # Grab a point and build its orbit but only include points from the grid.
+        g = grid_copy.pop()
         nirr_kpts += 1
-        mp_orbitals[nirr_kpts] = [mp]
+        gp_orbitals[nirr_kpts] = [g]
+
         for pg in pointgroup:
             # If the group operation moves the point outside the cell, %1 moves
             # it back in.
             # I ran into floating point precision problems the last time I ran
-            # %1. Just to be safe it's included here.
-            new_mp = np.round(np.dot(pg, mp), 12)%1.
-            if any([np.allclose(new_mp, mc) for mc in mesh_copy]):
-                ind = np.where(np.array([np.allclose(new_mp, mc)
-                                         for mc in mesh_copy]) == True)[0][0]
-                del mesh_copy[ind]
-                mp_orbitals[nirr_kpts].append(new_mp)
+            # %1, rounding fixed these.
+            new_gp = np.round(np.dot(pg, g), 9)%1
+            
+            # If the new grid point is in the grid, remove it and add it to the
+            # orbital of grid point (g).
+            if any([np.allclose(new_gp, gc) for gc in grid_copy]):
+                ind = np.where(np.array([np.allclose(new_gp, gc)
+                                         for gc in grid_copy]))[0][0]
+                gp_orbitals[nirr_kpts].append(new_gp)
+                del grid_copy[ind]
             else:
                 continue
-
     if coord == "cart":
-        for i in range(1, len(mp_orbitals.keys()) + 1):
-            for j in range(len(mp_orbitals[i])):
-                mp_orbitals[i][j] = np.dot(cell_vecs, mp_orbitals[i][j])
-        return mp_orbitals
-    elif coord == "cell":
-        return mp_orbitals
+        for i in range(1, len(gp_orbitals.keys()) + 1):
+            for j in range(len(gp_orbitals[i])):
+                gp_orbitals[i][j] = np.dot(lat_vecs, gp_orbitals[i][j])
+        return gp_orbitals# , pointgroup
+    elif coord == "lat":
+        return gp_orbitals
     else:
-        raise ValueError("There is no method for the coordinate system provided yet.")
-        
-    return mp_orbitals
+        raise ValueError("Coordinate options are 'cell' and 'lat'.")
 
-def find_full_orbitals(mesh_car, cell_vecs, coord = "cart"):
-    """ Find the complete orbitals of the points in a mesh, including points
-    not contained in the mesh.
+# def find_orbitals(grid_car, cell_vecs, coord = "cart"):
+#     """ Find the partial orbitals of the points in a grid, including only the
+#     points that are in the grid.
+
+#     Args:
+#         grid_car (numpy.ndarray): a list of grid point positions in Cartesian 
+#             coordinates.
+#         cell_vecs (numpy.ndarray): the vectors that define the integration cell.
+#         coord (str): a string that indicatese coordinate system of the points.
+#             It can be in Cartesian ("cart") or lattice ("cell").
+
+#     Returns:
+#         mp_orbitals (dict): the orbitals of the grid points in a dictionary. 
+#             The keys of the dictionary are integer labels and the values are the
+#             grid points in the orbital.
+#     """
+
+#     # grid_cell = [np.dot(np.linalg.inv(cell_vecs), mp) for mp in grid_car]
+#     mp_orbitals = {}
+#     nirr_kpts = 0
+#     grid_copy = deepcopy(grid_car)
+#     pointgroup = point_group(cell_vecs)
+#     while grid_copy != []:
+#         # Grap a point and build its orbit but only include points from the grid.
+#         # mp = grid_copy.pop()
+#         mp, grid_copy = grid_copy[-1], grid_copy[:-1]
+#         nirr_kpts += 1
+#         mp_orbitals[nirr_kpts] = [mp]
+#         for pg in pointgroup:
+#             # If the group operation moves the point outside the cell, %1 moves
+#             # it back in.
+#             # I ran into floating point precision problems the last time I ran
+#             # %1. Just to be safe it's included here.
+#             new_mp = np.round(np.dot(pg, mp), 9)%1.
+#             if any([np.allclose(new_mp, mc) for mc in grid_copy]):
+#                 ind = np.where(np.array([np.allclose(new_mp, mc)
+#                                          for mc in grid_copy]) == True)[0][0]
+#                 # del grid_copy[ind]
+#                 grid_copy = np.delete(grid_copy, ind)
+#                 mp_orbitals[nirr_kpts].append(new_mp)
+#             else:
+#                 continue
+
+#     if coord == "cart":
+#         for i in range(1, len(mp_orbitals.keys()) + 1):
+#             for j in range(len(mp_orbitals[i])):
+#                 mp_orbitals[i][j] = np.dot(cell_vecs, mp_orbitals[i][j])
+#         return mp_orbitals
+#     elif coord == "cell":
+#         return mp_orbitals
+#     else:
+#         raise ValueError("There is no method for the coordinate system provided yet.")
+        
+#     return mp_orbitals
+
+def find_full_orbitals(grid_car, lat_vecs, coord = "cart"):
+    """ Find the complete orbitals of the points in a grid, including points
+    not contained in the grid.
 
     Args:
-        mesh_car (list): a list of mesh point positions in cartesian coordinates.
-        cell_vecs (numpy.ndarray): the vectors that define the integration cell
+        grid_car (list): a list of grid point positions in cartesian coordinates.
+        lat_vecs (numpy.ndarray): the vectors that define the integration cell
 
     Returns:
-        mp_orbitals (dict): the orbitals of the mesh points in a dictionary. 
+        gp_orbitals (dict): the orbitals of the grid points in a dictionary. 
             The keys of the dictionary are integer labels and the values are the
-            mesh points in the orbital.
+            grid points in the orbital.
     """
 
-    mesh_cell = [np.dot(np.linalg.inv(cell_vecs), mp) for mp in mesh_car]
-    mp_orbitals = {}
+    grid_lat = [np.dot(np.linalg.inv(lat_vecs), gp) for gp in grid_car]
+    gp_orbitals = {}
     nirr_kpts = 0
-    mesh_copy = copy.deepcopy(mesh_cell)
-    pointgroup = _get_lattice_pointGroup(cell_vecs)
-    while mesh_copy != []:
-        # Grap a point and build its orbit but only include points from the mesh.
-        mp = mesh_copy.pop()
+    grid_copy = deepcopy(grid_lat)
+    pointgroup = point_group(lat_vecs)
+    pointgroup = [np.dot(np.dot(inv(lat_vecs), pg), lat_vecs) for pg in pointgroup]    
+    while grid_copy != []:
+        # Grap a point and build its orbit but only include points from the grid.
+        gp = grid_copy.pop()
         nirr_kpts += 1
-        mp_orbitals[nirr_kpts] = []
+        gp_orbitals[nirr_kpts] = []
         for pg in pointgroup:
             # If the group operation moves the point outside the cell, %1 moves
             # it back in.
             # I ran into floating point precision problems the last time I ran
             # %1. Just to be safe it's included here.
-            new_mp = np.round(np.dot(pg, mp), 12)%1.
-            if any([np.allclose(new_mp, mc) for mc in mesh_copy]):
-                ind = np.where(np.array([np.allclose(new_mp, mc) for mc in mesh_copy]) == True)[0][0]
-                del mesh_copy[ind]
-                mp_orbitals[nirr_kpts].append(new_mp)
+            new_gp = np.round(np.dot(pg, gp), 12)%1.
+            if any([np.allclose(new_gp, gc) for gc in grid_copy]):
+                ind = np.where(np.array([np.allclose(new_gp, gc) for gc in grid_copy]) == True)[0][0]
+                del grid_copy[ind]
+                gp_orbitals[nirr_kpts].append(new_gp)
             else:
-                mp_orbitals[nirr_kpts].append(new_mp)                
+                gp_orbitals[nirr_kpts].append(new_gp)                
                 continue
 
     if coord == "cart":
-        for i in range(1, len(mp_orbitals.keys()) + 1):
-            for j in range(len(mp_orbitals[i])):
-                mp_orbitals[i][j] = np.dot(cell_vecs, mp_orbitals[i][j])
-        return mp_orbitals
+        for i in range(1, len(gp_orbitals.keys()) + 1):
+            for j in range(len(gp_orbitals[i])):
+                gp_orbitals[i][j] = np.dot(lat_vecs, gp_orbitals[i][j])
+        return gp_orbitals
     elif coord == "cell":
-        return mp_orbitals
+        return gp_orbitals
     else:
-        raise ValueError("There is no method for the coordinate system provided yet.")
-
-    return mp_orbitals
+        raise ValueError("Coordinate options are 'cell' and 'lat'.")
 
 def find_lattice_type(centering_type, lattice_constants, lattice_angles):
     """Find the Bravais lattice type of the lattice.

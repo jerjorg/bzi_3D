@@ -1,7 +1,6 @@
 # Revision History
 
 ## Revision 0.0.1
-
 - Add integration, plots, convergence, symmetry and sampling modules.
 - Create unit tests for module functions.
 - Implement sphinx documentation.
@@ -12,7 +11,7 @@
   coordinates.
 - Add additional lattices to make_ptvecs.
 
-Revision 0.0.3
+## Revision 0.0.3
 - Generalize make_ptvecs so that it can handle all 14 Bravais lattices.
 - Create make_lattice_vectors that also generates the 14 Bravais lattices.
 - Create dictionaries and functions that return the high symmetry points for
@@ -26,15 +25,28 @@ Revision 0.0.3
 - Create a function that identifies the lattice type.
 - Create a lattice class that stores all variables related to the lattice.
 
-Revision 0.0.4
+## Revision 0.0.4
 - Add a class for the empirical pseudopotentials.
 - Add a simpler function for generating the points within a parallelepiped,
   make_cell_points.
 - Rewrite pseudopotentials in compact form with far less repeated code.
 
-Revision 0.0.5
-- Add rougly 15 new pseudopotentials for simple, monatomic metals.
+## Revision 0.0.5
+- Add roughly 15 new pseudopotentials for simple, monatomic metals.
 - Add unit tests that plot the band structures of these metals.
 - Remove rectangle_method function from integration since it relied on an
   outdated sampling method.
 - Add number of valence electrons as an attribute to the pseudopotentials.
+
+## Revision 0.0.6
+- Fix bugs in find_orbitals and find_full_orbitals that were caused by
+  assuming the group operators returned by point_group were in lattice
+  coordinates.
+
+## Revision 0.0.7
+- Add improved tetrahedron method module that includes methods for creating
+  a grid, splitting the grid into tetrahedra, and calculating the Fermi level,
+  and total energy.
+- Make minor changes to symmetry.
+- Create free electron model pseudopotential.
+- Add unit tests for calculating the Fermi level and total energy.

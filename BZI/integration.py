@@ -5,7 +5,7 @@ import numpy as np
 from math import ceil
 from BZI.sampling import HermiteNormalForm
 
-def rectangular_method(PP, neigvals, grid, cell_vecs, Fermi_level):
+def rectangular_method(PP, grid):
     """Integrate a pseudopotential within a cell below the Fermi level.
     
     Args:
@@ -19,11 +19,12 @@ def rectangular_method(PP, neigvals, grid, cell_vecs, Fermi_level):
     """
     
     integral = 0
+    neigvals = int(np.ceil(PP.nvalence_electrons/2.))
     for kpt in grid:
-        integral += sum(filter(lambda x: x <= Fermi_level, PP.eval(kpt, neigvals)))
-    return np.linalg.det(cell_vecs)/len(grid)*integral
+        integral += sum(filter(lambda x: x <= PP.fermi_level, PP.eval(kpt, neigvals)))
+    return np.linalg.det(PP.lattice.reciprocal_vectors)/len(grid)*integral
 
-def simple_fl(PP, grid, neigvals, nvalence):
+def rectangular_fermi_level(PP, grid):
     """Find the energy at which the toy band structure it cut.
     
     Args:
@@ -35,13 +36,14 @@ def simple_fl(PP, grid, neigvals, nvalence):
         (float) the Fermi level
     """
     
-    C = ceil(nvalence*len(grid)/2)
+    C = int(ceil(PP.nvalence_electrons*len(grid)/2.))
+    neigvals = int(np.ceil(PP.nvalence_electrons/2)+1)
     energies = np.array([])
     for g in grid:
-        energies = np.concatenate((energies, PP(g, neigvals)))
+        energies = np.concatenate((energies, PP.eval(g, neigvals)))
     return np.sort(energies)[C-1] # C -1 since python is zero based
 
-def monte_carlo(PP, cell_vecs, npts, Fermi_level):
+def monte_carlo(PP, npts):
     """Integrate a function using Monte Carlo sampling. Only works for integrations
     from 0 to 1 in all 3 directions.
     """

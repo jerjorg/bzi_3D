@@ -4,8 +4,8 @@ import time
 from BZI.symmetry import make_ptvecs
 from BZI.sampling import make_grid
 from BZI.pseudopots import Al_PP
-from BZI.integration import rectangle_method, monte_carlo
-from BZI.plots import PlotGrid
+from BZI.integration import monte_carlo
+from BZI.plots import PlotMesh
 
 
 class Convergence(object):
@@ -55,7 +55,7 @@ class Convergence(object):
         self.grid_centerings = grid_centerings or ["prim", "base", "body", "face"]
         self.grid_constants = grid_constants or [1/n for n in range(2,11)]
         self.offset = offset or [0.,0.,0.]
-        self.integration_methods = integration_methods or [rectangle_method]
+        # self.integration_methods = integration_methods or [rectangle_method]
         self.origin = origin or [0.,0.,0.]
         self.random = random or False
 
@@ -134,4 +134,4 @@ class Convergence(object):
         grid_vecs = make_ptvecs(self.grid_types[i], self.grid_constants[j])
         grid_pts = make_grid(self.rcell_vectors, gr_vecs, self.offset)
         
-        PlotGrid(grid_pts, self.rcell_vectors, self.offset)
+        PlotMesh(grid_pts, self.rcell_vectors, self.offset)

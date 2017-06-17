@@ -103,7 +103,8 @@ def ScatterPlotSingle(func, ndivisions, cutoff=None):
         ax.scatter(kxlist, kylist, estates,s=.5);
     plt.show()
     
-def PlotMesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.])):
+def PlotMesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
+             indices=None):
     """Create a 3D scatter plot of a set of mesh points inside a cell.
     
     Args:
@@ -121,6 +122,11 @@ def PlotMesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.])):
 
     ax = plt.subplot(1,1,1,projection="3d")
     ax.scatter(kxlist, kylist, kzlist, c="red")
+
+    # Give the points labels if provided.
+    if (type(indices) == list or type(indices) == np.ndarray):
+        for x,y,z,i in zip(kxlist,kylist,kzlist,indices):
+            ax.text(x,y,z,i)    
     
     c1 = cell_vecs[:,0] 
     c2 = cell_vecs[:,1] 

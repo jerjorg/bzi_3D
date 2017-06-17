@@ -449,7 +449,7 @@ def make_large_grid(cell_vectors, grid_vectors, offset, cart=True):
     return (np.asarray(grid), np.asarray(null_grid))
 
 def sphere_pts(A,r2,offset=[0.,0.,0.]):
-    """ Calculate all the points within a sphere that are 
+    """ Calculate all the points within a sphere that are
     given by an integer linear combination of the columns of 
     A.
     
@@ -530,7 +530,7 @@ def large_sphere_pts(A,r2,offset=[0.,0.,0.]):
             continue                
     return grid
 
-def make_cell_points(cell_vecs, grid_vecs, offset, cart=True):
+def make_cell_points(cell_vecs, grid_vecs, offset=[0,0,0], cart=True):
     """Sample within a parallelepiped using any regular grid.
 
     Args:

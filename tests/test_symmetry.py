@@ -3,12 +3,12 @@
 
 import pytest
 import numpy as np
-from numpy.linalg import norm
+from numpy.linalg import norm, inv
 from itertools import product
 from itertools import combinations
 
 from BZI.symmetry import (get_sympts, get_sympaths, make_ptvecs, make_rptvecs,
-                          make_lattice_vectors)
+                          make_lattice_vectors, find_orbitals)
             
 def test_make_ptvecs():
     """Verify the primitive translation vectors are correct.
@@ -1464,4 +1464,53 @@ def test_sympts_sympaths():
                             lattice_angles)
 
     for p1, p2 in zip(sympath1, sympath2):
-        assert p1 == p2                        
+        assert p1 == p2
+
+def test_find_orbitals():
+
+    # Make sure duplicate points get removed from the grid.
+    lat_angles = [np.pi/2]*3
+    lat_consts = [1]*3
+    lat_centering = "face"
+    lat_vecs = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    
+    grid = [[0,.5,.5], [.5,.5,0], [.5,0,.5], 
+            [0,-.5,.5], [-.5,.5,0], [-.5,0,.5],
+            [0,.5,-.5], [.5,-.5,0], [.5,0,-.5], 
+            [0,-.5,-.5], [-.5,-.5,0], [-.5,0,-.5]]
+
+    orbitals = find_orbitals(grid, lat_vecs, duplicates=True)
+    assert len(orbitals.keys()) == 1
+    assert np.allclose(orbitals[1], [0,0,0])
+
+    lat_angles = [np.pi/2]*3
+    lat_consts = [1]*3
+    lat_centering = "body"
+    lat_vecs = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    
+    grid = [[-.5,.5,.5], [.5,-.5,.5], [-.5,-.5,.5], 
+            [.5,.5,-.5], [-.5,.5,-.5], [.5,-.5,-.5],
+            [-.5,-.5,-.5], [0,0,0]]
+
+    orbitals = find_orbitals(grid, lat_vecs, duplicates=True)
+    assert len(orbitals.keys()) == 1
+    assert np.allclose(orbitals[1], [0,0,0])
+
+    lat_angles = [np.pi/2]*3
+    lat_consts = [1]*3
+    lat_centering = "prim"
+    lat_vecs = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    
+    grid = [[-1,1,1], [1,-1,1], [-1,-1,1], [1,1,-1], [-1,1,-1], [1,-1,-1],
+            [-1,-1,-1], [0,0,0], [0,1,1], [1,0,1], [0,0,1], [1,1,0], [0,1,0],
+            [1,0,0], [0,-1,0]]
+
+    orbitals = find_orbitals(grid, lat_vecs, duplicates=True)
+    assert len(orbitals.keys()) == 1
+    assert np.allclose(orbitals[1], [0,0,0])
+
+
+    # Verify orbitals are correct.
+
+    grid = 
+    
