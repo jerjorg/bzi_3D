@@ -25,6 +25,7 @@ class EmpiricalPP(object):
         energy_shift (float): an energy shift typically used to place the Fermi
             level at the correct position.
         fermi_level (float): the fermi level.
+        total_energy (float): the total energy.
 
     Attributes:
         lattice (:py:obj:`BZI.symmetry.lattice`): an instance of Lattice.
@@ -39,7 +40,7 @@ class EmpiricalPP(object):
         nvalence_electrons (int): the number of valence electrons
         energy_shift (float): an energy shift typically used to place the Fermi
             level at the correct position.
-        fermi_level (float): the fermi level.
+        total_energy (float): the total energy.
 
     Example:
         >>> centering_type = "face"
@@ -151,6 +152,7 @@ class CohenEmpiricalPP(object):
         energy_shift (float): an energy shift typically used to place the Fermi
             level at the correct position.
         fermi_level (float): the fermi level.
+        total_energy (float): the total energy.
 
     Attributes:
         lattice (:py:obj:`BZI.symmetry.lattice`): an instance of Lattice.
@@ -170,6 +172,7 @@ class CohenEmpiricalPP(object):
         energy_shift (float): an energy shift typically used to place the Fermi
             level at the correct position.
         fermi_level (float): the fermi level.
+        total_energy (float): the total energy.
     """
 
     def __init__(self, lattice, sym_form_factors, antisym_form_factors,

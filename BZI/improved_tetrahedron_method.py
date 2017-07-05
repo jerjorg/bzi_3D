@@ -227,7 +227,7 @@ def grid_and_tetrahedra(PP, ndivisions, lat_shift=[0,0,0], grid_shift=[0,0,0]):
             divisions along each basis vector to take when creating the grid.
         lat_shift (list or numpy.ndarray): a vector that shifts the grid in 
             fractions of the reciprocal lattice vectors.
-        gridshift (list of numpy.ndarray): the offset of the lattice in 
+        grid_shift (list of numpy.ndarray): the offset of the lattice in 
             fractions of the submesh translations.
 
     Returns:

@@ -6,11 +6,13 @@ Materials Science 49.2 (2010): 299-312.
 
 import numpy as np
 import math
-from numpy.linalg import norm, inv
+from numpy.linalg import norm, inv, det
 import itertools
 from copy import deepcopy
 from itertools import islice
+
 from phenum.symmetry import _get_lattice_pointGroup
+from phenum.grouptheory import SmithNormalForm
 
 class Lattice(object):
     """Create a lattice.
@@ -70,8 +72,8 @@ class Lattice(object):
                                           lattice_angles)
         self.symmetry_paths = get_sympaths(centering_type, lattice_constants,
                                            lattice_angles)
-        self.volume = np.linalg.det(self.vectors)
-        self.reciprocal_volume = np.linalg.det(self.reciprocal_vectors)
+        self.volume = det(self.vectors)
+        self.reciprocal_volume = det(self.reciprocal_vectors)
     
 # Define the symmetry points for a simple-cubic lattice in lattice coordinates.
 sc_sympts = {"G": [0. ,0., 0.],
@@ -611,7 +613,6 @@ def get_sympts(centering_type, lattice_constants, lattice_angles):
         msg = ("The lattice parameters provided don't correspond to a valid "
                "3D Bravais lattice.")
         raise ValueError(msg.format())
-
     
 def get_sympaths(centering_type, lattice_constants, lattice_angles):
     """Find the symmetry paths for the provided lattice.
@@ -880,7 +881,7 @@ def make_ptvecs(center_type, lat_consts, lat_angles):
                                  np.cos(beta)*np.cos(gamma)),
                 np.sqrt(np.round(c**2 - (c*np.cos(beta))**2 -
                                  (c/np.sin(gamma)*(np.cos(alpha) -
-                                  np.cos(beta)*np.cos(gamma)))**2, 9))])
+                                                   np.cos(beta)*np.cos(gamma)))**2, 15))])
     
     if center_type == "prim":
         # I have to take care that a hexagonal grid is rotated 60 degrees so
@@ -1385,7 +1386,7 @@ def shells_list(vectors, lat_vecs):
     """
     nested_shells = [shells(i, lat_vecs) for i in vectors]
     return np.array(list(itertools.chain(*nested_shells)))
-
+            
 def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False):
     """ Find the partial orbitals of the points in a grid, including only the
     points that are in the grid.
@@ -1396,16 +1397,19 @@ def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False):
         lat_vecs (numpy.ndarray): the vectors that define the integration cell.
         coord (str): a string that indicatese coordinate system of the points.
             It can be in Cartesian ("cart") or lattice ("lat").
+        duplicates (bool): if there are points in the grid outside the first
+            unit cell, duplicates should be true.
 
     Returns:
         gp_orbitals (dict): the orbitals of the grid points in a dictionary. 
             The keys of the dictionary are integer labels and the values are the
             grid points in the orbital.
     """
-    
-    # Put the grid in lattice coordinates.
-    grid_cell = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], 9)%1)
-    # Remove duplicates if necessary.    
+        
+    # Put the grid in lattice coordinates and move it into the first unit cell.
+    # grid_cell = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], 15)%1) # I removed the mod 1, put it back in on monday (maybe)
+    grid_cell = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], 15))
+    # Remove duplicates if necessary.
     if duplicates:
         grid_copy = list(deepcopy(grid_cell))
         grid_cell = []
@@ -1415,7 +1419,7 @@ def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False):
                 continue
             else:
                 grid_cell.append(gp)
-        
+
     gp_orbitals = {}
     nirr_kpts = 0
     grid_copy = list(deepcopy(grid_cell))
@@ -1427,14 +1431,13 @@ def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False):
         g = grid_copy.pop()
         nirr_kpts += 1
         gp_orbitals[nirr_kpts] = [g]
-
         for pg in pointgroup:
-            # If the group operation moves the point outside the cell, %1 moves
+            # If the group operation moves the point outside the cell, mod moves
             # it back in.
             # I ran into floating point precision problems the last time I ran
-            # %1, rounding fixed these.
-            new_gp = np.round(np.dot(pg, g), 9)%1
-            
+            # mod, rounding fixed these.
+            new_gp = np.round(np.dot(pg, g), 15)%1
+                  
             # If the new grid point is in the grid, remove it and add it to the
             # orbital of grid point (g).
             if any([np.allclose(new_gp, gc) for gc in grid_copy]):
@@ -1454,60 +1457,62 @@ def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False):
     else:
         raise ValueError("Coordinate options are 'cell' and 'lat'.")
 
-# def find_orbitals(grid_car, cell_vecs, coord = "cart"):
-#     """ Find the partial orbitals of the points in a grid, including only the
-#     points that are in the grid.
+def nfind_orbitals(grid_car, lat_vecs, HNF, coord = "cart", duplicates=False):
+    """ Find the partial orbitals of the points in a grid, including only the
+    points that are in the grid.
 
-#     Args:
-#         grid_car (numpy.ndarray): a list of grid point positions in Cartesian 
-#             coordinates.
-#         cell_vecs (numpy.ndarray): the vectors that define the integration cell.
-#         coord (str): a string that indicatese coordinate system of the points.
-#             It can be in Cartesian ("cart") or lattice ("cell").
+    Args:
+        grid_car (numpy.ndarray): a list of grid point positions in Cartesian 
+            coordinates.
+        lat_vecs (numpy.ndarray): the vectors that define the integration cell.
+        coord (str): a string that indicatese coordinate system of the points.
+            It can be in Cartesian ("cart") or lattice ("lat").
+        duplicates (bool): if there are points in the grid outside the first
+            unit cell, duplicates should be true.
 
-#     Returns:
-#         mp_orbitals (dict): the orbitals of the grid points in a dictionary. 
-#             The keys of the dictionary are integer labels and the values are the
-#             grid points in the orbital.
-#     """
+    Returns:
+        gp_orbitals (dict): the orbitals of the grid points in a dictionary. 
+            The keys of the dictionary are integer labels and the values are the
+            grid points in the orbital.
+    """
+    
+    # Put the grid in lattice coordinates.
+    grid_cell = np.dot(np.linalg.inv(lattice.vectors), np.array(grid_car).T).T
+    # grid_cell = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], 9)%1)
 
-#     # grid_cell = [np.dot(np.linalg.inv(cell_vecs), mp) for mp in grid_car]
-#     mp_orbitals = {}
-#     nirr_kpts = 0
-#     grid_copy = deepcopy(grid_car)
-#     pointgroup = point_group(cell_vecs)
-#     while grid_copy != []:
-#         # Grap a point and build its orbit but only include points from the grid.
-#         # mp = grid_copy.pop()
-#         mp, grid_copy = grid_copy[-1], grid_copy[:-1]
-#         nirr_kpts += 1
-#         mp_orbitals[nirr_kpts] = [mp]
-#         for pg in pointgroup:
-#             # If the group operation moves the point outside the cell, %1 moves
-#             # it back in.
-#             # I ran into floating point precision problems the last time I ran
-#             # %1. Just to be safe it's included here.
-#             new_mp = np.round(np.dot(pg, mp), 9)%1.
-#             if any([np.allclose(new_mp, mc) for mc in grid_copy]):
-#                 ind = np.where(np.array([np.allclose(new_mp, mc)
-#                                          for mc in grid_copy]) == True)[0][0]
-#                 # del grid_copy[ind]
-#                 grid_copy = np.delete(grid_copy, ind)
-#                 mp_orbitals[nirr_kpts].append(new_mp)
-#             else:
-#                 continue
+    # Put the grid in group coordinates
+    S,L,R = SmithNormalForm(HNF)
+    grid_group = np.dot(L, grid_cell.T).T
 
-#     if coord == "cart":
-#         for i in range(1, len(mp_orbitals.keys()) + 1):
-#             for j in range(len(mp_orbitals[i])):
-#                 mp_orbitals[i][j] = np.dot(cell_vecs, mp_orbitals[i][j])
-#         return mp_orbitals
-#     elif coord == "cell":
-#         return mp_orbitals
-#     else:
-#         raise ValueError("There is no method for the coordinate system provided yet.")
+    # Remove duplicates if necessary.
+    if duplicates:
+        grid_copy = list(deepcopy(grid_cell))
+        grid_cell = []
+        while len(grid_copy) != 0:
+            gp = grid_copy.pop()
+            if any([np.allclose(gp, gc) for gc in grid_copy]):
+                continue
+            else:
+                grid_cell.append(gp)
         
-#     return mp_orbitals
+    gp_orbitals = {}
+    nirr_kpts = 0
+    grid_copy = list(deepcopy(grid_cell))
+    pointgroup = point_group(lat_vecs)
+    pointgroup = [np.dot(np.dot(inv(lat_vecs), pg), lat_vecs) for pg in pointgroup]
+
+
+
+    return None
+    # if coord == "cart":
+    #     for i in range(1, len(gp_orbitals.keys()) + 1):
+    #         for j in range(len(gp_orbitals[i])):
+    #             gp_orbitals[i][j] = np.dot(lat_vecs, gp_orbitals[i][j])
+    #     return gp_orbitals# , pointgroup
+    # elif coord == "lat":
+    #     return gp_orbitals
+    # else:
+    #     raise ValueError("Coordinate options are 'cell' and 'lat'.")
 
 def find_full_orbitals(grid_car, lat_vecs, coord = "cart"):
     """ Find the complete orbitals of the points in a grid, including points
@@ -1539,7 +1544,7 @@ def find_full_orbitals(grid_car, lat_vecs, coord = "cart"):
             # it back in.
             # I ran into floating point precision problems the last time I ran
             # %1. Just to be safe it's included here.
-            new_gp = np.round(np.dot(pg, gp), 12)%1.
+            new_gp = mod(np.round(np.dot(pg, gp), 15), 1)
             if any([np.allclose(new_gp, gc) for gc in grid_copy]):
                 ind = np.where(np.array([np.allclose(new_gp, gc) for gc in grid_copy]) == True)[0][0]
                 del grid_copy[ind]
@@ -1700,3 +1705,313 @@ def find_lattice_type(centering_type, lattice_constants, lattice_angles):
         msg = ("The lattice angles provided do not correspond to any Bravais "
                "lattice type.")
         raise ValueError(msg.format(lattice_angles))
+
+# Find transformation to create HNF from integer matrix.
+def get_minmax_indices(a):
+    """Find the maximum and minimum elements of a list that aren't zero.
+
+    Args:
+        a (numpy.ndarray): a three element numpy array.
+
+    Returns:
+        minmax (list): the minimum and maximum values of array a with the
+            minimum first and maximum second.
+    """
+    a = np.abs(a)
+    maxi = 2 - np.argmax(a[::-1])
+    min = 0
+    i = 0
+    while min == 0:
+        min = a[i]
+        i += 1
+    mini = i-1
+    for i,ai in enumerate(a):
+        if ai > 0 and ai < min:
+            min = ai
+            mini = i
+    return np.asarray([mini, maxi])
+
+def swap_column(M, B, k):
+    """Swap the column k with whichever column has the highest value (out of
+    the columns to the right of k in row k). The swap is performed for both
+    matrices M and B. 
+
+    Args:
+        M (numpy.ndarray): the matrix being transformed
+        B (numpy.ndarray): a matrix to keep track of the transformation steps 
+            on M. 
+        k (int): the column to swap, as described in summary.
+    """
+    
+    Ms = deepcopy(M)
+    Bs = deepcopy(B)
+    
+    # Find the index of the non-zero element in row k.
+    maxidx = np.argmax(np.abs(Ms[k,k:])) + k
+    tmpCol = deepcopy(Bs[:,k]);
+    Bs[:,k] = Bs[:,maxidx]
+    Bs[:,maxidx] = tmpCol
+
+    tmpCol = deepcopy(Ms[:,k])
+    Ms[:,k] = Ms[:, maxidx]
+    Ms[:,maxidx] = tmpCol
+
+    return Ms, Bs
+
+def swap_row(M, B, k):
+    """Swap the row k with whichever row has the highest value (out of
+    the rows below k in column k). The swap is performed for both matrices M and B.
+
+    Args:
+        M (numpy.ndarray): the matrix being transformed
+        B (numpy.ndarray): a matrix to keep track of the transformation steps 
+            on M. 
+        k (int): the column to swap, as described in summary.
+    """
+    
+    Ms = deepcopy(M)
+    Bs = deepcopy(B)
+    
+    # Find the index of the non-zero element in row k.
+    maxidx = np.argmax(np.abs(Ms[k:,k])) + k
+
+    tmpCol = deepcopy(Bs[k,:]);
+    Bs[k,:] = Bs[maxidx,:]
+    Bs[maxidx,:] = tmpCol
+    
+    tmpRow = deepcopy(Ms[k,:])
+    Ms[k,:] = Ms[maxidx,:]
+    Ms[maxidx,:] = tmpRow
+
+    return Ms, Bs    
+
+def HermiteNormalForm(S):
+    """Find the Hermite normal form (HNF) of a given integer matrix and the
+    matrix that mediates the transformation.
+
+    Args:
+        S (numpy.ndarray): The 3x3 integer matrix describing the relationship 
+            between two commensurate lattices.
+    Returns:
+        H (numpy.ndarray): The resulting HNF matrix.
+        B (numpy.ndarray): The transformation matrix such that H = SB.
+    """
+    if np.linalg.det(S) == 0:
+        raise ValueError("Singular matrix passed to HNF routine")
+    B = np.identity(np.shape(S)[0]).astype(int)
+    H = deepcopy(S)
+    
+    # Keep doing column operations until all elements in the first row are zero
+    # except for the one on the diagonal.
+    while np.count_nonzero(H[0,:]) > 1:
+        # Divide the column with the smallest value into the largest.
+        minidx, maxidx = get_minmax_indices(H[0,:])
+        minm = H[0,minidx]
+        # Subtract a multiple of the column containing the smallest element from
+        # the row containing the largest element.
+        multiple = int(H[0, maxidx]/minm)
+        H[:, maxidx] = H[:, maxidx] - multiple*H[:, minidx]
+        B[:, maxidx] = B[:, maxidx] - multiple*B[:, minidx]
+        if np.allclose(np.dot(S, B), H) == False:
+            raise ValueError("COLS: Transformation matrices didn't work.")
+    if H[0,0] == 0:
+        H, B = swap_column(H, B, 0) # Swap columns if (0,0) is zero.
+    if H[0,0] < 0:
+        H[:,0] = -H[:,0]
+        B[:,0] = -B[:,0]
+
+    if np.count_nonzero(H[0,:]) > 1:
+        raise ValueError("Didn't zero out the rest of the row.")
+    if np.allclose(np.dot(S, B), H) == False:
+        raise ValueError("COLSWAP: Transformation matrices didn't work.")
+    # Now work on element H[1,2].
+    while H[1,2] != 0:
+        if H[1,1] == 0:
+            tempcol = deepcopy(H[:,1])
+            H[:,1] = H[:,2]
+            H[:,2] = tempcol
+
+            tempcol = deepcopy(B[:,1])
+            B[:,1] = B[:,2]
+            B[:,2] = tempcol
+            if H[1,2] == 0:
+                break            
+        if np.abs(H[1,2]) < np.abs(H[1,1]):
+            maxidx = 1
+            minidx = 2
+        else:
+            maxidx = 2
+            minidx = 1
+
+        multiple = int(H[1, maxidx]/H[1,minidx])
+        H[:,maxidx] = H[:, maxidx] - multiple*H[:,minidx]
+        B[:,maxidx] = B[:, maxidx] - multiple*B[:,minidx]
+        
+        if np.allclose(np.dot(S, B), H) == False:
+            raise ValueError("COLS: Transformation matrices didn't work.")
+
+    if H[1,1] == 0:
+        tempcol = deepcopy(H[:,1])
+        H[:,1] = H[:,2]
+        H[:,2] = tempcol
+    if H[1,1] < 0: # change signs
+        H[:,1] = -H[:,1]
+        B[:,1] = -B[:,1]
+    if H[1,2] != 0:
+        raise ValueError("Didn't zero out last element.")
+    if np.allclose(np.dot(S,B), H) == False:
+        raise ValueError("COLSWAP: Transformation matrices didn't work.")
+    if H[2,2] < 0: # change signs
+        H[:,2] = -H[:,2]
+        B[:,2] = -B[:,2]
+    check1 = (np.array([0,0,1]), np.array([1,2,2]))
+    if np.count_nonzero(H[check1]) != 0:
+        raise ValueError("Not lower triangular")
+    if np.allclose(np.dot(S, B), H) == False:
+        raise ValueError("End Part1: Transformation matrices didn't work.")
+    
+    # Now that the matrix is in lower triangular form, make sure the lower
+    # off-diagonal elements are non-negative but less than the diagonal
+    # elements.
+    while H[1,1] <= H[1,0] or H[1,0] < 0:
+        if H[1,1] <= H[1,0]:
+            multiple = 1
+        else:
+            multiple = -1
+        H[:,0] = H[:,0] - multiple*H[:,1]
+        B[:,0] = B[:,0] - multiple*B[:,1]
+    for j in [0,1]:
+        while H[2,2] <= H[2,j] or H[2,j] < 0:
+            if H[2,2] <= H[2,j]:
+                multiple = 1
+            else:
+                multiple = -1
+            H[:,j] = H[:,j] - multiple*H[:,2]
+            B[:,j] = B[:,j] - multiple*B[:,2]
+
+    if np.allclose(np.dot(S, B), H) == False:
+        raise ValueError("End Part1: Transformation matrices didn't work.")
+    if np.count_nonzero(H[check1]) != 0:
+        raise ValueError("Not lower triangular")
+    check2 = (np.asarray([0, 1, 1, 2, 2, 2]), np.asarray([0, 0, 1, 0, 1, 2]))
+    if any(H[check2] < 0) == True:
+        raise ValueError("Negative elements in lower triangle.")
+
+    if H[1,0] > H[1,1] or H[2,0] > H[2,2] or H[2,1] > H[2,2]:
+        raise ValueError("Lower triangular elements bigger than diagonal.")
+    return H, B
+
+def UpperHermiteNormalForm(S):
+    """Find the Hermite normal form (HNF) of a given integer matrix and the
+    matrix that mediates the transformation.
+
+    Args:
+        S (numpy.ndarray): The 3x3 integer matrix describing the relationship 
+            between two commensurate lattices.
+    Returns:
+        H (numpy.ndarray): The resulting HNF matrix.
+        B (numpy.ndarray): The transformation matrix such that H = SB.
+    """
+    if np.linalg.det(S) == 0:
+        raise ValueError("Singular matrix passed to HNF routine")
+    B = np.identity(np.shape(S)[0]).astype(int)
+    H = deepcopy(S)
+
+    #    Keep doing row operations until all elements in the first column are zero
+    #    except for the one on the diagonal.
+    while np.count_nonzero(H[:,0]) > 1:
+        # Divide the row with the smallest value into the largest.
+        minidx, maxidx = get_minmax_indices(H[:,0])
+        minm = H[minidx,0]
+        # Subtract a multiple of the row containing the smallest element from
+        # the row containing the largest element.
+        multiple = int(H[maxidx,0]/minm)
+        H[maxidx,:] = H[maxidx,:] - multiple*H[minidx,:]
+        B[maxidx,:] = B[maxidx,:] - multiple*B[minidx,:]
+        if np.allclose(np.dot(B, S), H) == False:
+            raise ValueError("ROWS: Transformation matrices didn't work.")
+    if H[0,0] == 0:
+        H, B = swap_row(H, B, 0) # Swap rows if (0,0) is zero.
+    if H[0,0] < 0:
+        H[0,:] = -H[0,:]
+        B[0,:] = -B[0,:]
+    if np.count_nonzero(H[:,0]) > 1:
+        raise ValueError("Didn't zero out the rest of the row.")
+    if np.allclose(np.dot(B,S), H) == False:
+        raise ValueError("ROWSWAP: Transformation matrices didn't work.")
+    # Now work on element H[2,1].
+    while H[2,1] != 0:
+        if H[1,1] == 0:
+            temprow = deepcopy(H[1,:])
+            H[1,:] = H[2,:]
+            H[2,:] = temprow
+
+            temprow = deepcopy(B[1,:])
+            B[1,:] = B[2,:]
+            B[2,:] = temprow
+            break         
+        if np.abs(H[2,1]) < np.abs(H[1,1]):
+            maxidx = 1
+            minidx = 2
+        else:
+            maxidx = 2
+            minidx = 1
+        
+        multiple = int(H[maxidx,1]/H[minidx,1])
+        H[maxidx,:] = H[maxidx,:] - multiple*H[minidx,:]
+        B[maxidx,:] = B[maxidx,:] - multiple*B[minidx,:]
+
+        if np.allclose(np.dot(B,S), H) == False:
+            raise ValueError("COLS: Transformation matrices didn't work.")
+
+    if H[1,1] == 0:
+        temprow = deepcopy(H[1,:])
+        H[1,:] = H[0,:]
+        H[0,:] = temprow
+    if H[1,1] < 0: # change signs
+        H[1,:] = -H[1,:]
+        B[1,:] = -B[1,:]
+    if H[1,0] != 0:
+        raise ValueError("Didn't zero out last element.")
+    if np.allclose(np.dot(B,S), H) == False:
+        raise ValueError("COLSWAP: Transformation matrices didn't work.")
+    if H[2,2] < 0: # change signs
+        H[2,:] = -H[2,:]
+        B[2,:] = -B[2,:]
+    check1 = (np.array([2,2,1]), np.array([1,0,0]))
+
+    if np.count_nonzero(H[check1]) != 0:
+        raise ValueError("Not lower triangular")
+    if np.allclose(np.dot(B,S), H) == False:
+        raise ValueError("End Part1: Transformation matrices didn't work.")
+
+    # Now that the matrix is in lower triangular form, make sure the lower
+    # off-diagonal elements are non-negative but less than the diagonal
+    # elements.    
+    while H[1,1] <= H[0,1] or H[0,1] < 0:
+        if H[1,1] <= H[0,1]:
+            multiple = 1
+        else:
+            multiple = -1
+        H[0,:] = H[0,:] - multiple*H[1,:]
+        B[0,:] = B[0,:] - multiple*B[1,:]
+    for j in [0,1]:
+        while H[2,2] <= H[j,2] or H[j,2] < 0:
+            if H[2,2] <= H[j,2]:
+                multiple = 1
+            else:
+                multiple = -1
+            H[j,:] = H[j,:] - multiple*H[2,:]
+            B[j,:] = B[j,:] - multiple*B[2,:]
+
+    if np.allclose(np.dot(B, S), H) == False:
+        raise ValueError("End Part1: Transformation matrices didn't work.")
+    if np.count_nonzero(H[check1]) != 0:
+        raise ValueError("Not lower triangular")
+    check2 = (np.asarray([0, 0, 0, 1, 1, 2]), np.asarray([0, 1, 2, 1, 2, 2]))
+    if any(H[check2] < 0) == True:
+        raise ValueError("Negative elements in lower triangle.")
+    if H[0,1] > H[1,1] or H[0,2] > H[2,2] or H[1,2] > H[2,2]:
+        raise ValueError("Lower triangular elements bigger than diagonal.")
+    return H, B
+
