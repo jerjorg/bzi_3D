@@ -269,14 +269,8 @@ def make_cell_points(lat_vecs, grid_vecs, offset=[0,0,0], cart=True):
         >>> grid = make_grid(lat_vecs, grid_vecs, offset)
     """
 
-    # Put the offset in Cartesian coordinates.
-    offset = np.dot(grid_vecs, offset)
-
-    # Offset in cell coordinates in the first unit cell
-    offset = np.round(np.dot(np.linalg.inv(lat_vecs), offset), 15)%1
-
     # Offset in cell coordinates
-    offset = np.dot(lat_vecs, offset)
+    offset = np.dot(grid_vecs, offset)
 
     # Integer matrix
     N = np.dot(np.linalg.inv(grid_vecs), lat_vecs)
@@ -296,7 +290,7 @@ def make_cell_points(lat_vecs, grid_vecs, offset=[0,0,0], cart=True):
         # Loop through the diagonal of the HNF matrix.
         for i,j,k in product(range(D[0]), range(D[1]), range(D[2])):
             # Find the point in Cartesian coordinates.
-            pt = np.dot(grid_vecs, [i,j,k])
+            pt = np.dot(grid_vecs, [i,j,k]) + offset
             
             # Put the point in cell coordinates and move it to the 
             # first unit cell.
@@ -304,7 +298,7 @@ def make_cell_points(lat_vecs, grid_vecs, offset=[0,0,0], cart=True):
             pt = np.round(np.dot(np.linalg.inv(lat_vecs), pt),12)%1
 
             # Put the point back into Cartesian coordinates.
-            pt = np.dot(lat_vecs, pt) + offset
+            pt = np.dot(lat_vecs, pt)
             grid.append(pt)
         return grid
     else:
