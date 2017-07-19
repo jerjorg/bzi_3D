@@ -7,8 +7,11 @@ from numpy.linalg import norm, inv
 from itertools import product
 from itertools import combinations
 
+from BZI.sampling import make_cell_points
+
 from BZI.symmetry import (get_sympts, get_sympaths, make_ptvecs, make_rptvecs,
-                          make_lattice_vectors, find_orbitals)
+                          make_lattice_vectors, find_orbitals,
+                          reduce_kpoint_list)
             
 def test_make_ptvecs():
     """Verify the primitive translation vectors are correct.
@@ -141,7 +144,7 @@ def test_make_lattice_vectors():
     """Check that make_lattice_vectors agrees with what is obtained with
     make_ptvecs."""
     
-    lat_type = "simple_cubic"
+    lat_type = "simple cubic"
     lat_consts = [1]*3
     lat_angles = [np.pi/2]*3
     lat_centering = "prim"
@@ -149,7 +152,7 @@ def test_make_lattice_vectors():
     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
     assert np.allclose(lat_vecs1, lat_vecs2)
 
-    lat_type = "body_centered_cubic"
+    lat_type = "body-centered cubic"
     lat_consts = [1]*3
     lat_angles = [np.pi/2]*3
     lat_centering = "body"
@@ -157,7 +160,7 @@ def test_make_lattice_vectors():
     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
     assert np.allclose(lat_vecs1, lat_vecs2)
 
-    lat_type = "face_centered_cubic"
+    lat_type = "face-centered cubic"
     lat_consts = [1]*3
     lat_angles = [np.pi/2]*3
     lat_centering = "face"
@@ -173,7 +176,7 @@ def test_make_lattice_vectors():
     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
     assert np.allclose(lat_vecs1, lat_vecs2)
 
-    lat_type = "body_centered_tetragonal"
+    lat_type = "body-centered tetragonal"
     lat_consts = [1, 1, 2]
     lat_angles = [np.pi/2]*3
     lat_centering = "body"
@@ -189,7 +192,7 @@ def test_make_lattice_vectors():
     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
     assert np.allclose(lat_vecs1, lat_vecs2)
 
-    lat_type = "face_centered_orthorhombic"
+    lat_type = "face-centered orthorhombic"
     lat_consts = [1, 2, 3]
     lat_angles = [np.pi/2]*3
     lat_centering = "face"
@@ -197,7 +200,7 @@ def test_make_lattice_vectors():
     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
     assert np.allclose(lat_vecs1, lat_vecs2)
 
-    lat_type = "body_centered_orthorhombic"
+    lat_type = "body-centered orthorhombic"
     lat_consts = [1, 2, 3]
     lat_angles = [np.pi/2]*3
     lat_centering = "body"
@@ -205,7 +208,7 @@ def test_make_lattice_vectors():
     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
     assert np.allclose(lat_vecs1, lat_vecs2)
 
-    lat_type = "base_centered_orthorhombic"
+    lat_type = "base-centered orthorhombic"
     lat_consts = [1, 2, 3]
     lat_angles = [np.pi/2]*3
     lat_centering = "base"
@@ -238,7 +241,7 @@ def test_make_lattice_vectors():
     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
     assert np.allclose(lat_vecs1, lat_vecs2)
 
-    lat_type = "base_centered_monoclinic"
+    lat_type = "base-centered monoclinic"
     lat_consts = [1, 2, 3]
     lat_angles = [np.pi/4, np.pi/2, np.pi/2]
     lat_centering = "base"
@@ -259,57 +262,57 @@ def test_make_lattice_vectors():
     # Verify that an error gets raised for poor input parameters.
     
     # Simple cubic
-    lat_type = "simple_cubic"
+    lat_type = "simple cubic"
     lat_consts = [1, 2, 3]
     lat_angles = [np.pi/2]*3
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "simple_cubic"
+    lat_type = "simple cubic"
     lat_consts = [1, 1, 1]
     lat_angles = [np.pi/2, np.pi/2, np.pi/3]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "simple_cubic"
+    lat_type = "simple cubic"
     lat_consts = [1, 1, 2]
     lat_angles = [np.pi/3, np.pi/2, np.pi/2]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
     # Body-centered cubic
-    lat_type = "body_centered_cubic"
+    lat_type = "body-centered cubic"
     lat_consts = [1, 2, 1]
     lat_angles = [np.pi/2]*3
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "body_centered_cubic"
+    lat_type = "body-centered cubic"
     lat_consts = [1, 1, 1]
     lat_angles = [np.pi/2, np.pi/3, np.pi/2]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-    lat_type = "body_centered_cubic"
+    lat_type = "body-centered cubic"
     lat_consts = [2, 1, 1]
     lat_angles = [np.pi/2, np.pi/3, np.pi/2]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
     # Face-centered cubic
-    lat_type = "face_centered_cubic"
+    lat_type = "face-centered cubic"
     lat_consts = [3.3, 1, 1]
     lat_angles = [np.pi/2]*3
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-    lat_type = "face_centered_cubic"
+    lat_type = "face-centered cubic"
     lat_consts = [np.pi, np.pi, np.pi]
     lat_angles = [np.pi/2, np.pi/2, np.pi/5]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "face_centered_cubic"
+    lat_type = "face-centered cubic"
     lat_consts = [np.pi, np.pi, np.pi]
     lat_angles = [np.pi/2, np.pi/5, np.pi/5]
     with pytest.raises(ValueError) as error:
@@ -336,19 +339,19 @@ def test_make_lattice_vectors():
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
     # Body-centered tetragonal
-    lat_type = "body_centered_tetragonal"
+    lat_type = "body-centered tetragonal"
     lat_consts = [np.pi/3, np.pi/3, np.pi/3]
     lat_angles = [np.pi/2]*3
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "body_centered_tetragonal"
+    lat_type = "body-centered tetragonal"
     lat_consts = [1, 1, 2]
     lat_angles = [np.pi/2, np.pi/3, np.pi/4]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "body_centered_tetragonal"
+    lat_type = "body-centered tetragonal"
     lat_consts = [1.1, 1.1, 2.2]
     lat_angles = [np.pi/2, 1, 1]
     with pytest.raises(ValueError) as error:
@@ -386,99 +389,99 @@ def test_make_lattice_vectors():
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
     # Face-centered orthorhombic
-    lat_type = "face_centered_orthorhombic"
+    lat_type = "face-centered orthorhombic"
     lat_consts = [1, 1, 3]
     lat_angles = [np.pi/2]*3
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "face_centered_orthorhombic"
+    lat_type = "face-centered orthorhombic"
     lat_consts = [1, 1, 1]
     lat_angles = [np.pi/2]*3
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "face_centered_orthorhombic"
+    lat_type = "face-centered orthorhombic"
     lat_consts = [1, 1, 1]
     lat_angles = [np.pi/2, np.pi/2, np.pi/3]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "face_centered_orthorhombic"
+    lat_type = "face-centered orthorhombic"
     lat_consts = [1, 1, 1]
     lat_angles = [np.pi/2, np.pi/4, np.pi/3]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "face_centered_orthorhombic"
+    lat_type = "face-centered orthorhombic"
     lat_consts = [1, 1, 1]
     lat_angles = [np.pi/5, np.pi/4, np.pi/3]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
     # Body-centered orthorhombic    
-    lat_type = "body_centered_orthorhombic"
+    lat_type = "body-centered orthorhombic"
     lat_consts = [2.2, 2.2, 5.5]
     lat_angles = [np.pi/2]*3
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "body_centered_orthorhombic"
+    lat_type = "body-centered orthorhombic"
     lat_consts = [2.2, 5.5, 5.5]
     lat_angles = [np.pi/2]*3
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "body_centered_orthorhombic"
+    lat_type = "body-centered orthorhombic"
     lat_consts = [5.5, 5.5, 5.5]
     lat_angles = [np.pi/2]*3
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
     
-    lat_type = "body_centered_orthorhombic"
+    lat_type = "body-centered orthorhombic"
     lat_consts = [1.1, 1.2, 1.3]
     lat_angles = [np.pi/2, np.pi/2, np.pi/7]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "body_centered_orthorhombic"
+    lat_type = "body-centered orthorhombic"
     lat_consts = [1.1, 1.2, 1.3]
     lat_angles = [np.pi/2, np.pi/7, np.pi/7]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-    lat_type = "body_centered_orthorhombic"
+    lat_type = "body-centered orthorhombic"
     lat_consts = [1.1, 1.2, 1.3]
     lat_angles = [np.pi/7, np.pi/7, np.pi/7]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
     # Base-centered orthorhombic    
-    lat_type = "base_centered_orthorhombic"
+    lat_type = "base-centered orthorhombic"
     lat_consts = [1, 2, 2]
     lat_angles = [np.pi/2]*3
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "base_centered_orthorhombic"
+    lat_type = "base-centered orthorhombic"
     lat_consts = [2, 2, 2]
     lat_angles = [np.pi/2]*3
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-    lat_type = "base_centered_orthorhombic"
+    lat_type = "base-centered orthorhombic"
     lat_consts = [2, 2, 2]
     lat_angles = [np.pi/2, np.pi/2, 1]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "base_centered_orthorhombic"
+    lat_type = "base-centered orthorhombic"
     lat_consts = [2, 2, 2]
     lat_angles = [np.pi/2, 1, 1]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "base_centered_orthorhombic"
+    lat_type = "base-centered orthorhombic"
     lat_consts = [2, 2, 2]
     lat_angles = [1, 1, 1]
     with pytest.raises(ValueError) as error:
@@ -632,43 +635,43 @@ def test_make_lattice_vectors():
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
     # Base-centered monoclinic        
-    lat_type = "base_centered_monoclinic"
+    lat_type = "base-centered monoclinic"
     lat_consts = [1, 3.1, 3]
     lat_angles = [np.pi/4, np.pi/2, np.pi/2]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "base_centered_monoclinic"
+    lat_type = "base-centered monoclinic"
     lat_consts = [3+1e-6, 3, 3]
     lat_angles = [np.pi/4, np.pi/2, np.pi/2]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "base_centered_monoclinic"
+    lat_type = "base-centered monoclinic"
     lat_consts = [3+1e-6, 3+1e-6, 3]
     lat_angles = [np.pi/4, np.pi/2, np.pi/2]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "base_centered_monoclinic"
+    lat_type = "base-centered monoclinic"
     lat_consts = [1, 1, 3]
     lat_angles = [np.pi, np.pi/2, np.pi/2]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
     
-    lat_type = "base_centered_monoclinic"
+    lat_type = "base-centered monoclinic"
     lat_consts = [3, 3, 3]
     lat_angles = [np.pi, np.pi, np.pi]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "base_centered_monoclinic"
+    lat_type = "base-centered monoclinic"
     lat_consts = [3, 2, 3]
     lat_angles = [np.pi/3, np.pi, np.pi]
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-    lat_type = "base_centered_monoclinic"
+    lat_type = "base-centered monoclinic"
     lat_consts = [2, 2, 3]
     lat_angles = [np.pi/3, np.pi/2+1e-2, np.pi/2]
     with pytest.raises(ValueError) as error:
@@ -1505,12 +1508,80 @@ def test_find_orbitals():
             [-1,-1,-1], [0,0,0], [0,1,1], [1,0,1], [0,0,1], [1,1,0], [0,1,0],
             [1,0,0], [0,-1,0]]
 
-    orbitals = find_orbitals(grid, lat_vecs, duplicates=True)
+
     assert len(orbitals.keys()) == 1
-    assert np.allclose(orbitals[1], [0,0,0])
+    assert np.allclose(orbitals[1], [0,0,0])    
 
 
-    # Verify orbitals are correct.
+def test_reduce_kpoint_list():
 
-    grid = 
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
+
+    ### Simple Cubic ###
+    lat_consts = [2.8272]*3
+    lat_angles = [np.pi/2]*3
+    centering = 'prim'
+
+    lat_vecs = make_ptvecs(centering, lat_consts, lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
+
+    H = np.array([[40,0,0],
+                  [0,40,0],
+                  [0,0,40]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1/2, 1/2, 1/2])
+
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
     
+
+    red_grid, weights = reduce_kpoint_list(grid, rlat_vecs, grid_vecs,
+                                          offset)
+    assert len(weights) == 1540
+    assert len(red_grid) == 1540
+    assert np.sum(weights) == 40**3
+
+    H = np.array([[41,0,0],
+                  [0,41,0],
+                  [0,0,41]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid, rlat_vecs, grid_vecs,
+                                          offset)
+    assert len(weights) == 1771
+    assert len(red_grid) == 1771
+    assert np.sum(weights) == 41**3
+
+    H = np.array([[42,0,0],
+                  [0,42,0],
+                  [0,0,42]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    # offset = np.array([1./2, 1./2, 1./2])
+    offset = np.array([0.]*3)
+
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    redgrid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 2024
+    assert len(red_grid) == 2024
+    assert np.sum(weights) == 42**2
+
+    H = np.array([[40,0,0],
+                  [0,40,0],
+                  [0,0,20]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2, 1./2, 1./2])
+    # offset = np.array([0.]*3)
+
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    redgrid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+
+    assert len(weights) == 2100
+    assert len(red_grid) == 2100
+    assert np.sum(weights) == 40*40*20
