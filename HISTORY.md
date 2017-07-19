@@ -1,5 +1,16 @@
 # Revision History
 
+## Revision 0.0.11
+- Add new implementation of symmetry reducing k-point grids based on Gus's
+  idea found in msg-byu/kgridGen.
+  
+## Revision 0.0.10
+- Begin implementation of new k-point symmetry reduction function. 
+
+## Revision 0.0.9
+- Make a slight change to make_cell_points in sampling. The points now always
+  reside in the first unit cell no matter the shift.
+
 ## Revision 0.0.8
 - Reverse the order of the HISTORY.md file.
 - Add band energy as an attribute of the pseudopotential classes.

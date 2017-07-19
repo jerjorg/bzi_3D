@@ -5,11 +5,14 @@ Materials Science 49.2 (2010): 299-312.
 """
 
 import numpy as np
-import math
 from numpy.linalg import norm, inv, det
+import math
 import itertools
 from copy import deepcopy
 from itertools import islice
+from BZI.msg import err
+
+
 
 from phenum.symmetry import _get_lattice_pointGroup
 from phenum.grouptheory import SmithNormalForm
@@ -64,8 +67,8 @@ class Lattice(object):
         self.angles = lattice_angles
         self.type = find_lattice_type(centering_type, lattice_constants,
                                       lattice_angles)        
-        self.vectors = make_ptvecs(centering_type, lattice_constants,
-                                   lattice_angles)
+        self.vectors = make_lattice_vectors(self.type, lattice_constants,
+                                            lattice_angles)
         self.reciprocal_vectors = make_rptvecs(self.vectors)
         self.symmetry_group = point_group(self.vectors)
         self.symmetry_points = get_sympts(centering_type, lattice_constants,
@@ -988,7 +991,7 @@ def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
             vectors.
 
     Example:
-        >>> lattice_type = "face_centered_cubic"
+        >>> lattice_type = "face-centered cubic"
         >>> lattice_constants = [1]*3
         >>> lattice_angles = [numpy.pi/2]*3
         >>> lattice_vectors = make_lattice_vectors(lattice_type, 
@@ -1004,7 +1007,7 @@ def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
     beta = float(lattice_angles[1])
     gamma = float(lattice_angles[2])
     
-    if lattice_type == "simple_cubic":
+    if lattice_type == "simple cubic":
         if not ((np.isclose(a, b) and np.isclose(b, c))):
             msg = ("The lattice constants should all be the same for a simple-"
                     "cubic lattice")
@@ -1022,7 +1025,7 @@ def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
         lattice_vectors = np.transpose(np.array([a1, a2, a3], dtype=float))
         return lattice_vectors
     
-    elif lattice_type == "face_centered_cubic":
+    elif lattice_type == "face-centered cubic":
         if not ((np.isclose(a, b) and np.isclose(b, c))):
             msg = ("The lattice constants should all be the same for a face-"
                    "centered, cubic lattice.")
@@ -1039,7 +1042,7 @@ def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
         lattice_vectors = np.transpose(np.array([a1, a2, a3], dtype=float))
         return lattice_vectors
     
-    elif lattice_type == "body_centered_cubic":
+    elif lattice_type == "body-centered cubic":
         if not ((np.isclose(a, b) and np.isclose(b, c))):
             msg = ("The lattice constants should all be the same for a body-"
                    "centered, cubic lattice.")
@@ -1076,7 +1079,7 @@ def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
         lattice_vectors = np.transpose(np.array([a1, a2, a3], dtype=float))
         return lattice_vectors
     
-    elif lattice_type == "body_centered_tetragonal":
+    elif lattice_type == "body-centered tetragonal":
         if not (np.isclose(a, b) and
                 not np.isclose(b, c)):
             msg = ("For a body-centered, tetragonal lattice, a = b != c where "
@@ -1105,7 +1108,7 @@ def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
             msg = ("The lattice angles should all be the same and equal to pi/2 "
                    "for an orthorhombic lattice.")
             raise ValueError(msg.format(lattice_angles))
-        if not (a < b < c):
+        if (b < a) or (c < b):
             msg = ("The lattice constants should in ascending order for an "
                    "orthorhombic lattice.")
             raise ValueError(msg.format(lattice_constants))
@@ -1116,7 +1119,7 @@ def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
         lattice_vectors = np.transpose(np.array([a1, a2, a3], dtype=float))
         return lattice_vectors
 
-    elif lattice_type == "face_centered_orthorhombic":
+    elif lattice_type == "face-centered orthorhombic":
         if (np.isclose(a, b) or np.isclose(b, c) or np.isclose(a, c)):
             msg = ("The lattice constants should all be different for a "
                    "face-centered, orthorhombic lattice.")
@@ -1137,7 +1140,7 @@ def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
         lattice_vectors = np.transpose(np.array([a1, a2, a3], dtype=float))
         return lattice_vectors
 
-    elif lattice_type == "body_centered_orthorhombic":
+    elif lattice_type == "body-centered orthorhombic":
         if (np.isclose(a, b) or np.isclose(b, c) or np.isclose(a, c)):
             msg = ("The lattice constants should all be different for a "
                    "body-centered, orthorhombic lattice.")
@@ -1158,7 +1161,7 @@ def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
         lattice_vectors = np.transpose(np.array([a1, a2, a3], dtype=float))
         return lattice_vectors
  
-    elif lattice_type == "base_centered_orthorhombic":
+    elif lattice_type == "base-centered orthorhombic":
         if (np.isclose(a, b) or np.isclose(b, c) or np.isclose(a, c)):
             msg = ("The lattice constants should all be different for a "
                    "base-centered, orthorhombic lattice.")
@@ -1248,7 +1251,7 @@ def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
         lattice_vectors = np.transpose(np.array([a1, a2, a3], dtype=float))
         return lattice_vectors
 
-    elif lattice_type == "base_centered_monoclinic":
+    elif lattice_type == "base-centered monoclinic":
         if (a > c or b > c):
             msg = ("The first and second lattice constants, a and b, should "
                    "both be less than or equal to the last lattice constant c. "
@@ -1407,7 +1410,8 @@ def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False):
     """
         
     # Put the grid in lattice coordinates and move it into the first unit cell.
-    # grid_cell = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], 15)%1) # I removed the mod 1, put it back in on monday (maybe)
+    # grid_cell = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], 15)%1)
+    # I removed the mod 1, put it back in on monday (maybe)
     grid_cell = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], 15))
     # Remove duplicates if necessary.
     if duplicates:
@@ -1688,9 +1692,9 @@ def find_lattice_type(centering_type, lattice_constants, lattice_angles):
             raise ValueError(msg.format(lattice_constants))
             
     # Check if the lattice is triclinic.
-    elif not(np.isclose(alpha, beta) and np.isclose(beta, gamma) and
-             np.isclose(alpha, gamma)):
-        if (not np.isclose(a, b) and np.isclose(b, c) and np.isclose(a, c)):
+    elif not (np.isclose(alpha, beta) and np.isclose(beta, gamma) and
+          np.isclose(alpha, gamma)):
+        if not (np.isclose(a, b) and np.isclose(b, c) and np.isclose(a, c)):
             if centering_type == "prim":
                 return "triclinic"
             else:
@@ -2015,3 +2019,157 @@ def UpperHermiteNormalForm(S):
         raise ValueError("Lower triangular elements bigger than diagonal.")
     return H, B
 
+
+def find_kpt_index(kpt, invK, L, D, eps=10):
+    """This function takes a k-point in Cartesian coordinates and "hashes" it 
+    into a single number, corresponding to its place in the k-point list.
+
+    Args:
+    kpt (list or numpy.ndarray): the k-point in Cartesian coordinates
+    invK(list or numpy.ndarray): the inverse of the k-point grid generating
+        vectors
+    L (list or numpy.ndarray): the left transform for the SNF conversion
+    D (list or numpy.ndarray): the diagonal of the SNF
+    eps (float): a finite-precision parameter
+
+    Returns:
+    """
+
+    gpt = np.round(np.dot(invK, kpt), 14)
+    if not np.allclose(np.zeros(np.shape(gpt)), gpt - np.round(gpt)):
+        msg = "The k-point is not a lattice point of the generating vectors."
+        raise ValueError(msg.format(kpt))
+    # Convert the k-point from grid coordinates to group coordinates, and then
+    # bring it into the first unit cell.
+    gpt = np.dot(L, gpt)%D
+
+    # Convert from group coordinates to a singe base-10 number between 1 and
+    # the number of k-points in the unreduced grid.
+    gpt = int(np.round(gpt[0]*D[1]*D[2] + gpt[1]*D[2] + gpt[2], eps))
+    return gpt
+
+def bring_into_cell(kpt, lat_vecs, eps=10):
+    """Bring a k-point into the first unit cell.
+    """    
+    k = np.round(np.dot(inv(lat_vecs), kpt), eps)%1
+    return np.dot(lat_vecs, k)
+
+
+def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
+                       eps=10):
+    """Use the point group symmetry of the lattice vectors to reduce a list of
+    k-points.
+    
+    Args:
+        kpoint_list (list or numpy.ndarray): a list of k-point positions in
+            Cartesian coordinates.
+        lattice_vectors (list or numpy.ndarray): the vectors that generate the
+            reciprocal lattice in a 3x3 array with the vectors as columns.
+        grid_vectors (list or numpy.ndarray): the vectors that generate the
+            k-point grid in a 3x3 array with the vectors as columns in 
+            Cartesian coordinates.
+        shift (list or numpy.ndarray): the offset of the k-point grid in grid
+            coordinates.
+
+    Returns:
+        reduced_kpoints (list): an ordered list of irreducible k-points
+        kpoint_weights (list): an ordered list of irreducible k-point weights.
+    """
+    
+    try:
+        inv(lattice_vectors)
+    except np.linalg.linalg.LinAlgError:
+        msg = "The lattice generating vectors are linearly dependent."
+        raise ValueError(msg.format(lattice_vectors))
+    
+    try:
+        inv(grid_vectors)
+    except np.linalg.linalg.LinAlgError:
+        msg = "The grid generating vectors are linearly dependent."
+        raise ValueError(msg.format(lattice_vectors))
+    
+    try:
+        ncomps = np.shape(kpoint_list)[1]
+    except IndexError:
+        msg = "Please provide a list of k-points."
+        raise ValueError(msg.format(kpoint_list))
+    
+    if ncomps != 3:
+        msg = "The k-points must be lists or arrays with three elements"
+        raise ValueError(msg.format(kpoint_list))
+    
+    if abs(det(lattice_vectors)) < abs(det(grid_vectors)):
+        msg = """The k-point generating vectors define a grid with a unit cell 
+        larger than the reciprocal lattice unit cell."""
+        raise ValueError(msg.format(grid_vectors))
+
+    # Put the shift in Cartesian coordinates.
+    shift = np.dot(grid_vectors, shift)
+
+    # Integer matrix
+    N = np.dot(inv(grid_vectors), lattice_vectors)
+    # Check that N is an integer matrix. In other words, verify that the grid
+    # and lattice are commensurate.
+    for i in range(len(N[:,0])):
+        for j in range(len(N[0,:])):
+            if np.isclose(N[i,j]%1, 0) or np.isclose(N[i,j]%1, 1):
+                N[i,j] = int(np.round(N[i,j]))
+            else:
+                msg = "The lattice and grid vectors are incommensurate."
+                raise ValueError(msg.format(grid_vectors))
+
+    # Find the HNF of N. B is the transformation matrix (BN = H).
+    H,B = HermiteNormalForm(N)
+    H = [list(H[i]) for i in range(3)]
+    # Find the SNF of H. L and R are the left and right transformation matrices
+    # (LHR = S).    
+    S,L,R = SmithNormalForm(H)
+
+    # Get the diagonal of SNF.
+    D = np.diag(S)
+    
+    cOrbit = 0 # unique orbit counter
+    pointgroup = point_group(lattice_vectors) # a list of point group operators
+    nSymOps = len(pointgroup) # the number of symmetry operations
+    nUR = len(kpoint_list) # the number of unreduced k-points
+    # A dictionary to keep track of the number of symmetrically-equivalent
+    # k-points.
+    hashtable = dict.fromkeys(range(nUR))
+
+    # A dictionary to keep track of the k-points that represent each orbital.
+    iFirst = {}
+
+    # A dictionary to keep track of the number of symmetrically-equivalent
+    # k-points in each orbit.
+    iWt = {}
+    invK = inv(grid_vectors)
+
+    # Loop over unreduced k-points.
+    for i in range(nUR):
+        ur_kpt = kpoint_list[i]
+        idx = find_kpt_index(ur_kpt - shift, invK, L, D, eps)
+        if hashtable[idx] != None:
+            continue
+        cOrbit += 1        
+        hashtable[idx] = cOrbit
+        iFirst[cOrbit] = i
+        iWt[cOrbit] = 1
+        for pg in pointgroup:
+            # Rotate the k-point.
+            rot_kpt = np.dot(pg, ur_kpt)
+            # Bring it back into the first unit cell.
+            rot_kpt = bring_into_cell(rot_kpt, lattice_vectors)
+            # Remove the shift from the k-point.
+            idx = find_kpt_index(rot_kpt - shift, invK, L, D, eps)
+            if hashtable[idx] == None:
+                hashtable[idx] = cOrbit
+                iWt[cOrbit] += 1
+
+    sum = 0
+    kpoint_weights = list(iWt.values())[:cOrbit]
+    reduced_kpoints = [[0,0,0] for _ in range(cOrbit)]
+    for i in range(cOrbit):
+        sum += kpoint_weights[i]
+        reduced_kpoints[i] = kpoint_list[iFirst[i+1]]
+    
+    return reduced_kpoints, kpoint_weights
