@@ -1,8 +1,14 @@
 # Revision History
 
+## Revision 0.0.12
+- Fix find_orbitals so that it correctly reduces a k-point grid when k-point
+  grid includes points translationally equivalent.
+- Fix naming convention in unit tests for make_lattice_vectors.
+- Fix finite precision error in find_kpt_index. Replace eps = 10 with eps = 9.
+  
 ## Revision 0.0.11
 - Add new implementation of symmetry reducing k-point grids based on Gus's
-  idea found in msg-byu/kgridGen.
+  ideas found in msg-byu/kgridGen.
   
 ## Revision 0.0.10
 - Begin implementation of new k-point symmetry reduction function. 

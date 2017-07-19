@@ -14,7 +14,7 @@ from BZI.msg import err
 
 
 
-from phenum.symmetry import _get_lattice_pointGroup
+from phenum.symmetry import get_lattice_pointGroup
 from phenum.grouptheory import SmithNormalForm
 
 class Lattice(object):
@@ -1342,7 +1342,7 @@ def point_group(lat_vecs):
     """
     # _get_lattice_pointGroup has the vectors as rows instead of columns.
     lat_vecs = np.transpose(lat_vecs)
-    return _get_lattice_pointGroup(lat_vecs)
+    return get_lattice_pointGroup(lat_vecs)
 
 def shells(vector, lat_vecs):
     """Find the vectors that are equivalent to another vector by symmetry
@@ -1390,7 +1390,8 @@ def shells_list(vectors, lat_vecs):
     nested_shells = [shells(i, lat_vecs) for i in vectors]
     return np.array(list(itertools.chain(*nested_shells)))
             
-def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False):
+def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False,
+                  eps=10):
     """ Find the partial orbitals of the points in a grid, including only the
     points that are in the grid.
 
@@ -1402,6 +1403,8 @@ def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False):
             It can be in Cartesian ("cart") or lattice ("lat").
         duplicates (bool): if there are points in the grid outside the first
             unit cell, duplicates should be true.
+        eps (int): a finite precision parameter that determines the number of
+            decimals kepts when rounding.
 
     Returns:
         gp_orbitals (dict): the orbitals of the grid points in a dictionary. 
@@ -1418,7 +1421,7 @@ def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False):
         grid_copy = list(deepcopy(grid_cell))
         grid_cell = []
         while len(grid_copy) != 0:
-            gp = grid_copy.pop()
+            gp = np.round(grid_copy.pop(), eps)%1
             if any([np.allclose(gp, gc) for gc in grid_copy]):
                 continue
             else:
@@ -1789,13 +1792,15 @@ def swap_row(M, B, k):
 
     return Ms, Bs    
 
-def HermiteNormalForm(S):
+def HermiteNormalForm(S, eps=10):
     """Find the Hermite normal form (HNF) of a given integer matrix and the
     matrix that mediates the transformation.
 
     Args:
         S (numpy.ndarray): The 3x3 integer matrix describing the relationship 
             between two commensurate lattices.
+        eps (int): finite precision parameter that determines number of decimals
+            kept when rounding.
     Returns:
         H (numpy.ndarray): The resulting HNF matrix.
         B (numpy.ndarray): The transformation matrix such that H = SB.
@@ -1903,6 +1908,7 @@ def HermiteNormalForm(S):
 
     if H[1,0] > H[1,1] or H[2,0] > H[2,2] or H[2,1] > H[2,2]:
         raise ValueError("Lower triangular elements bigger than diagonal.")
+    H = np.round(H, eps).astype(int)
     return H, B
 
 def UpperHermiteNormalForm(S):
@@ -2020,7 +2026,7 @@ def UpperHermiteNormalForm(S):
     return H, B
 
 
-def find_kpt_index(kpt, invK, L, D, eps=10):
+def find_kpt_index(kpt, invK, L, D, eps=9):
     """This function takes a k-point in Cartesian coordinates and "hashes" it 
     into a single number, corresponding to its place in the k-point list.
 
@@ -2035,20 +2041,20 @@ def find_kpt_index(kpt, invK, L, D, eps=10):
     Returns:
     """
 
-    gpt = np.round(np.dot(invK, kpt), 14)
-    if not np.allclose(np.zeros(np.shape(gpt)), gpt - np.round(gpt)):
-        msg = "The k-point is not a lattice point of the generating vectors."
-        raise ValueError(msg.format(kpt))
+    gpt = np.dot(invK, kpt)
+    # if not np.allclose(np.zeros(np.shape(gpt)), gpt - np.round(gpt, eps)):
+    #     msg = "The k-point is not a lattice point of the generating vectors."
+    #     raise ValueError(msg.format(kpt))
     # Convert the k-point from grid coordinates to group coordinates, and then
     # bring it into the first unit cell.
-    gpt = np.dot(L, gpt)%D
-
+    gpt = np.round(np.dot(L, gpt), eps).astype(int)%D
     # Convert from group coordinates to a singe base-10 number between 1 and
     # the number of k-points in the unreduced grid.
-    gpt = int(np.round(gpt[0]*D[1]*D[2] + gpt[1]*D[2] + gpt[2], eps))
-    return gpt
+    # gpt = int(np.round(gpt[0]*D[1]*D[2] + gpt[1]*D[2] + gpt[2], eps))
+    return gpt[0]*D[1]*D[2] + gpt[1]*D[2] + gpt[2]
 
-def bring_into_cell(kpt, lat_vecs, eps=10):
+
+def bring_into_cell(kpt, lat_vecs, eps=15):
     """Bring a k-point into the first unit cell.
     """    
     k = np.round(np.dot(inv(lat_vecs), kpt), eps)%1
@@ -2056,7 +2062,7 @@ def bring_into_cell(kpt, lat_vecs, eps=10):
 
 
 def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
-                       eps=10):
+                       eps=9):
     """Use the point group symmetry of the lattice vectors to reduce a list of
     k-points.
     
@@ -2122,11 +2128,17 @@ def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
     H,B = HermiteNormalForm(N)
     H = [list(H[i]) for i in range(3)]
     # Find the SNF of H. L and R are the left and right transformation matrices
-    # (LHR = S).    
+    # (LHR = S).
+    print("H ", H)
+    for i in H:
+        for j in i:
+            print(type(j))
+
+    
     S,L,R = SmithNormalForm(H)
 
     # Get the diagonal of SNF.
-    D = np.diag(S)
+    D = np.round(np.diag(S), eps).astype(int)
     
     cOrbit = 0 # unique orbit counter
     pointgroup = point_group(lattice_vectors) # a list of point group operators
