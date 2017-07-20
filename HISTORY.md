@@ -1,5 +1,11 @@
 # Revision History
 
+## Revision 0.1.0
+- Many thanks to Dr. Hess for allowing integration of his code with BZI.
+  Add the following modules to BZI that were written by
+  [Dr. Hess](https://www.physics.byu.edu/department/directory/hess):
+  makeIBZ.py, kmeshroutines.py, and IBZTest.py (found in tests).
+
 ## Revision 0.0.14
 - Add unit tests that compare k-point symmetry reduction to that obtained in
   VASP for orthorhombic, monoclinic, and tetragonal crystal classes.
