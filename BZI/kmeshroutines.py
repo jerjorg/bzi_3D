@@ -1,5 +1,5 @@
 """
-This module was written by Dr. Hess at BYU. See 
+This module was written by Dr. Hess. See 
 https://www.physics.byu.edu/department/directory/hess.
 """
 

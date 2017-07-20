@@ -277,7 +277,7 @@ class FreeElectronModel():
 
     Attributes:
         lattice (:py:obj:`BZI.symmetry.lattice`): an instance of Lattice.
-        nvalence_electrons (int): the number of valence electrons.
+        nvalence_electrons (int): the number of valence electrons is 1.
         degree (int): the degree of the radial dispersion relation.
         energy_shift (float): an energy shift typically used to place the Fermi
             level at the correct position.
@@ -288,11 +288,11 @@ class FreeElectronModel():
                  fermi_level=None):
         self.lattice = lattice
         self.degree = degree
-        if nvalence_electrons > 2:
-            msg = ("The free electron model can only have two valuenc electrons"
-                   " since there is only one band.")
-            raise ValueError(msg.format(nvalence_electrons))
-        self.nvalence_electrons = nvalence_electrons
+        # The free electron pseudopotential can only have one valence electron
+        # because the energy dispersion relation isn't periodic and with two
+        # valence electrons the Fermi surface would extend outside the unit 
+        # cell.
+        self.nvalence_electrons = 1
         self.energy_shift = energy_shift or 0.
         self.fermi_level = fermi_level or 0.
 

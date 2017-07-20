@@ -1751,6 +1751,12 @@ def test_reduce_kpoint_list():
     assert irrkpts == []
                     
     ### Face-centered cubic ###
+    lat_consts = [3.248231]*3
+    lat_angles = [np.pi/2]*3
+    centering = 'face'
+    lat_vecs = make_ptvecs(centering, lat_consts, lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
+    
     H = np.array([[20,0,0],
                   [0,20,0],
                   [0,0,20]])
@@ -2171,7 +2177,7 @@ def test_reduce_kpoint_list():
                 ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
                 del grid_copy[ind]
                 del irrkpts[ind]
-    assert irrkpt == []
+    assert irrkpts == []
 
     ### Face-centered orthorhombic ###
     lat_consts = [2.95, 3.92, 8.55]
@@ -2320,8 +2326,8 @@ def test_reduce_kpoint_list():
     red_grid, weights = reduce_kpoint_list(grid,
                        rlat_vecs, grid_vecs,
                        offset)
-    assert len(weights) == 7696
-    assert len(red_grid) == 7696
+    assert len(weights) == 3392
+    assert len(red_grid) == 3392
     assert np.sum(weights) == 14*30**2
 
     H = np.array([[31,0,0],
@@ -2334,9 +2340,9 @@ def test_reduce_kpoint_list():
     red_grid, weights = reduce_kpoint_list(grid,
                         rlat_vecs, grid_vecs,
                         offset)
-    assert len(weights) == 7696
-    assert len(red_grid) == 7696
-    assert np.sum(weights) == 14*30**2
+    assert len(weights) == 3848
+    assert len(red_grid) == 3848
+    assert np.sum(weights) == 15*31**2
 
     H = np.array([[31,0,0],
                   [0,15,0],
@@ -2444,9 +2450,9 @@ def test_reduce_kpoint_list():
     red_grid, weights = reduce_kpoint_list(grid,
                         rlat_vecs, grid_vecs,
                         offset)
-    assert len(weights) == 6288
-    assert len(red_grid) == 6288
-    assert np.sum(weights) == 14*30**2
+    assert len(weights) == 7208
+    assert len(red_grid) == 7208
+    assert np.sum(weights) == 15*31**2
 
     H = np.array([[31,0,0],
                   [0,15,0],
@@ -2591,6 +2597,14 @@ def test_reduce_kpoint_list():
     assert irrkpts == []
 
     ### Body-centered tetragonal ###
+    lat_consts = [4.93777, 4.93777, 7.461038]
+    lat_angles = [np.pi/2]*3
+    centering = 'body'
+
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
+    
     H = np.array([[32,0,0],
                   [0,32,0],
                   [0,0,32]])

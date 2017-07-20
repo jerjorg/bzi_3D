@@ -1,5 +1,13 @@
 # Revision History
 
+## Revision 0.1.1
+- Fix integration unit tests. Since make_cell_points always moves the points
+  back into the unit cell, it can't be used with the free-electron
+  pseudopotential. Replaced make_cell_points with make_grid in unit tests.
+- The free electron pseudopotential can't have more than one electron since
+  having two would move the Fermi surface outside the unit cell. This is a
+  problem because it isn't periodic like most other pseudopotentials.
+
 ## Revision 0.1.0
 - Many thanks to Dr. Hess for allowing integration of his code with BZI.
   Add the following modules to BZI that were written by
