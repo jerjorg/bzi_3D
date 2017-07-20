@@ -1,5 +1,20 @@
 # Revision History
 
+## Revision 0.0.13
+- Change the line in find_kpt_index
+```
+np.round(np.dot(L, gpt), eps).astype(int)%D
+# np.dot(L, np.round(gpt).astype(int))%D
+```
+- Add a check that skips k-points when they don't belong to the grid
+```
+if not np.allclose(np.dot(invK, rot_kpt-shift),
+       np.round(np.dot(invK, rot_kpt-shift))):
+    continue
+```
+in reduce_kpoint_list.
+- Add unit tests for simple cubic lattices.
+
 ## Revision 0.0.12
 - Fix find_orbitals so that it correctly reduces a k-point grid when k-point
   grid includes points translationally equivalent.

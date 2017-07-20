@@ -12,8 +12,6 @@ from copy import deepcopy
 from itertools import islice
 from BZI.msg import err
 
-
-
 from phenum.symmetry import get_lattice_pointGroup
 from phenum.grouptheory import SmithNormalForm
 
@@ -2042,15 +2040,10 @@ def find_kpt_index(kpt, invK, L, D, eps=9):
     """
 
     gpt = np.dot(invK, kpt)
-    # if not np.allclose(np.zeros(np.shape(gpt)), gpt - np.round(gpt, eps)):
-    #     msg = "The k-point is not a lattice point of the generating vectors."
-    #     raise ValueError(msg.format(kpt))
-    # Convert the k-point from grid coordinates to group coordinates, and then
-    # bring it into the first unit cell.
-    gpt = np.round(np.dot(L, gpt), eps).astype(int)%D
+    gpt = np.dot(L, np.round(gpt).astype(int))%D
+    
     # Convert from group coordinates to a singe base-10 number between 1 and
     # the number of k-points in the unreduced grid.
-    # gpt = int(np.round(gpt[0]*D[1]*D[2] + gpt[1]*D[2] + gpt[2], eps))
     return gpt[0]*D[1]*D[2] + gpt[1]*D[2] + gpt[2]
 
 
@@ -2129,12 +2122,6 @@ def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
     H = [list(H[i]) for i in range(3)]
     # Find the SNF of H. L and R are the left and right transformation matrices
     # (LHR = S).
-    print("H ", H)
-    for i in H:
-        for j in i:
-            print(type(j))
-
-    
     S,L,R = SmithNormalForm(H)
 
     # Get the diagonal of SNF.
@@ -2171,12 +2158,13 @@ def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
             rot_kpt = np.dot(pg, ur_kpt)
             # Bring it back into the first unit cell.
             rot_kpt = bring_into_cell(rot_kpt, lattice_vectors)
-            # Remove the shift from the k-point.
+            if not np.allclose(np.dot(invK, rot_kpt-shift),
+                               np.round(np.dot(invK, rot_kpt-shift))):
+                continue
             idx = find_kpt_index(rot_kpt - shift, invK, L, D, eps)
             if hashtable[idx] == None:
                 hashtable[idx] = cOrbit
                 iWt[cOrbit] += 1
-
     sum = 0
     kpoint_weights = list(iWt.values())[:cOrbit]
     reduced_kpoints = [[0,0,0] for _ in range(cOrbit)]
