@@ -1,5 +1,9 @@
 # Revision History
 
+## Revision 0.0.14
+- Add unit tests that compare k-point symmetry reduction to that obtained in
+  VASP for orthorhombic, monoclinic, and tetragonal crystal classes.
+
 ## Revision 0.0.13
 - Change the line in find_kpt_index
 ```

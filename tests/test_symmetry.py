@@ -1571,14 +1571,12 @@ def test_reduce_kpoint_list():
                   [0,0,20]])
     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
     offset = np.array([1./2, 1./2, 1./2])
-    # offset = np.array([0.]*3)
 
     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
     red_grid, weights = reduce_kpoint_list(grid,
                         rlat_vecs, grid_vecs,
                         offset)
-
     assert len(weights) == 2100
     assert len(red_grid) == 2100
     assert np.sum(weights) == 40*40*20
@@ -1588,7 +1586,6 @@ def test_reduce_kpoint_list():
                   [0,21,0],
                   [0,0,41]])
     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-    # offset = np.array([1./2, 1./2, 1./2])
     offset = np.array([0.0]*3)
 
     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
@@ -1604,7 +1601,6 @@ def test_reduce_kpoint_list():
                   [0,42,0],
                   [0,0,42]])
     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-    # offset = np.array([1./2, 1./2, 1./2])
     offset = np.array([0.0]*3)
 
     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
@@ -1612,7 +1608,6 @@ def test_reduce_kpoint_list():
     red_grid, weights = reduce_kpoint_list(grid,
                         rlat_vecs, grid_vecs,
                         offset)
-
     assert len(weights) == 3014
     assert len(red_grid) == 3014
     assert np.sum(weights) == 42*42*22
@@ -1622,7 +1617,6 @@ def test_reduce_kpoint_list():
                   [0,3,0],
                   [0,0,3]])
     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-    # offset = np.array([1./2, 1./2, 1./2])
     offset = np.array([0.0]*3)
 
     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
@@ -1633,6 +1627,1047 @@ def test_reduce_kpoint_list():
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
     for v in find_orbitals(grid, rlat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+    assert irrkpts == []
+
+    ### Body-centered cubic ###
+    lat_consts = [2*1.580307]*3
+    lat_angles = [np.pi/2]*3
+    centering = 'body'
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
+
+    H = np.array([[40,0,0],
+                  [0,40,0],
+                  [0,0,40]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 1650
+    assert len(red_grid) == 1650
+    assert np.sum(weights) == 40**3
+
+    H = np.array([[41,0,0],
+                  [0,41,0],
+                  [0,0,41]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 1771
+    assert len(red_grid) == 1771
+    assert np.sum(weights) == 41**3
+
+    H = np.array([[42,0,0],
+                  [0,42,0],
+                  [0,0,42]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 1903
+    assert len(red_grid) == 1903
+    assert np.sum(weights) == 42**3
+
+    H = np.array([[20,0,0],
+                  [0,40,0],
+                  [0,0,40]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 1411
+    assert len(red_grid) == 1411
+    assert np.sum(weights) == 20*40*40
+
+    H = np.array([[41,0,0],
+                  [0,21,0],
+                  [0,0,41]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 8771
+    assert len(red_grid) == 8771
+    assert np.sum(weights) == 41*21*41
+
+    H = np.array([[18,0,0],
+                  [0,38,0],
+                  [0,0,38]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 6108
+    assert len(red_grid) == 6108
+    assert np.sum(weights) == 18*38*38
+
+    H = np.array([[3,0,0],
+                  [0,3,0],
+                  [0,0,3]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in find_orbitals(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+    assert irrkpts == []
+                    
+    ### Face-centered cubic ###
+    H = np.array([[20,0,0],
+                  [0,20,0],
+                  [0,0,20]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 770
+    assert len(red_grid) == 770
+    assert np.sum(weights) == 20**3
+
+    H = np.array([[41,0,0],
+                  [0,41,0],
+                  [0,0,41]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 1771
+    assert len(red_grid) == 1771
+    assert np.sum(weights) == 41**3
+
+    H = np.array([[40,0,0],
+                  [0,40,0],
+                  [0,0,40]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 1661
+    assert len(red_grid) == 1661
+    assert np.sum(weights) == 40**3
+
+    H = np.array([[40,0,0],
+                  [0,20,0],
+                  [0,0,20]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 1026
+    assert len(red_grid) == 1026
+    assert np.sum(weights) == 40*20**2
+
+    H = np.array([[21,0,0],
+                  [0,41,0],
+                  [0,0,21]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 4741
+    assert len(red_grid) == 4741
+    assert np.sum(weights) == 41*21**2
+
+    H = np.array([[18,0,0],
+                  [0,18,0],
+                  [0,0,38]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3043
+    assert len(red_grid) == 3043
+    assert np.sum(weights) == 38*18**2
+
+    H = np.array([[3,0,0],
+                  [0,3,0],
+                  [0,0,3]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in find_orbitals(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+    assert irrkpts == []
+
+    ### Orthorhombic ###
+
+    lat_consts = [2.95, 3.92, 8.55]
+    lat_angles = [np.pi/2]*3
+    centering = 'prim'
+
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
+    H = np.array([[40,0,0],
+                  [0,40,0],
+                  [0,0,40]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 8000
+    assert len(red_grid) == 8000
+    assert np.sum(weights) == 40**3
+
+    H = np.array([[40,0,0],
+                  [0,40,0],
+                  [0,0,40]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+
+    assert len(weights) == 9261
+    assert len(red_grid) == 9261
+    assert np.sum(weights) == 40**3
+
+    H = np.array([[41,0,0],
+                  [0,41,0],
+                  [0,0,41]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 9261
+    assert len(red_grid) == 9261
+    assert np.sum(weights) == 41**3
+
+    H = np.array([[21,0,0],
+                  [0,41,0],
+                  [0,0,41]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 4851
+    assert len(red_grid) == 4851
+    assert np.sum(weights) == 21*41**2
+
+    H = np.array([[40,0,0],
+                  [0,20,0],
+                  [0,0,40]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 4000
+    assert len(red_grid) == 4000
+    assert np.sum(weights) == 20*40**2
+
+    H = np.array([[40,0,0],
+                  [0,41,0],
+                  [0,0,20]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 4851
+    assert len(red_grid) == 4851
+    assert np.sum(weights) == 40*41*20
+
+    H = np.array([[3,0,0],
+                  [0,3,0],
+                  [0,0,3]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in find_orbitals(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+    assert irrkpts == []
+
+    ### Base-centered orthorhombic ###
+    lat_consts = [2.95, 3.92, 8.55]
+    lat_angles = [np.pi/2]*3
+    centering = 'base'
+    
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
+
+    H = np.array([[30,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3856
+    assert len(red_grid) == 3856
+    assert np.sum(weights) == 30**3
+    
+    H = np.array([[31,0,0],
+                  [0,31,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 4096
+    assert len(red_grid) == 4096
+    assert np.sum(weights) == 31**3
+
+    H = np.array([[14,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3376
+    assert len(red_grid) == 3376
+    assert np.sum(weights) == 14*30*30
+
+    H = np.array([[31,0,0],
+                  [0,15,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3728
+    assert len(red_grid) == 3728
+    assert np.sum(weights) == 15*31**2
+
+    H = np.array([[30,0,0],
+                  [0,31,0],
+                  [0,0,15]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3728
+    assert len(red_grid) == 3728
+    assert np.sum(weights) == 30*31*15
+
+    H = np.array([[3,0,0],
+                  [0,3,0],
+                  [0,0,3]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in find_orbitals(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+
+    ### Body-centered orthorhombic ###
+    lat_consts = [2.95, 3.92, 8.55]
+    lat_angles = [np.pi/2]*3
+    centering = 'body'
+
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)    
+    H = np.array([[30,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3736
+    assert len(red_grid) == 3736
+    assert np.sum(weights) == 30**3
+
+    H = np.array([[31,0,0],
+                  [0,31,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 4096
+    assert len(red_grid) == 4096
+    assert np.sum(weights) == 31**3
+
+    H = np.array([[14,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 6169
+    assert len(red_grid) == 6169
+    assert np.sum(weights) == 14*30**2
+
+    H = np.array([[30,0,0],
+                  [0,14,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 6169
+    assert len(red_grid) == 6169
+    assert np.sum(weights) == 14*30**2
+
+    H = np.array([[30,0,0],
+                  [0,31,0],
+                  [0,0,14]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 6512
+    assert len(red_grid) == 6512
+    assert np.sum(weights) == 14*30*31
+
+    H = np.array([[3,0,0],
+                  [0,3,0],
+                  [0,0,3]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in find_orbitals(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+    assert irrkpt == []
+
+    ### Face-centered orthorhombic ###
+    lat_consts = [2.95, 3.92, 8.55]
+    lat_angles = [np.pi/2]*3
+    centering = 'face'
+
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
+
+    H = np.array([[30,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3736
+    assert len(red_grid) == 3736
+    assert np.sum(weights) == 30**3
+
+    H = np.array([[31,0,0],
+                  [0,31,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 4096
+    assert len(red_grid) == 4096
+    assert np.sum(weights) == 31**3
+
+    H = np.array([[14,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 5874
+    assert len(red_grid) == 5874
+    assert np.sum(weights) == 14*30**2
+
+    H = np.array([[32,0,0],
+                  [0,16,0],
+                  [0,0,32]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3281
+    assert len(red_grid) == 3281
+    assert np.sum(weights) == 16*32**2
+
+    H = np.array([[34,0,0],
+                  [0,35,0],
+                  [0,0,13]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 7736
+    assert len(red_grid) == 7736
+    assert np.sum(weights) == 34*35*13
+
+    H = np.array([[3,0,0],
+                  [0,3,0],
+                  [0,0,3]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in find_orbitals(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+
+    ### Monoclinic ###
+    lat_consts = [5.596, 3.533, 4.274]
+    lat_angles = [np.pi/2, 119.069*np.pi/180, np.pi/2]
+    centering = 'prim'
+
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
+    
+    H = np.array([[30,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 7232
+    assert len(red_grid) == 7232
+    assert np.sum(weights) == 30**3
+
+    H = np.array([[31,0,0],
+                  [0,31,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)                
+    assert len(weights) == 7696
+    assert len(red_grid) == 7696
+    assert np.sum(weights) == 31**3
+    H = np.array([[14,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                       rlat_vecs, grid_vecs,
+                       offset)
+    assert len(weights) == 7696
+    assert len(red_grid) == 7696
+    assert np.sum(weights) == 14*30**2
+
+    H = np.array([[31,0,0],
+                  [0,15,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 7696
+    assert len(red_grid) == 7696
+    assert np.sum(weights) == 14*30**2
+
+    H = np.array([[31,0,0],
+                  [0,15,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3848
+    assert len(red_grid) == 3848
+    assert np.sum(weights) == 15*31**2
+
+    H = np.array([[30,0,0],
+                  [0,31,0],
+                  [0,0,14]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3360
+    assert len(red_grid) == 3360
+    assert np.sum(weights) == 30*31*14
+
+    H = np.array([[3,0,0],
+                  [0,3,0],
+                  [0,0,3]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in find_orbitals(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+    assert irrkpts == []
+
+    ### Base-centered monoclinic ###
+    lat_consts = [5.596, 3.533, 4.274]
+    lat_angles = [np.pi/2, 119.069*np.pi/180, np.pi/2]
+    centering = 'base'
+
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)    
+
+    H = np.array([[30,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 6992
+    assert len(red_grid) == 6992
+    assert np.sum(weights) == 30**3
+
+    H = np.array([[31,0,0],
+                  [0,31,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 7696
+    assert len(red_grid) == 7696
+    assert np.sum(weights) == 31**3
+
+    H = np.array([[14,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 6288
+    assert len(red_grid) == 6288
+    assert np.sum(weights) == 14*30**2
+                
+    H = np.array([[31,0,0],
+                  [0,15,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 6288
+    assert len(red_grid) == 6288
+    assert np.sum(weights) == 14*30**2
+
+    H = np.array([[31,0,0],
+                  [0,15,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 7208
+    assert len(red_grid) == 7208
+    assert np.sum(weights) == 15*31**2
+
+    H = np.array([[31,0,0],
+                  [0,20,0],
+                  [0,0,15]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = [0.0, 0.5, 0.5]
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 4650
+    assert len(red_grid) == 4650
+    assert np.sum(weights) == 31*20*15
+
+    H = np.array([[4,0,0],
+                  [0,4,0],
+                  [0,2,3]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = [0.0, 0.5, 0.5]
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in find_orbitals(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+    assert irrkpts == []
+                
+    ### Tetragonal ###
+    lat_consts = [4.93777, 4.93777, 7.461038]
+    lat_angles = [np.pi/2]*3
+    centering = 'prim'
+
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
+
+    H = np.array([[30,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 2176
+    assert len(red_grid) == 2176
+    assert np.sum(weights) == 30**3
+    
+    H = np.array([[31,0,0],
+                  [0,31,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 2176
+    assert len(red_grid) == 2176
+    assert np.sum(weights) == 31**3
+
+    H = np.array([[14,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 1575
+    assert len(red_grid) == 1575
+    assert np.sum(weights) == 14*30**2
+
+    H = np.array([[31,0,0],
+                  [0,15,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 2048
+    assert len(red_grid) == 2048
+    assert np.sum(weights) == 15*31**2
+
+    H = np.array([[33,0,0],
+                  [0,31,0],
+                  [0,0,17]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 2448
+    assert len(red_grid) == 2448
+    assert np.sum(weights) == 33*31*17
+
+    H = np.array([[5,0,0],
+                  [3,4,0],
+                  [1,2,7]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in find_orbitals(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+    assert irrkpts == []
+
+    ### Body-centered tetragonal ###
+    H = np.array([[32,0,0],
+                  [0,32,0],
+                  [0,0,32]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 2393
+    assert len(red_grid) == 2393
+    assert np.sum(weights) == 32**3
+
+    H = np.array([[33,0,0],
+                  [0,33,0],
+                  [0,0,33]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 2601
+    assert len(red_grid) == 2601
+    assert np.sum(weights) == 33**3
+
+    H = np.array([[15,0,0],
+                  [0,31,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 6983
+    assert len(red_grid) == 6983
+    assert np.sum(weights) == 15*31**2
+
+    H = np.array([[31,0,0],
+                  [0,15,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 6983
+    assert len(red_grid) == 6983
+    assert np.sum(weights) == 15*31**2
+
+    H = np.array([[31,0,0],
+                  [0,32,0],
+                  [0,0,15]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 7441
+    assert len(red_grid) == 7441
+    assert np.sum(weights) == 31*32*15
+
+    H = np.array([[3,0,0],
+                  [0,4,0],
+                  [0,0,5]])
+    offset = np.array([1./2]*3)
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in find_orbitals(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
