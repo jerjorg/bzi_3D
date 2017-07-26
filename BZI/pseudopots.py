@@ -274,6 +274,7 @@ class FreeElectronModel():
         energy_shift (float): an energy shift typically used to place the Fermi
             level at the correct position.
         fermi_level (float): the fermi level.
+        total_enery(float): the total energy
 
     Attributes:
         lattice (:py:obj:`BZI.symmetry.lattice`): an instance of Lattice.
@@ -282,10 +283,11 @@ class FreeElectronModel():
         energy_shift (float): an energy shift typically used to place the Fermi
             level at the correct position.
         fermi_level (float): the fermi level.
+        total_enery(float): the total energy
     """
     
     def __init__(self, lattice, nvalence_electrons, degree, energy_shift=None,
-                 fermi_level=None):
+                 fermi_level=None, total_energy=None):
         self.lattice = lattice
         self.degree = degree
         # The free electron pseudopotential can only have one valence electron
@@ -295,12 +297,13 @@ class FreeElectronModel():
         self.nvalence_electrons = 1
         self.energy_shift = energy_shift or 0.
         self.fermi_level = fermi_level or 0.
+        self.total_energy = total_energy or 0.
 
-    def eval(self, x, neigvals):
+    def eval(self, kpoint, neigvals):
         # There's only one eigenvalue so neigvals isn't needed in general but
         # it is when running tests on functions that take an instance of the
         # pseudopotential classes.
-        return [np.linalg.norm(x)**self.degree]
+        return [np.linalg.norm(kpoint)**self.degree]
     
 #### W pseudopotentials ####
 def W1(spt):
@@ -596,9 +599,9 @@ free_lattice = Lattice(free_lat_centering, free_lat_consts, free_lat_angles)
 free_pff = [0.0]
 free_energy_cutoff = 2*(2*np.pi/free_lat_const)**2
 free_atomic_positions = [[0.]*3]
-free_nvalence_electrons = 3
-free_PP = EmpiricalPP(free_lattice, free_pff, free_energy_cutoff,
-                      free_atomic_positions, free_nvalence_electrons)
+free_nvalence_electrons = 1
+free_degree = 2
+free_PP = FreeElectronModel(free_lattice, free_nvalence_electrons, 2)
 
 # The following pseudopotentials come from: 
 # Cohen, Marvin L., and Volker Heine. "The fitting of pseudopotentials to
@@ -784,7 +787,7 @@ Zn_PP = EmpiricalPP(Zn_lattice, Zn_pff, Zn_energy_cutoff, Zn_atomic_positions,
                     Zn_nvalence_electrons)
 
 
-# See Band structure and Fermi surface of Zine and Cadmium by Stark and
+# See Band structure and Fermi surface of Zinc and Cadmium by Stark and
 # Falicov for Cd form factors.
 #### Pseudopotential of Cd ####
 Cd_centering_type = "prim"

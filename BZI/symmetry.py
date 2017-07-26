@@ -1549,7 +1549,7 @@ def find_full_orbitals(grid_car, lat_vecs, coord = "cart"):
             # it back in.
             # I ran into floating point precision problems the last time I ran
             # %1. Just to be safe it's included here.
-            new_gp = mod(np.round(np.dot(pg, gp), 15), 1)
+            new_gp = np.round(np.dot(pg, gp), 15)%1
             if any([np.allclose(new_gp, gc) for gc in grid_copy]):
                 ind = np.where(np.array([np.allclose(new_gp, gc) for gc in grid_copy]) == True)[0][0]
                 del grid_copy[ind]
@@ -2086,17 +2086,118 @@ def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
     except np.linalg.linalg.LinAlgError:
         msg = "The grid generating vectors are linearly dependent."
         raise ValueError(msg.format(lattice_vectors))
+        
+    if abs(det(lattice_vectors)) < abs(det(grid_vectors)):
+        msg = """The k-point generating vectors define a grid with a unit cell 
+        larger than the reciprocal lattice unit cell."""
+        raise ValueError(msg.format(grid_vectors))
+
+    # Put the shift in Cartesian coordinates.
+    shift = np.dot(grid_vectors, shift)
+
+    # Integer matrix
+    N = np.dot(inv(grid_vectors), lattice_vectors)
+    # Check that N is an integer matrix. In other words, verify that the grid
+    # and lattice are commensurate.
+    for i in range(len(N[:,0])):
+        for j in range(len(N[0,:])):
+            if np.isclose(N[i,j]%1, 0) or np.isclose(N[i,j]%1, 1):
+                N[i,j] = int(np.round(N[i,j]))
+            else:
+                msg = "The lattice and grid vectors are incommensurate."
+                raise ValueError(msg.format(grid_vectors))
+
+    # Find the HNF of N. B is the transformation matrix (BN = H).
+    H,B = HermiteNormalForm(N)
+    H = [list(H[i]) for i in range(3)]
+    # Find the SNF of H. L and R are the left and right transformation matrices
+    # (LHR = S).
+    S,L,R = SmithNormalForm(H)
+
+    # Get the diagonal of SNF.
+    D = np.round(np.diag(S), eps).astype(int)
+    
+    cOrbit = 0 # unique orbit counter
+    pointgroup = point_group(lattice_vectors) # a list of point group operators
+    nSymOps = len(pointgroup) # the number of symmetry operations
+    nUR = len(kpoint_list) # the number of unreduced k-points
+    
+    # A dictionary to keep track of the number of symmetrically-equivalent
+    # k-points.
+    hashtable = dict.fromkeys(range(nUR))
+
+    # A dictionary to keep track of the k-points that represent each orbital.
+    iFirst = {}
+
+    # A dictionary to keep track of the number of symmetrically-equivalent
+    # k-points in each orbit.
+    iWt = {}
+    invK = inv(grid_vectors)
+
+    # Loop over unreduced k-points.
+    for i in range(nUR):
+        ur_kpt = kpoint_list[i]
+        idx = find_kpt_index(ur_kpt - shift, invK, L, D, eps)
+        if hashtable[idx] != None:
+            continue
+        cOrbit += 1        
+        hashtable[idx] = cOrbit
+        iFirst[cOrbit] = i
+        iWt[cOrbit] = 1
+        for pg in pointgroup:
+            # Rotate the k-point.
+            rot_kpt = np.dot(pg, ur_kpt)
+            # Bring it back into the first unit cell.
+            rot_kpt = bring_into_cell(rot_kpt, lattice_vectors)
+            if not np.allclose(np.dot(invK, rot_kpt-shift),
+                               np.round(np.dot(invK, rot_kpt-shift))):
+                continue
+            idx = find_kpt_index(rot_kpt - shift, invK, L, D, eps)
+            if hashtable[idx] == None:
+                hashtable[idx] = cOrbit
+                iWt[cOrbit] += 1
+    sum = 0
+    kpoint_weights = list(iWt.values())[:cOrbit]
+    reduced_kpoints = [[0,0,0] for _ in range(cOrbit)]
+    for i in range(cOrbit):
+        sum += kpoint_weights[i]
+        reduced_kpoints[i] = kpoint_list[iFirst[i+1]]
+    
+    return reduced_kpoints, kpoint_weights
+
+def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
+                eps=9):
+    """Use the point group symmetry of the lattice vectors to reduce a list of
+    k-points.
+    
+    Args:
+        kpoint_list (list or numpy.ndarray): a list of k-point positions in
+            Cartesian coordinates.
+        lattice_vectors (list or numpy.ndarray): the vectors that generate the
+            reciprocal lattice in a 3x3 array with the vectors as columns.
+        grid_vectors (list or numpy.ndarray): the vectors that generate the
+            k-point grid in a 3x3 array with the vectors as columns in 
+            Cartesian coordinates.
+        shift (list or numpy.ndarray): the offset of the k-point grid in grid
+            coordinates.
+
+    Returns:
+        reduced_kpoints (list): an ordered list of irreducible k-points
+        kpoint_weights (list): an ordered list of irreducible k-point weights.
+    """
     
     try:
-        ncomps = np.shape(kpoint_list)[1]
-    except IndexError:
-        msg = "Please provide a list of k-points."
-        raise ValueError(msg.format(kpoint_list))
+        inv(lattice_vectors)
+    except np.linalg.linalg.LinAlgError:
+        msg = "The lattice generating vectors are linearly dependent."
+        raise ValueError(msg.format(lattice_vectors))
     
-    if ncomps != 3:
-        msg = "The k-points must be lists or arrays with three elements"
-        raise ValueError(msg.format(kpoint_list))
-    
+    try:
+        inv(grid_vectors)
+    except np.linalg.linalg.LinAlgError:
+        msg = "The grid generating vectors are linearly dependent."
+        raise ValueError(msg.format(lattice_vectors))
+        
     if abs(det(lattice_vectors)) < abs(det(grid_vectors)):
         msg = """The k-point generating vectors define a grid with a unit cell 
         larger than the reciprocal lattice unit cell."""
@@ -2165,11 +2266,14 @@ def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
             if hashtable[idx] == None:
                 hashtable[idx] = cOrbit
                 iWt[cOrbit] += 1
-    sum = 0
-    kpoint_weights = list(iWt.values())[:cOrbit]
-    reduced_kpoints = [[0,0,0] for _ in range(cOrbit)]
-    for i in range(cOrbit):
-        sum += kpoint_weights[i]
-        reduced_kpoints[i] = kpoint_list[iFirst[i+1]]
+    # sum = 0
+    # kpoint_weights = list(iWt.values())[:cOrbit]
+    # reduced_kpoints = [[0,0,0] for _ in range(cOrbit)]
+    # for i in range(cOrbit):
+    #     sum += kpoint_weights[i]
+    #     reduced_kpoints[i] = kpoint_list[iFirst[i+1]]
     
-    return reduced_kpoints, kpoint_weights
+    # return reduced_kpoints, kpoint_weights
+
+    hashtable = dict((k, v) for k, v in hashtable.items() if v)
+    return hashtable, iFirst

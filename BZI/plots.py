@@ -105,7 +105,7 @@ def ScatterPlotSingle(func, ndivisions, cutoff=None):
         ax.scatter(kxlist, kylist, estates,s=.5);
     plt.show()
     
-def PlotMesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
+def plot_mesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
              indices=None):
     """Create a 3D scatter plot of a set of mesh points inside a cell.
     
@@ -114,7 +114,7 @@ def PlotMesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
             coordinates.
         cell_vecs (list or numpy.ndarray): a list vectors that define a cell.
         offset (list or numpy.ndarray): the offset of the unit cell, which is 
-           also plotted.
+           also plotted, in Cartesian coordinates.
         indices (list or numpy.ndarray): the indices of the points. If
             provided, they will be plotted with the mesh points.
     Returns:
@@ -139,18 +139,18 @@ def PlotMesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
     c3 = cell_vecs[:,2] 
     O = np.asarray([0.,0.,0.]) 
 
-    l1 = zip(O - offset, c1 - offset)
-    l2 = zip(c2 - offset, c1 + c2 - offset)
-    l3 = zip(c3 - offset, c1 + c3 - offset)
-    l4 = zip(c2 + c3 - offset, c1 + c2 + c3 - offset)
-    l5 = zip(O - offset, c3 - offset)
-    l6 = zip(c1 - offset, c1 + c3 - offset)
-    l7 = zip(c2 - offset, c2 + c3 - offset)
-    l8 = zip(c1 + c2 - offset, c1 + c2 + c3 - offset)
-    l9 = zip(O - offset, c2 - offset)
-    l10 = zip(c1 - offset, c1 + c2 - offset)
-    l11 = zip(c3 - offset, c2 + c3 - offset)
-    l12 = zip(c1 + c3 - offset, c1 + c2 + c3 - offset)
+    l1 = zip(O + offset, c1 + offset)
+    l2 = zip(c2 + offset, c1 + c2 + offset)
+    l3 = zip(c3 + offset, c1 + c3 + offset)
+    l4 = zip(c2 + c3 + offset, c1 + c2 + c3 + offset)
+    l5 = zip(O + offset, c3 + offset)
+    l6 = zip(c1 + offset, c1 + c3 + offset)
+    l7 = zip(c2 + offset, c2 + c3 + offset)
+    l8 = zip(c1 + c2 + offset, c1 + c2 + c3 + offset)
+    l9 = zip(O + offset, c2 + offset)
+    l10 = zip(c1 + offset, c1 + c2 + offset)
+    l11 = zip(c3 + offset, c2 + c3 + offset)
+    l12 = zip(c1 + c3 + offset, c1 + c2 + c3 + offset)
 
     ls = [l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12]
 
@@ -185,18 +185,18 @@ def PlotMeshes(mesh_points_list, cell_vecs, atoms, offset = np.asarray([0.,0.,0.
     c3 = cell_vecs[:,2] 
     O = np.asarray([0.,0.,0.]) 
 
-    l1 = zip(O - offset, c1 - offset)
-    l2 = zip(c2 - offset, c1 + c2 - offset)
-    l3 = zip(c3 - offset, c1 + c3 - offset)
-    l4 = zip(c2 + c3 - offset, c1 + c2 + c3 - offset)
-    l5 = zip(O - offset, c3 - offset)
-    l6 = zip(c1 - offset, c1 + c3 - offset)
-    l7 = zip(c2 - offset, c2 + c3 - offset)
-    l8 = zip(c1 + c2 - offset, c1 + c2 + c3 - offset)
-    l9 = zip(O - offset, c2 - offset)
-    l10 = zip(c1 - offset, c1 + c2 - offset)
-    l11 = zip(c3 - offset, c2 + c3 - offset)
-    l12 = zip(c1 + c3 - offset, c1 + c2 + c3 - offset)
+    l1 = zip(O + offset, c1 + offset)
+    l2 = zip(c2 + offset, c1 + c2 + offset)
+    l3 = zip(c3 + offset, c1 + c3 + offset)
+    l4 = zip(c2 + c3 + offset, c1 + c2 + c3 + offset)
+    l5 = zip(O + offset, c3 + offset)
+    l6 = zip(c1 + offset, c1 + c3 + offset)
+    l7 = zip(c2 + offset, c2 + c3 + offset)
+    l8 = zip(c1 + c2 + offset, c1 + c2 + c3 + offset)
+    l9 = zip(O + offset, c2 + offset)
+    l10 = zip(c1 + offset, c1 + c2 + offset)
+    l11 = zip(c3 + offset, c2 + c3 + offset)
+    l12 = zip(c1 + c3 + offset, c1 + c2 + c3 + offset)
 
     ls = [l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12]
 

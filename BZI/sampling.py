@@ -2,6 +2,7 @@
 """
  
 import numpy as np
+from numpy.linalg import inv, norm
 from copy import deepcopy
 from itertools import product
 from math import ceil
@@ -17,7 +18,7 @@ def make_grid(lat_vecs, grid_vecs, offset, cart=True):
             to sample. The vectors are the columns of the matrix.
         grid_vecs (numpy.ndarray): the vectors that generate the grid as 
             columns of the matrix..
-        offset: the offset of the coordinate system grid coordinates.
+        offset: the offset of the coordinate system in grid coordinates.
         cart (bool): if true, return the grid in Cartesian coordinates; other-
             wise, return the grid in cell coordinates.
 
@@ -40,14 +41,14 @@ def make_grid(lat_vecs, grid_vecs, offset, cart=True):
     # Put the offset in Cartesian coordinates.
     offset = np.dot(grid_vecs, offset)
 
-    # Offset in cell coordinates in the first unit cell
-    offset = np.round(np.dot(np.linalg.inv(lat_vecs), offset), 15)%1
+    # Offset in lattice coordinates in the first unit cell
+    # offset = np.round(np.dot(inv(lat_vecs), offset), 15)%1
 
-    # Offset in cell coordinates
-    offset = np.dot(lat_vecs, offset)
+    # # Offset in cell coordinates
+    # offset = np.dot(lat_vecs, offset)
 
     # Integer matrix
-    N = np.dot(np.linalg.inv(grid_vecs), lat_vecs)
+    N = np.dot(inv(grid_vecs), lat_vecs)
     # Check that N is an integer matrix.
     for i in range(len(N[:,0])):
         for j in range(len(N[0,:])):
@@ -64,7 +65,7 @@ def make_grid(lat_vecs, grid_vecs, offset, cart=True):
     d = H[1,1]
     e = H[1,2]
     f = H[2,2]
-    cell_const = np.linalg.norm(lat_vecs[:,0])
+    cell_const = norm(lat_vecs[:,0])
 
     if cart:
         grid = []
@@ -77,10 +78,10 @@ def make_grid(lat_vecs, grid_vecs, offset, cart=True):
                 z1pl = int((c - b*e/d)*z3p/f + b/d*z2p)
                 z1pu = int(z1pl + a)
                 for z1p in range(z1pl + 1, z1pu + 1):
-                    z = np.dot(np.linalg.inv(U), [z1p,z2p,z3p])
+                    z = np.dot(inv(U), [z1p,z2p,z3p])
                     pt = np.dot(grid_vecs, z)
-                    gpt = np.round(np.dot(np.linalg.inv(lat_vecs), pt), 12)%1
-                    grid.append(np.dot(lat_vecs, gpt) - offset)
+                    gpt = np.round(np.dot(inv(lat_vecs), pt), 12)%1
+                    grid.append(np.dot(lat_vecs, gpt) + offset)
         return grid
     else:
         grid = []
@@ -93,10 +94,10 @@ def make_grid(lat_vecs, grid_vecs, offset, cart=True):
                 z1pl = int((c - b*e/d)*z3p/f + b/d*z2p)
                 z1pu = int(z1pl + a)
                 for z1p in range(z1pl + 1, z1pu + 1):
-                    z = np.dot(np.linalg.inv(U), [z1p,z2p,z3p])
+                    z = np.dot(inv(U), [z1p,z2p,z3p])
                     pt = np.dot(grid_vecs, z)
-                    gpt = np.round(np.dot(np.linalg.inv(lat_vecs), pt), 12)%1
-                    grid.append(gpt - offset)
+                    gpt = np.round(np.dot(inv(lat_vecs), pt), 12)%1
+                    grid.append(gpt + offset)
         return grid
                     
 def make_large_grid(cell_vectors, grid_vectors, offset, cart=True):
@@ -123,15 +124,15 @@ def make_large_grid(cell_vectors, grid_vectors, offset, cart=True):
     offset = np.dot(grid_vecs, offset)
 
     # Offset in cell coordinates in the first unit cell
-    offset = np.round(np.dot(np.linalg.inv(lat_vecs), offset), 15)%1
+    offset = np.round(np.dot(inv(lat_vecs), offset), 15)%1
 
     # Offset in cell coordinates
     offset = np.dot(lat_vecs, offset)
     
     grid = []
     null_grid = []
-    cell_lengths = np.array([np.linalg.norm(cv) for cv in cell_vectors])
-    cell_directions = [c/np.linalg.norm(c) for c in cell_vectors]
+    cell_lengths = np.array([norm(cv) for cv in cell_vectors])
+    cell_directions = [c/norm(c) for c in cell_vectors]
     # G is a matrix of cell vector components along the cell vector
     # directions.
     G = np.asarray([[abs(np.dot(g, c)) for c in cell_directions] for g in grid_vectors])
@@ -148,7 +149,7 @@ def make_large_grid(cell_vectors, grid_vectors, offset, cart=True):
     for nv in product(range(-n[0], n[0]+1), range(-n[1], n[1]+1),
                       range(-n[2], n[2]+1)):
         # Sum across columns since we're adding up components of each vector.
-        grid_pt = np.sum(grid_vectors*nv, 1) - offset
+        grid_pt = np.sum(grid_vectors*nv, 1) + offset
         projections = [np.dot(grid_pt,c) for c in cell_directions]
         projection_test = np.alltrue([abs(p) <= cl/2 for (p,cl) in zip(projections, cell_lengths)])
         if projection_test == True:
@@ -178,7 +179,7 @@ def sphere_pts(A,r2,offset=[0.,0.,0.]):
     offset = np.asarray(offset)
     
     # Put the offset in cell coordinates
-    oi= np.round(np.dot(np.linalg.inv(A),offset))
+    oi= np.round(np.dot(inv(A),offset))
     # Find a cell point close to the offset
     oi = oi.astype(int)
     
@@ -187,14 +188,14 @@ def sphere_pts(A,r2,offset=[0.,0.,0.]):
     n = [0,0,0]
     for i in range(3):
         # Add 1 because the offset was rounded to the nearest cell point.
-        n[i] = int(np.ceil(np.linalg.norm(np.cross(A[:,(i+1)%3],A[:,(i+2)%3]))*r/V) + 1)
+        n[i] = int(np.ceil(norm(np.cross(A[:,(i+1)%3],A[:,(i+2)%3]))*r/V) + 1)
         
     grid = []
     for i,j,k in product(range(-n[0] + oi[0], n[0] + oi[0]),
                          range(-n[1] + oi[1], n[1] + oi[1]),
                          range(-n[2] + oi[2], n[2] + oi[2])):
         pt = np.dot(A,[i,j,k])
-        if np.dot(pt-offset,pt-offset) <= r2 + eps:
+        if np.dot(pt+offset,pt+offset) <= r2 + eps:
             grid.append(np.array(pt))
         else:
             continue                
@@ -221,7 +222,7 @@ def large_sphere_pts(A,r2,offset=[0.,0.,0.]):
     eps = 1e-9
     offset = np.asarray(offset)
     # Put the offset in cell coordinates
-    oi= np.round(np.dot(np.linalg.inv(A),offset))
+    oi= np.round(np.dot(inv(A),offset))
     # Find a cell point close to the offset
     oi = oi.astype(int)
     # scale the integers by about 100% to ensure all points are enclosed.
@@ -233,7 +234,7 @@ def large_sphere_pts(A,r2,offset=[0.,0.,0.]):
                          range(-jmax + oi[1],jmax + oi[1]),
                          range(-kmax + oi[2],kmax + oi[2])):
         pt = np.dot(A,[i,j,k])
-        if np.dot(pt-offset,pt-offset) <= r2 + eps:
+        if np.dot(pt+offset,pt+offset) <= r2 + eps:
             grid.append(pt)
         else:
             continue                
@@ -269,11 +270,14 @@ def make_cell_points(lat_vecs, grid_vecs, offset=[0,0,0], cart=True):
         >>> grid = make_grid(lat_vecs, grid_vecs, offset)
     """
 
-    # Offset in cell coordinates
-    offset = np.dot(grid_vecs, offset)
+    # Offset in Cartesian coordinates
+    car_offset = np.dot(grid_vecs, offset)
+    
+    # Offset in lattice coordinates.
+    lat_offset = np.dot(inv(lat_vecs), car_offset)
 
     # Integer matrix
-    N = np.dot(np.linalg.inv(grid_vecs), lat_vecs)
+    N = np.dot(inv(grid_vecs), lat_vecs)
 
     # Check that N is an integer matrix.
     for i in range(len(N[:,0])):
@@ -290,12 +294,12 @@ def make_cell_points(lat_vecs, grid_vecs, offset=[0,0,0], cart=True):
         # Loop through the diagonal of the HNF matrix.
         for i,j,k in product(range(D[0]), range(D[1]), range(D[2])):
             # Find the point in Cartesian coordinates.
-            pt = np.dot(grid_vecs, [i,j,k]) + offset
+            pt = np.dot(grid_vecs, [i,j,k]) + car_offset
             
             # Put the point in cell coordinates and move it to the 
             # first unit cell.
-            # pt = np.round(np.dot(pt, np.linalg.inv(lat_vecs)),12)%1
-            pt = np.round(np.dot(np.linalg.inv(lat_vecs), pt),12)%1
+            # pt = np.round(np.dot(pt, inv(lat_vecs)),12)%1
+            pt = np.round(np.dot(inv(lat_vecs), pt),12)%1
 
             # Put the point back into Cartesian coordinates.
             pt = np.dot(lat_vecs, pt)
@@ -307,6 +311,7 @@ def make_cell_points(lat_vecs, grid_vecs, offset=[0,0,0], cart=True):
             pt = np.dot(grid_vecs, [i,j,k])
             # Put the point in cell coordinates and move it to the 
             # first unit cell.
-            pt = np.round(np.dot(np.linalg.inv(lat_vecs), pt),12)%1 + offset
+            # pt = np.round(np.dot(inv(lat_vecs), pt),12)%1 + offset
+            pt = np.round(np.dot(inv(lat_vecs), pt) + offset, 12)%1
             grid.append(pt)
         return grid

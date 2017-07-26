@@ -37,13 +37,10 @@ def rectangular_fermi_level(PP, grid):
     """
     
     C = int(ceil(PP.nvalence_electrons*len(grid)/2.))
-    print("C ", C)
     neigvals = int(np.ceil(PP.nvalence_electrons/2)+1)
-    print("neigvals ", neigvals)
     energies = np.array([])
     for g in grid:
         energies = np.concatenate((energies, PP.eval(g, neigvals)))
-    print(np.max(energies))
     return np.sort(energies)[C-1] # C -1 since python is zero based
 
 

@@ -110,6 +110,141 @@ def number_of_states(VG, VT, energies, e):
     else:
         return VT/VG
 
+def find_adjacent_tetrahedra(tetrahedra_list, k):
+    """For each k point in the grid, this function generates a list of
+    tetrahedra indices for each tetrahedron containing the k point.
+
+    Args:
+        tetrahedra_quadruples (list of lists of ints): a list of quadruples.
+            There is exactly one quadruple for every tetrahedron. Each
+            quadruple is a list of the grid_points indices for the corners of
+            the tetrahedron.
+        k (int): the total number of points in the grid.
+
+    Returns:
+        tetrahedra_by_point (list of list of ints): for each k point in the
+            grid, a list of the indices of each tetrahedron containing that
+            k point is given.
+    """
+
+    adjacent_tetrahedra = []
+    """list of list of ints: for each k point in the grid, a list of the
+    indices of each tetrahedron containing that k point is given."""
+
+    # Find all tetrahedra containing the k-point.
+    for tet in tetrahedra_list:
+        for ki in tet:
+            if ki == k:
+                adjacent_tetrahedra.append(tet)
+
+    return adjacent_tetrahedra
+
+def corrected_integration_weights(PP, grid, tetrahedra_list, tetrahedron,
+                                  iband):
+    """Determine the corrected integration weights of a single tetrahedron and 
+    band.
+    
+    Args:
+        PP (:py:obj:`BZI.pseudopots.EmpiricalPP`): a pseudopotential object.
+            tetrahedra (numpy.ndarray): lists of tetrahedra vertices.
+        grid (numpy.ndarray): a Monkhorst-Pack grid.
+        tetrahedra_list (list): a list of tetrahedra where each tetrahedra is a
+            quadruple of integers.
+        tetrahedron(list): the tetrahedron being considered.
+        iband (int): the index of the band being considered.
+        
+    Returns:
+        energies (list): the energies at the vertices of the provided
+            tetrahedron and band index.
+        weights (list): the integration weights of the corners of the 
+            tetrahedron.
+    """
+    
+    tetrahedron = np.array(tetrahedron)
+    VT = PP.lattice.reciprocal_volume/len(tetrahedra_list)
+    VG = PP.lattice.reciprocal_volume
+    neigvals = int(np.ceil(PP.nvalence_electrons/2)+1)
+
+    # Find the correction to the integration weights. This is done according to
+    # Eq. 22 in Blochl's improved tetrahedron paper.
+
+    # We're going to calculate the weight correction for all the k-points in
+    # the tetrahedron being considered.    
+    corrections = [0.]*4
+    energies = [PP.eval(grid[ki], iband)[iband] for ki in tetrahedron]
+    tetrahedron = tetrahedron[np.argsort(energies)]
+    energies = np.sort(energies)
+    
+    for i,ki in enumerate(tetrahedron):
+        en = energies[i]
+        kpt = grid[ki]
+        adjacent_tetrahedra = find_adjacent_tetrahedra(tetrahedra_list, ki)
+        for tet in adjacent_tetrahedra:
+            for kj in tet:
+                kp = grid[kj]
+                enj = PP.eval(kp, neigvals)[iband]
+                corrections[i] += enj - en
+        corrections[i] *= 1/40.*density_of_states(VG, VT, energies, PP.fermi_level)
+
+    c1 = corrections[0]
+    c2 = corrections[1]
+    c3 = corrections[2]
+    c4 = corrections[3]
+
+    e1 = energies[0]
+    e2 = energies[1]
+    e3 = energies[2]
+    e4 = energies[3]
+
+    eF = PP.fermi_level
+    if eF < e1:
+        return energies, [c1, c2, c3, c4]
+    
+    elif e1 <= eF < e2:
+        e21 = e2 - e1
+        e31 = e3 - e1
+        e41 = e4 - e1    
+        C = VT/4.*(eF - e1)**3/(e21*e31*e41)
+        
+        w1 = C*(4 - (eF - e1)*(1./e21 + 1./e31 + 1/e41))
+        w2 = C*(eF - e1)/e21
+        w3 = C*(eF - e1)/e31
+        w4 = C*(eF - e1)/e41
+        return energies, [w1 + c1, w2 + c1, w3 + c1, w4 + c1]
+    
+    elif e2 <= eF < e3:
+        e21 = e2 - e1
+        e31 = e3 - e1
+        e41 = e4 - e1
+        e32 = e3 - e2
+        e42 = e4 - e2
+        
+        C1 = VT/4.*(eF - e1)**2/(e41*e31)
+        C2 = VT/4.*(eF - e1)*(eF - e2)*(eF - e3)/(e41*e32*e31)
+        C3 = VT/4.*(eF - e2)**2*(e4 - eF)/(e42*e32*e41)
+
+        w1 = C1 + (C1 + C2)*(e3 - eF)/e31 + (C1 + C2 + C3)*(e4 - eF)/e41
+        w2 = C1 + C2 + C3 + (C2 + C3)*(e3 - eF)/e32 + C3*(e4 - eF)/e42
+        w3 = (C1 + C2)*(eF - e1)/e31 + (C2 + C3)*(eF - e2)/e32
+        w4 = (C1 + C2 + C3)*(eF - e1)/e41 + C3*(eF - e2)/e42
+        return energies, [w1 + c1, w2 + c2, w3 + c3, w4 + c4]
+    
+    elif e3 <= eF < e4:
+        e41 = e4 - e1
+        e42 = e4 - e2
+        e43 = e4 - e3
+        C = VT/4.*(e4 - eF)**3/(e41*e42*e43)
+
+        w1 = VT/4. - C*(e4 - eF)/e41
+        w2 = VT/4. - C*(e4 - eF)/e42
+        w3 = VT/4. - C*(e4 - eF)/e43
+        w4 = VT/4. - C*(4 - (1/e41 + 1/e42 + 1/e43)*(e4 - eF))
+        return energies, [w1 + c1, w2 + c2, w3 + c3, w4 + c4]
+    
+    else:
+        return energies, [VT/4. + c1, VT/4. + c2, VT/4. + c3, VT/4 + c4]
+    
+
 def integration_weights(VT, energies, eF):
     """Determine the integration weights of a single tetrahedron and band.
     
@@ -117,10 +252,17 @@ def integration_weights(VT, energies, eF):
         energies (list): a list of energies at the corners of the tetrahedron ordered
             from least to greatest.
         eF (float): the Fermi level or Fermi energy.
+
         
     Returns:
         (list): the integration weights of the corners of the tetrahedron.
     """
+
+    # Find the correction to the integration weights. This is done according to
+    # Eq. 22 in Blochl's improved tetrahedron paper.
+    
+    # In this equation there is a sum over adjacent tetrahedra. We find the
+    # adjacent tetrahedra by looping over them and identifying the ones    
     
     e1 = energies[0]
     e2 = energies[1]
@@ -172,7 +314,7 @@ def integration_weights(VT, energies, eF):
         return [w1, w2, w3, w4]
     
     else:
-        return [VT/4.]*4
+        return [VT/4.]*4    
 
 def density_of_states(VG, VT, energies, e):
     """Calculate the contribution to the density of states of a single tetrahedron
@@ -200,7 +342,7 @@ def density_of_states(VG, VT, energies, e):
     elif e1 <= e < e2:
         e21 = e2 - e1
         e31 = e3 - e1
-        e41 = e4 - e1            
+        e41 = e4 - e1
         return 3*VT/VG*(e - e1)**2/(e21*e31*e41)
     
     elif e2 <= e < e3:
@@ -249,7 +391,7 @@ def grid_and_tetrahedra(PP, ndivisions, lat_shift=[0,0,0], grid_shift=[0,0,0]):
     for k,j,i in product(range(ndiv1[0]), range(ndiv1[1]), range(ndiv1[2])):
         index = int(i + ndiv1[2]*(j + ndiv1[1]*k))
         grid[k,j,i] = np.dot(PP.lattice.reciprocal_vectors, 
-                             np.array([i,j,k], dtype=float)/ndiv0) - offset
+                             np.array([i,j,k], dtype=float)/ndiv0) + offset
         indices[k,j,i] = index
 
     diagonal_indices = [[1,8],[2,7],[3,6],[4,5]]
@@ -461,3 +603,29 @@ def calc_total_energy(PP, tetrahedra, weights, grid):
             total_energy.append(weights[i]*np.dot(int_weights, eband))
 
     return math.fsum(total_energy)
+
+def get_corrected_total_energy(PP, tetrahedra_list,grid):
+    """Calculate the corrected integration weights used in calculating the
+    total energy.
+    
+    Args:
+        PP (:py:obj:`BZI.pseudopots.EmpiricalPP`): a pseudopotential object.
+            tetrahedra (numpy.ndarray): lists of tetrahedra vertices.
+        tetrahedra (list): a list of tetrahedra where each tetrahedra is a 
+            quadruple of integers.
+        grid (numpy.ndarray): a grid of points in 3D.
+            
+    Returns:
+        total_states (float): the number of filled states.    
+    """
+
+
+    neigvals = int(np.ceil(PP.nvalence_electrons/2))
+    print("number of eigenvalues ", neigvals)
+    total_energy = 0.    
+    for iband in range(neigvals):
+        for tet in tetrahedra_list:
+            energies, tweights = corrected_integration_weights(PP, grid, tetrahedra_list,
+                                                    tet, iband)
+            total_energy += np.dot(tweights, energies)
+    return total_energy
