@@ -13,8 +13,6 @@ def test_rectangular():
     """
 
     degree_list = range(1,5)
-    # Can't 
-
     for degree in degree_list:
         # Verify the Fermi level of the free electron model.
         lat_angles =[np.pi/2]*3
@@ -22,7 +20,7 @@ def test_rectangular():
         lat_centering = "prim"
         lattice = Lattice(lat_centering, lat_consts, lat_angles)
         
-        free = FreeElectronModel(lattice, nvalence, degree)
+        free = FreeElectronModel(lattice, degree)
         
         grid_consts = [40]*3
         grid_angles = [np.pi/2]*3
@@ -39,7 +37,6 @@ def test_rectangular():
         fl_answer = (3*occupied_volume/(4*np.pi))**(degree/3.)
 
         print("degree ", degree)
-        print("ne ", nvalence)
         print("shere volume ", sphere_volume)
         print("occupied_volume ", occupied_volume)
         

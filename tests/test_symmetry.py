@@ -1514,7 +1514,7 @@ def test_find_orbitals():
     assert np.allclose(orbitals[1], [0,0,0])    
 
 
-def test_reduce_kpoint_list():
+def test_reduce_simple_cubic():
 
     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
 
@@ -1636,6 +1636,9 @@ def test_reduce_kpoint_list():
                 del irrkpts[ind]
     assert irrkpts == []
 
+def test_reduce_body_centered_cubic():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
+
     ### Body-centered cubic ###
     lat_consts = [2*1.580307]*3
     lat_angles = [np.pi/2]*3
@@ -1749,7 +1752,11 @@ def test_reduce_kpoint_list():
                 del grid_copy[ind]
                 del irrkpts[ind]
     assert irrkpts == []
-                    
+    
+
+def test_reduce_face_centered_cubic():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
+    
     ### Face-centered cubic ###
     lat_consts = [3.248231]*3
     lat_angles = [np.pi/2]*3
@@ -1862,6 +1869,9 @@ def test_reduce_kpoint_list():
                 del grid_copy[ind]
                 del irrkpts[ind]
     assert irrkpts == []
+    
+def test_reduce_orthorhombic():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
 
     ### Orthorhombic ###
 
@@ -1978,6 +1988,9 @@ def test_reduce_kpoint_list():
                 del grid_copy[ind]
                 del irrkpts[ind]
     assert irrkpts == []
+    
+def test_reduce_base_centered_orthorhombic():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
 
     ### Base-centered orthorhombic ###
     lat_consts = [2.95, 3.92, 8.55]
@@ -2078,6 +2091,9 @@ def test_reduce_kpoint_list():
                 ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
                 del grid_copy[ind]
                 del irrkpts[ind]
+                
+def test_reduce_body_centered_orthorhombic():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
 
     ### Body-centered orthorhombic ###
     lat_consts = [2.95, 3.92, 8.55]
@@ -2179,6 +2195,9 @@ def test_reduce_kpoint_list():
                 del irrkpts[ind]
     assert irrkpts == []
 
+def test_reduce_face_centered_orthorhombic():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
+    
     ### Face-centered orthorhombic ###
     lat_consts = [2.95, 3.92, 8.55]
     lat_angles = [np.pi/2]*3
@@ -2279,6 +2298,9 @@ def test_reduce_kpoint_list():
                 ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
                 del grid_copy[ind]
                 del irrkpts[ind]
+                
+def test_reduce_monoclinic():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
 
     ### Monoclinic ###
     lat_consts = [5.596, 3.533, 4.274]
@@ -2393,6 +2415,9 @@ def test_reduce_kpoint_list():
                 del irrkpts[ind]
     assert irrkpts == []
 
+def test_reduce_base_centered_monoclinic():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
+    
     ### Base-centered monoclinic ###
     lat_consts = [5.596, 3.533, 4.274]
     lat_angles = [np.pi/2, 119.069*np.pi/180, np.pi/2]
@@ -2501,6 +2526,9 @@ def test_reduce_kpoint_list():
                 del irrkpts[ind]
     assert irrkpts == []
                 
+def test_reduce_tetragonal():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
+    
     ### Tetragonal ###
     lat_consts = [4.93777, 4.93777, 7.461038]
     lat_angles = [np.pi/2]*3
@@ -2595,7 +2623,9 @@ def test_reduce_kpoint_list():
                 del grid_copy[ind]
                 del irrkpts[ind]
     assert irrkpts == []
-
+    
+def test_body_centered_tetragonal():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
     ### Body-centered tetragonal ###
     lat_consts = [4.93777, 4.93777, 7.461038]
     lat_angles = [np.pi/2]*3

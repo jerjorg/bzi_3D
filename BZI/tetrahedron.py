@@ -621,7 +621,6 @@ def get_corrected_total_energy(PP, tetrahedra_list,grid):
 
 
     neigvals = int(np.ceil(PP.nvalence_electrons/2))
-    print("number of eigenvalues ", neigvals)
     total_energy = 0.    
     for iband in range(neigvals):
         for tet in tetrahedra_list:

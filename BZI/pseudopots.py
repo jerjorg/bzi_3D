@@ -286,7 +286,7 @@ class FreeElectronModel():
         total_enery(float): the total energy
     """
     
-    def __init__(self, lattice, nvalence_electrons, degree, energy_shift=None,
+    def __init__(self, lattice, degree, energy_shift=None,
                  fermi_level=None, total_energy=None):
         self.lattice = lattice
         self.degree = degree
