@@ -11,6 +11,132 @@ from BZI.sampling import sphere_pts
 # Conversions
 angstrom_to_Bohr = 1.889725989
 Ry_to_eV = 13.605698066
+isclose = np.vectorize(np.isclose)
+
+# class EmpiricalPP(object):
+#     """Create an empirical pseudopotential.
+
+#     Args:
+#         lattice (:py:obj:`BZI.symmetry.lattice`): an instance of Lattice.
+#         form_factors (list): a list of pseudopotential form factors. Every 
+#             energy shell up to the cutoff energy should be accounted for.
+#         energy_cutoff (float): the cutoff energy of the Fourier expansion.  
+#         atomic_positions (list): a list of atomic positions.
+#         nvalence_electrons (int): the number of valence electrons
+#         energy_shift (float): an energy shift typically used to place the Fermi
+#             level at the correct position.
+#         fermi_level (float): the fermi level.
+#         total_energy (float): the total energy.
+
+#     Attributes:
+#         lattice (:py:obj:`BZI.symmetry.lattice`): an instance of Lattice.
+#         form_factors (list): a list of pseudopotential form factors. Every 
+#             energy shell up to the cutoff energy should be accounted for.
+#         energy_cutoff (float): the cutoff energy of the Fourier expansion.  
+#         rlat_pts (list): a list of reciprocal lattice points included in the 
+#             Fourier expansion.
+#         energy_shells (list): a list of spherical shells that points in rlat_pts
+#             reside on.
+#         atomic_positions (list): a list of atomic positions.
+#         nvalence_electrons (int): the number of valence electrons
+#         energy_shift (float): an energy shift typically used to place the Fermi
+#             level at the correct position.
+#         total_energy (float): the total energy.
+
+#     Example:
+#         >>> centering_type = "face"
+#         >>> lat_const = 4.0
+#         >>> lat_consts = [lat_const]*3
+#         >>> lat_angles = [np.pi/2]*3
+#         >>> lattice = Lattice(centering_type, lat_consts, lat_angles)
+#         >>> pff = [0.019, 0.055]
+#         >>> cutoff = 4*(2*np.pi/lat_const)**2
+#         >>> atomic_positions = [0.,0.,0.]
+#         >>> Nvalence_electrons = 3
+#         >>> PP = EmpiricalPP(lattice, pff, cutoff, nvalence_electrons,
+#         >>>                  atomic_positions)
+#     """
+    
+#     def __init__(self, lattice, form_factors, energy_cutoff, atomic_positions,
+#                  nvalence_electrons, energy_shift=None, fermi_level=None):
+#         self.lattice = lattice
+#         self.form_factors = form_factors
+#         self.energy_cutoff = energy_cutoff
+#         if np.shape(atomic_positions) == (3,):
+#             msg = ("Please provide a list of atomic positions instead of an "
+#                    "individual atomic position.")
+#             raise ValueError(msg.format(atomic_positions))
+#         else:
+#             self.atomic_positions = atomic_positions
+#         self.rlat_pts = sphere_pts(self.lattice.reciprocal_vectors,
+#                                    self.energy_cutoff)
+#         self.find_energy_shells()
+#         self.nvalence_electrons = nvalence_electrons
+#         self.energy_shift = energy_shift or 0.
+#         self.fermi_level = fermi_level or 0.
+
+#     def find_energy_shells(self):
+#         """Find the spherical shells of constant energy on which the points in
+#         rlat_pts reside. These are ordered from least to greatest.
+#         """
+
+#         shells = []
+#         for rpt in self.rlat_pts:
+#             if any(np.isclose(np.dot(rpt, rpt), shells)):
+#                 continue
+#             else:
+#                 shells.append(np.dot(rpt, rpt))
+#         # Round energy shells at the 10th decimal so that equality comparisons
+#         # can be performed. This could potential cause problems.
+#         self.energy_shells = np.round(np.sort(shells), 10)
+                
+#     def eval(self, kpoint, neigvals):
+#         """Evaluate the empirical pseudopotential eigenvalues at the provided
+#         k-point. Only return the lowest 'neigvals' eigenvalues.
+#         """
+
+#         size = len(self.rlat_pts)
+#         H = np.zeros([size, size], dtype=complex)
+#         for i,rpt1 in enumerate(self.rlat_pts):
+#             for j in range(i+1):
+#                 rpt2 = self.rlat_pts[j]
+#                 h = rpt2 - rpt1
+#                 r2 = np.dot(h,h)
+#                 for ap in self.atomic_positions:
+#                     if i == j:
+#                         H[i,j] = np.dot(kpoint + rpt1, kpoint + rpt1)
+#                         break
+#                     else:
+#                         try:
+#                             k = np.where(np.isclose(self.energy_shells, r2))[0][0]
+#                             H[i,j] += self.form_factors[k]*np.exp(-1j*np.dot(h,ap))
+#                         except:
+#                             continue
+#         return np.sort(np.linalg.eigvalsh(H))[:neigvals]*Ry_to_eV
+
+#     def hamiltonian(self, kpoint):
+#         """Evaluate the empirical pseudopotential Hamiltonian at the provided
+#         k-point. This function is typically used to verify the Hamiltonian is 
+#         Hermitian.
+#         """
+        
+#         size = len(self.rlat_pts)
+#         H = np.zeros([size, size], dtype=complex)
+#         for i,rpt1 in enumerate(self.rlat_pts):
+#             for j,rpt2 in enumerate(self.rlat_pts):
+#                 h = rpt2 - rpt1
+#                 r2 = np.dot(h,h)
+#                 for ap in self.atomic_positions:
+#                     if i == j:
+#                         H[i,j] = np.dot(kpoint + rpt1, kpoint + rpt1)
+#                         break
+#                     else:
+#                         try:
+#                             k = np.where(np.isclose(self.energy_shells, r2))[0][0]
+#                             H[i,j] = self.form_factors[k]*np.exp(-1j*np.dot(h,ap))
+#                         except:
+#                             continue
+#         return H*Ry_to_eV
 
 class EmpiricalPP(object):
     """Create an empirical pseudopotential.
@@ -51,7 +177,7 @@ class EmpiricalPP(object):
         >>> pff = [0.019, 0.055]
         >>> cutoff = 4*(2*np.pi/lat_const)**2
         >>> atomic_positions = [0.,0.,0.]
-        >>> nvalence_electrons = 3
+        >>> Nvalence_electrons = 3
         >>> PP = EmpiricalPP(lattice, pff, cutoff, nvalence_electrons,
         >>>                  atomic_positions)
     """
@@ -73,6 +199,8 @@ class EmpiricalPP(object):
         self.nvalence_electrons = nvalence_electrons
         self.energy_shift = energy_shift or 0.
         self.fermi_level = fermi_level or 0.
+        self.init_hamiltonian = self.hamiltonian([0.]*3) - np.diag(
+            np.diag(self.hamiltonian([0.]*3)))
 
     def find_energy_shells(self):
         """Find the spherical shells of constant energy on which the points in
@@ -85,31 +213,37 @@ class EmpiricalPP(object):
                 continue
             else:
                 shells.append(np.dot(rpt, rpt))
-        self.energy_shells = np.sort(shells)
+        # Round energy shells at the 10th decimal so that equality comparisons
+        # can be performed. This could potential cause problems.
+        self.energy_shells = np.round(np.sort(shells), 10)
                 
     def eval(self, kpoint, neigvals):
         """Evaluate the empirical pseudopotential eigenvalues at the provided
         k-point. Only return the lowest 'neigvals' eigenvalues.
         """
         
-        size = len(self.rlat_pts)
-        H = np.zeros([size, size], dtype=complex)
-        for i,rpt1 in enumerate(self.rlat_pts):
-            for j in range(i+1):
-                rpt2 = self.rlat_pts[j]
-                h = rpt2 - rpt1
-                r2 = np.dot(h,h)
-                for ap in self.atomic_positions:
-                    if i == j:
-                        H[i,j] = np.dot(kpoint + rpt1, kpoint + rpt1)
-                        break
-                    else:
-                        try:
-                            k = np.where(np.isclose(self.energy_shells, r2))[0][0]
-                            H[i,j] += self.form_factors[k]*np.exp(-1j*np.dot(h,ap))
-                        except:
-                            continue
-        return np.sort(np.linalg.eigvalsh(H))[:neigvals]*Ry_to_eV
+        if np.allclose(self.atomic_positions, [[0.]*3]):
+            diag = np.eye(len(self.rlat_pts))*np.apply_along_axis(
+                norm, 1, self.rlat_pts - kpoint)**2
+            H = self.init_hamiltonian + diag*Ry_to_eV
+        else:
+            # Calculate the diagonal elements of the Hamiltonian.
+            diag = np.eye(len(self.rlat_pts))*np.apply_along_axis(
+                norm, 1, self.rlat_pts - kpoint)**2
+            # For some reason the lattice points need to be double nested for
+            # numpy.tile to work.
+            nested_rlatpts = np.array([[rlp] for rlp in self.rlat_pts])
+            # Create a matrix of reciprocal lattice points where the first
+            # lattice point is repeated acroass the first row, the second
+            # lattice point the second row, and so on.
+            rlatpt_mat = np.tile(nested_rlatpts,(len(self.rlat_pts),1))
+            # Create a matrix of the differences of the lattice points. Each
+            # element is given by a_i - a_j.
+            rlp_diff = rlatpt_mat - np.transpose(rlatpt_mat, (1,0,2))
+            # Calculate the phase portion of the Hamiltonian matrix elements.
+            phase_mat = np.dot(rlp_diff, np.sum(self.atomic_positions,0))
+            H = np.dot(self.init_hamiltonian, np.exp(-1j*phase_mat)) + diag*Ry_to_eV
+        return np.sort(np.linalg.eigvalsh(H))[:neigvals]
 
     def hamiltonian(self, kpoint):
         """Evaluate the empirical pseudopotential Hamiltonian at the provided
@@ -117,23 +251,28 @@ class EmpiricalPP(object):
         Hermitian.
         """
         
-        size = len(self.rlat_pts)
-        H = np.zeros([size, size], dtype=complex)
-        for i,rpt1 in enumerate(self.rlat_pts):
-            for j,rpt2 in enumerate(self.rlat_pts):
-                h = rpt2 - rpt1
-                r2 = np.dot(h,h)
-                for ap in self.atomic_positions:
-                    if i == j:
-                        H[i,j] = np.dot(kpoint + rpt1, kpoint + rpt1)
-                        break
-                    else:
-                        try:
-                            k = np.where(np.isclose(self.energy_shells, r2))[0][0]
-                            H[i,j] = self.form_factors[k]*np.exp(-1j*np.dot(h,ap))
-                        except:
-                            continue
-        return H*Ry_to_eV
+        # Calculate the diagonal elements of the Hamiltonian.
+        diag = np.eye(len(self.rlat_pts))*np.apply_along_axis(norm, 1,
+                                                              self.rlat_pts - kpoint)**2
+        # For some reason the lattice points need to be double nested for
+        # numpy.tile to work.
+        nested_rlatpts = np.array([[rlp] for rlp in self.rlat_pts])
+        # Create a matrix of reciprocal lattice points where the first lattice
+        # point is repeated acroass the first row, the second lattice point the
+        # second row, and so on.
+        rlatpt_mat = np.tile(nested_rlatpts,(len(self.rlat_pts),1))
+        # Create a matrix of the differences of the lattice points. Each element
+        # is given by a_i - a_j.
+        rlp_diff = rlatpt_mat - np.transpose(rlatpt_mat, (1,0,2))
+        # Find the norm squared of the difference.
+        r2_mat = np.apply_along_axis(norm, 2, rlp_diff)**2
+        H = np.zeros(np.shape(r2_mat))
+        for i in range(1,len(self.form_factors)):
+            if self.form_factors[i] == 0.:
+                continue
+            else:
+                H[np.isclose(r2_mat, self.energy_shells[i])] = self.form_factors[i]
+        return (H + diag)*Ry_to_eV
 
 class CohenEmpiricalPP(object):
     """Create an empirical pseudopotential after Cohen's derivation.
@@ -860,5 +999,3 @@ Sn_atomic_positions = [[0.]*3]
 Sn_nvalence_electrons = 4
 Sn_PP = EmpiricalPP(Sn_lattice, Sn_pff, Sn_energy_cutoff, Sn_atomic_positions,
                     Sn_nvalence_electrons)
-
-

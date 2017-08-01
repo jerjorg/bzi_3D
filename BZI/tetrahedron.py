@@ -431,7 +431,8 @@ def calc_total_states(PP, tetrahedra, weights, grid, energy, nbands):
     Returns:
         total_states (float): the number of filled states.
     """
-    
+
+    grid = grid.flatten()
     Vg = PP.lattice.reciprocal_volume
     Vt = Vg/len(tetrahedra)
     
@@ -439,7 +440,7 @@ def calc_total_states(PP, tetrahedra, weights, grid, energy, nbands):
     for i,tet in enumerate(tetrahedra):
         energies = []
         for ind in tet:
-            energies.append(PP.eval(grid.flatten()[ind], nbands))
+            energies.append(PP.eval(grid[ind], nbands))
         # Reshape energies so that the energies of each band are grouped
         # together.
         energies = np.transpose(energies)
@@ -532,7 +533,6 @@ def find_irreducible_tetrahedra(free, tetrahedra, grid):
         weights (list): a list of tetrahedron weights.
     """
 
-    # grid_car = grid.flatten()
     grid_cell = np.round(np.array([np.dot(np.linalg.inv(
         free.lattice.reciprocal_vectors), gc) for
                                    gc in grid]), 9)%1

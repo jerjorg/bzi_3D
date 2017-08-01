@@ -2266,14 +2266,6 @@ def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
             if hashtable[idx] == None:
                 hashtable[idx] = cOrbit
                 iWt[cOrbit] += 1
-    # sum = 0
-    # kpoint_weights = list(iWt.values())[:cOrbit]
-    # reduced_kpoints = [[0,0,0] for _ in range(cOrbit)]
-    # for i in range(cOrbit):
-    #     sum += kpoint_weights[i]
-    #     reduced_kpoints[i] = kpoint_list[iFirst[i+1]]
-    
-    # return reduced_kpoints, kpoint_weights
 
     hashtable = dict((k, v) for k, v in hashtable.items() if v)
     return hashtable, iFirst

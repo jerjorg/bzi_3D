@@ -100,65 +100,62 @@ def make_grid(lat_vecs, grid_vecs, offset, cart=True):
                     grid.append(gpt + offset)
         return grid
                     
-def make_large_grid(cell_vectors, grid_vectors, offset, cart=True):
+def make_large_grid(cell_vectors, grid_vectors, offset, cart=True, eps = 1e-9):
     """This function is similar to make_grid except it samples a volume
     that is larger and saves the points that are thrown away in make_grid.
+    It returns two grids: the first is the unique points within the first unit
+    cell. The second is all the points generated outside the first unit cell.
 
-    Args:
-        lat_vecs (numpy.ndarray): the vectors defining the volume in which 
+    ARGS:
+        cell_vectors (numpy.ndarray): the vectors defining the volume in which
             to sample. The vectors are the columns of the matrix.
         grid_vecs (numpy.ndarray): the vectors that generate the grid as 
             columns of the matrix..
-        offset: the origin of the coordinate system in Cartesian or cell
-            coordinates.
+        offset: the origin of the coordinate system in grid coordinates.
         cart (bool): if true, return the grid in Cartesian coordinates. Other-
             wise return the grid in cell coordinates.        
 
     Returns:
         grid (numpy.ndarray): an array of sampling-point coordinates.
-        null_grid (numpy.ndarray): an array of sampling-point coordinates outside
-            volume.
+        null_grid (numpy.ndarray): an array of sampling-point coordinates 
+            outside volume.
     """
 
+    # Find a grid point close to the offset
+    oi = np.round(offset).astype(int)
+
     # Put the offset in Cartesian coordinates.
-    offset = np.dot(grid_vecs, offset)
+    offset = np.dot(grid_vectors, offset)
 
-    # Offset in cell coordinates in the first unit cell
-    offset = np.round(np.dot(inv(lat_vecs), offset), 15)%1
+    r = np.max(norm(cell_vectors, axis=0))
+    V = np.linalg.det(grid_vectors)
 
-    # Offset in cell coordinates
-    offset = np.dot(lat_vecs, offset)
-    
+    # Add one to account for the offset.
+    # Multiply by two to cover larger volume.
+    n = np.round(np.array([norm(np.cross(grid_vectors[:,(i+1)%3],
+                                grid_vectors[:,(i+2)%3]))*r/V + 1
+                           for i in range(3)])*1.5).astype(int)
     grid = []
     null_grid = []
-    cell_lengths = np.array([norm(cv) for cv in cell_vectors])
-    cell_directions = [c/norm(c) for c in cell_vectors]
-    # G is a matrix of cell vector components along the cell vector
-    # directions.
-    G = np.asarray([[abs(np.dot(g, c)) for c in cell_directions] for g in grid_vectors])
-
-    # Find the optimum integer values for creating the grid.
-    n = [0,0,0]
-    for i in range(len(n)):
-        index = np.where(np.asarray(G) == np.max(G))
-        # The factor 5./4 makes the sampling volume larger.
-        n[index[1][0]] = int(cell_lengths[index[1][0]]/np.max(G)*(5./4))
-        G[index[0][0],:] = 0.
-        G[:,index[1][0]] = 0.
+    for nv in product(range(-n[0] + oi[0], n[0] + oi[0]),
+                      range(-n[1] + oi[1], n[1] + oi[1]),
+                      range(-n[2] + oi[2], n[2] + oi[2])):    
+        grid_pt = np.dot(grid_vectors, nv) + offset
         
-    for nv in product(range(-n[0], n[0]+1), range(-n[1], n[1]+1),
-                      range(-n[2], n[2]+1)):
-        # Sum across columns since we're adding up components of each vector.
-        grid_pt = np.sum(grid_vectors*nv, 1) + offset
-        projections = [np.dot(grid_pt,c) for c in cell_directions]
-        projection_test = np.alltrue([abs(p) <= cl/2 for (p,cl) in zip(projections, cell_lengths)])
-        if projection_test == True:
-            grid.append(grid_pt)
-        else:
+        grid_pt_cell = np.round(np.dot(inv(cell_vectors), grid_pt), 15)
+        if any(abs(grid_pt_cell) > 1):
             null_grid.append(grid_pt)
+        else:
+            grid_pt_cell = grid_pt_cell%1
+            grid_pt = np.dot(cell_vectors, grid_pt_cell)
+            if any([np.allclose(grid_pt, g) for g in grid]):
+                continue
+            else:
+                grid.append(grid_pt)
+            
     return (np.asarray(grid), np.asarray(null_grid))
 
-def sphere_pts(A,r2,offset=[0.,0.,0.]):
+def sphere_pts(A, r2, offset=[0.,0.,0.], eps=1e-9):
     """ Calculate all the points within a sphere that are
     given by an integer linear combination of the columns of 
     A.
@@ -175,31 +172,74 @@ def sphere_pts(A,r2,offset=[0.,0.,0.]):
     """
 
     # This is a parameter that should help deal with rounding error.
-    eps = 1e-9
     offset = np.asarray(offset)
     
     # Put the offset in cell coordinates
     oi= np.round(np.dot(inv(A),offset))
     # Find a cell point close to the offset
     oi = oi.astype(int)
-    
     r = np.sqrt(r2)
     V = np.linalg.det(A)
-    n = [0,0,0]
-    for i in range(3):
-        # Add 1 because the offset was rounded to the nearest cell point.
-        n[i] = int(np.ceil(norm(np.cross(A[:,(i+1)%3],A[:,(i+2)%3]))*r/V) + 1)
+    n = [int(np.ceil(norm(np.cross(A[:,(i+1)%3],A[:,(i+2)%3]))*r/V) + 1)
+         for i in range(3)]         
+    ints = product(range(-n[0] + oi[0], n[0] + oi[0]),
+                   range(-n[1] + oi[1], n[1] + oi[1]),
+                   range(-n[2] + oi[2], n[2] + oi[2]))
+    grid = np.array([np.dot(A, comb) for comb in ints])
+    norms = np.array([np.dot(p,p) for p in grid])
+    return grid[np.where(norms < (r2 + eps))]
+
+
+# def sphere_pts(A,r2,offset=[0.,0.,0.]):
+#     """ Calculate all the points within a sphere that are
+#     given by an integer linear combination of the columns of 
+#     A.
+    
+#     Args:
+#         A (numpy.ndarray): the columns representing basis vectors.
+#         r2 (float): the squared radius of the sphere.
+#         offset(list or numpy.ndarray): a vector that points to the center
+#             of the sphere in Cartesian coordinates.
         
-    grid = []
-    for i,j,k in product(range(-n[0] + oi[0], n[0] + oi[0]),
-                         range(-n[1] + oi[1], n[1] + oi[1]),
-                         range(-n[2] + oi[2], n[2] + oi[2])):
-        pt = np.dot(A,[i,j,k])
-        if np.dot(pt+offset,pt+offset) <= r2 + eps:
-            grid.append(np.array(pt))
-        else:
-            continue                
-    return grid
+#     Returns:
+#         grid (list): an array of grid coordinates in cartesian
+#             coordinates.
+#     """
+
+#     # This is a parameter that should help deal with rounding error.
+#     eps = 1e-9
+#     offset = np.asarray(offset)
+    
+#     # Put the offset in cell coordinates
+#     oi= np.round(np.dot(inv(A),offset))
+#     # Find a cell point close to the offset
+#     oi = oi.astype(int)
+    
+#     r = np.sqrt(r2)
+#     V = np.linalg.det(A)
+#     n = [0,0,0]
+#     for i in range(3):
+#         # Add 1 because the offset was rounded to the nearest cell point.
+#         n[i] = int(np.ceil(norm(np.cross(A[:,(i+1)%3],A[:,(i+2)%3]))*r/V) + 1)
+
+#     ints = product(range(-n[0] + oi[0], n[0] + oi[0]),
+#                    range(-n[1] + oi[1], n[1] + oi[1]),
+#                    range(-n[2] + oi[2], n[2] + oi[2]))
+
+#     grid = np.array([np.dot(A, comb) for comb in ints])
+#     norms = np.array([np.dot(p,p) for p in grid])
+#     return grid[np.where(norms < (r2 + eps))]
+        
+#     # grid = []
+#     # for i,j,k in product(range(-n[0] + oi[0], n[0] + oi[0]),
+#     #                      range(-n[1] + oi[1], n[1] + oi[1]),
+#     #                      range(-n[2] + oi[2], n[2] + oi[2])):
+#     #     pt = np.dot(A,[i,j,k])
+#     #     if np.dot(pt+offset,pt+offset) <= r2 + eps:
+#     #         grid.append(np.array(pt))
+#     #     else:
+#     #         continue                
+#     return grid
 
 def large_sphere_pts(A,r2,offset=[0.,0.,0.]):
     """ Calculate all the points within a sphere that are 

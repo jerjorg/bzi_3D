@@ -453,8 +453,9 @@ def PlotVaspBandStructure(file_loc, material, lat_type, lat_consts, lat_angles,
                         nbands += l
                     except ValueError:
                         continue
-        nbands = int(nbands)
+        # nbands = int(nbands)
 
+    nbands = 10
     # Extract the total number of k-points, number of k-points per path,
     # the number of paths and the symmetry points from the KPOINTs file.
     with open(file_loc + "KPOINTS","r") as file:
@@ -555,9 +556,9 @@ def PlotVaspBandStructure(file_loc, material, lat_type, lat_consts, lat_angles,
         for nk in range(len(car_kpoints)):
             ienergy.append(energies[nk][nb])
         if nb == 0:
-            plt.plot(lines,ienergy, label="VASP Band structure",color="black")
+            plt.plot(lines,ienergy, label="VASP Band structure",color="blue")
         else:
-            plt.plot(lines,ienergy,color="black")
+            plt.plot(lines,ienergy,color="blue")
 
     # Plot a vertical line at the symmetry points with proper labels.
     for i in range(nsympts):
@@ -582,7 +583,7 @@ def PlotVaspBandStructure(file_loc, material, lat_type, lat_consts, lat_angles,
     plt.title("%s Band Structure" %material)
     plt.grid(linestyle="dotted")
     if save:
-        plt.savefig("%s_band_struct.pdf" %materials,
+        plt.savefig("%s_band_struct.pdf" %material,
                     bbox_extra_artists=(lgd,), bbox_inches='tight')
     elif show:
         plt.show()

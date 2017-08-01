@@ -1,5 +1,14 @@
 # Revision History
 
+## Revision 0.1.6
+- Changed .travis.yml python version from 3.5 to 3.6.
+- Modified the EmpiricalPP class in pseudopots.py so that it would run much
+  faster (50x!) by eliminating for loops.
+- Slight change to calc_total_states when extra .flatten() was slowing this
+  down.
+- Modified make_large_grid so that it would provide a translationally unique
+  grid within the first unit cell. Unit tests now pass.
+
 ## Revision 0.1.5
 - Separate the unit tests in test_symmetry.py so that they don't time out when
   run on travis.ci servers.
