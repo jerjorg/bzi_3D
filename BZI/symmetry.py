@@ -1413,21 +1413,21 @@ def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False,
     # Put the grid in lattice coordinates and move it into the first unit cell.
     # grid_cell = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], 15)%1)
     # I removed the mod 1, put it back in on monday (maybe)
-    grid_cell = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], 15))
+    grid_lat = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], 15))
     # Remove duplicates if necessary.
     if duplicates:
-        grid_copy = list(deepcopy(grid_cell))
-        grid_cell = []
+        grid_copy = list(deepcopy(grid_lat))
+        grid_lat = []
         while len(grid_copy) != 0:
             gp = np.round(grid_copy.pop(), eps)%1
             if any([np.allclose(gp, gc) for gc in grid_copy]):
                 continue
             else:
-                grid_cell.append(gp)
+                grid_lat.append(gp)
 
     gp_orbitals = {}
     nirr_kpts = 0
-    grid_copy = list(deepcopy(grid_cell))
+    grid_copy = list(deepcopy(grid_lat))
     pointgroup = point_group(lat_vecs)
     pointgroup = [np.dot(np.dot(inv(lat_vecs), pg), lat_vecs) for pg in pointgroup]
 
@@ -1441,26 +1441,27 @@ def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False,
             # it back in.
             # I ran into floating point precision problems the last time I ran
             # mod, rounding fixed these.
-            new_gp = np.round(np.dot(pg, g), 15)%1
+            new_gps = [np.round(np.dot(pg, g), 15)%1, np.round(np.dot(pg, g), 15)]
                   
             # If the new grid point is in the grid, remove it and add it to the
             # orbital of grid point (g).
-            if any([np.allclose(new_gp, gc) for gc in grid_copy]):
-                ind = np.where(np.array([np.allclose(new_gp, gc)
-                                         for gc in grid_copy]))[0][0]
-                gp_orbitals[nirr_kpts].append(new_gp)
-                del grid_copy[ind]
-            else:
-                continue
-    if coord == "cart":
-        for i in range(1, len(gp_orbitals.keys()) + 1):
-            for j in range(len(gp_orbitals[i])):
-                gp_orbitals[i][j] = np.dot(lat_vecs, gp_orbitals[i][j])
-        return gp_orbitals# , pointgroup
-    elif coord == "lat":
-        return gp_orbitals
-    else:
-        raise ValueError("Coordinate options are 'cell' and 'lat'.")
+            for new_gp in new_gps:
+                if any([np.allclose(new_gp, gc) for gc in grid_copy]):
+                    ind = np.where(np.array([np.allclose(new_gp, gc)
+                                             for gc in grid_copy]))[0][0]
+                    gp_orbitals[nirr_kpts].append(new_gp)
+                    del grid_copy[ind]
+                else:
+                    continue
+    # if coord == "cart":
+    #     for i in range(1, len(gp_orbitals.keys()) + 1):
+    #         for j in range(len(gp_orbitals[i])):
+    #             gp_orbitals[i][j] = np.dot(lat_vecs, gp_orbitals[i][j])
+    #     return gp_orbitals# , pointgroup
+    # elif coord == "lat":
+    return gp_orbitals
+    # else:
+    #     raise ValueError("Coordinate options are 'cell' and 'lat'.")
 
 def nfind_orbitals(grid_car, lat_vecs, HNF, coord = "cart", duplicates=False):
     """ Find the partial orbitals of the points in a grid, including only the
@@ -2162,7 +2163,7 @@ def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
     for i in range(cOrbit):
         sum += kpoint_weights[i]
         reduced_kpoints[i] = kpoint_list[iFirst[i+1]]
-    
+        
     return reduced_kpoints, kpoint_weights
 
 def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,

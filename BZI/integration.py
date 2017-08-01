@@ -9,25 +9,49 @@ def rectangular_method(PP, grid, weights):
     """Integrate a pseudopotential within a cell below the Fermi level.
     
     Args:
-        PP (function): the pseudopotential
-        neigvals (int): the number of eigenvalues returned by the 
-            pseudopotential.
-        grid (list): a list of grid points
-        cell_vecs (numpy.ndarray): a 3x3 numpy array with cell vectors as 
-            columns
-        Fermi_level (float): the cutoff energy or Fermi level
+        PP (function): the empirical pseudopotential.
+        grid (list): a list of grid points.
+        weights(list): a list of k-point weights in the same order as grid.
     """
-    
+
     integral = 0
     neigvals = int(np.ceil(PP.nvalence_electrons/2.))
+    C = int(ceil(PP.nvalence_electrons*np.sum(weights)/2.))
+    nstates = 0
+    last_state_indices = []
     for i,kpt in enumerate(grid):
+        
+        filled_states = weights[i]*len(list(filter(lambda x: x <= PP.fermi_level,
+                                          PP.eval(kpt, neigvals))))
+
+        if any([np.isclose(PP.fermi_level, en) for en in filter( lambda x: x <= PP.fermi_level, PP.eval(kpt, neigvals) )]):
+            last_state_indices.append(i)
+            continue        
+        nstates += filled_states
         integral += weights[i]*sum(filter(lambda x: x <= PP.fermi_level,
                                           PP.eval(kpt, neigvals)))
-    # return np.linalg.det(PP.lattice.reciprocal_vectors)/len(grid)*integral
+        
+    # Loop over states that have energies near the Fermi level.
+    for i in last_state_indices:
+        filled_states = weights[i]*len(list(filter(lambda x: x <= PP.fermi_level,
+                                                       PP.eval(grid[i], neigvals))))
+        if filled_states + nstates < C:            
+            nstates += filled_states
+            integral += weights[i]*sum(filter(lambda x: x <= PP.fermi_level,
+                                              PP.eval(grid[i], neigvals)))
+        else:
+            weight = C - nstates
+            filled_states = weight*len(list(filter(lambda x: x <= PP.fermi_level,
+                                                       PP.eval(grid[i], neigvals))))
+
+            nstates += filled_states
+            integral += weight*sum(filter(lambda x: x <= PP.fermi_level,
+                                          PP.eval(grid[i], neigvals)))
+            break
     return np.linalg.det(PP.lattice.reciprocal_vectors)/np.sum(weights)*integral
     
 
-def rectangular_fermi_level(PP, grid, weights):
+def rectangular_fermi_level(PP, grid, weights, eps=1e-9):
     """Find the energy at which the toy band structure it cut.
     
     Args:
@@ -44,7 +68,7 @@ def rectangular_fermi_level(PP, grid, weights):
     energies = np.array([])
     for i,g in enumerate(grid):
         energies = np.concatenate((energies, list(PP.eval(g, neigvals))*weights[i]))
-    return np.sort(energies)[C-1] # C -1 since python is zero based
+    return np.sort(energies)[C-1] # + eps# C -1 since python is zero based
 
 def monte_carlo(PP, npts):
     """Integrate a function using Monte Carlo sampling. Only works for integrations

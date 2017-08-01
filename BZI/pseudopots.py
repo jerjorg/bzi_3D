@@ -422,7 +422,11 @@ class FreeElectronModel():
         energy_shift (float): an energy shift typically used to place the Fermi
             level at the correct position.
         fermi_level (float): the fermi level.
-        total_enery(float): the total energy
+        fermi_level_ans (float): the exact, analytical value for the Fermi 
+            level.
+        total_enery (float): the total energy
+        total_enery_ans (float): the exact, analytical value for the total
+            energy.
     """
     
     def __init__(self, lattice, degree, energy_shift=None,
@@ -436,7 +440,11 @@ class FreeElectronModel():
         self.nvalence_electrons = 1
         self.energy_shift = energy_shift or 0.
         self.fermi_level = fermi_level or 0.
+        occupied_volume = self.lattice.reciprocal_volume*self.nvalence_electrons/2
+        self.fermi_level_ans = (3*occupied_volume/(4*np.pi))**(self.degree/3.)
         self.total_energy = total_energy or 0.
+        rf = self.fermi_level_ans**(1./degree)
+        self.total_energy_ans = 4*np.pi/(3. + self.degree)*rf**(3. + self.degree)
 
     def eval(self, kpoint, neigvals):
         # There's only one eigenvalue so neigvals isn't needed in general but

@@ -1,5 +1,21 @@
 # Revision History
 
+## Revision 0.1.7
+- The function find_orbitals wasn't returning the correct symmetry reduction
+  when the grid was centered at the origin. Fixed this by adding
+  ```
+  new_gps = [np.round(np.dot(pg, g), 15)%1, np.round(np.dot(pg, g), 15)]
+
+  ```
+  and removing both points if there were contained in the origin grid.
+- Energies were being identified as above the Fermi level when they were
+  at the same energy as the Fermi level. Added a small number to the Fermi
+  level so that they would be included.
+- Ran into issues where more energy states than filled states were contributing
+  to the total energy. Fixed this by keeping track of the k-points that had
+  energies near the Fermi level added their contribution last.
+- Added analytic solutions to the free electron pseudopotential as attributes.
+
 ## Revision 0.1.6
 - Changed .travis.yml python version from 3.5 to 3.6.
 - Modified the EmpiricalPP class in pseudopots.py so that it would run much
@@ -136,4 +152,3 @@ in `reduce_kpoint_list`.
 - Create unit tests for module functions.
 - Implement sphinx documentation.
 - Get Travis CI and Coveralls working.
-
