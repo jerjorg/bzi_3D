@@ -3,9 +3,9 @@
 
 import numpy as np
 from numpy.linalg import norm
+from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import itertools
-from mpl_toolkits.mplot3d import Axes3D
 # from BZI.pseudopots import Toy_PP, W1
 from BZI.symmetry import (bcc_sympts, fcc_sympts, sc_sympts, make_ptvecs,
                           make_rptvecs, sym_path)
@@ -291,7 +291,7 @@ def plot_band_structure(materials_list, PPlist, PPargs_list, lattice, npts,
     # k-points between symmetry point pairs in lattice coordinates.
     lat_kpoints = sym_path(lattice, npts)
 
-    # k-points between symmetry point pairs in cartesian coordinates.
+    # k-points between symmetry point pairs in Cartesian coordinates.
     car_kpoints = [np.dot(lattice.reciprocal_vectors, k) for k in lat_kpoints]
 
     # Find the distance of each symmetry path by putting the symmetry point pairs 
@@ -332,7 +332,6 @@ def plot_band_structure(materials_list, PPlist, PPargs_list, lattice, npts,
     # Find the x-axis labels and label locations.
     plot_xlabels = [lattice.symmetry_paths[0][0]]
     plot_xlabel_pos = [0.]
-    lattice.symmetry_paths
     for i in range(len(lattice.symmetry_paths) - 1):
         if (lattice.symmetry_paths[i][1] == lattice.symmetry_paths[i+1][0]):
             plot_xlabels.append(lattice.symmetry_paths[i][1])
@@ -589,3 +588,37 @@ def PlotVaspBandStructure(file_loc, material, lat_type, lat_consts, lat_angles,
         plt.show()
     else:
         return None
+
+
+def plot_paths(PP, npts, save=False):
+    """Plot the path along which the band structure is plotted.
+    """
+    
+    # k-points between symmetry point pairs in lattice coordinates.
+    lat_kpoints = sym_path(PP.lattice, npts)
+
+    # k-points between symmetry point pairs in Cartesian coordinates.
+    car_kpoints = [np.dot(PP.lattice.reciprocal_vectors, k) for k in lat_kpoints]
+
+    # Plot the paths.
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    x = [ckp[0] for ckp in car_kpoints]
+    y = [ckp[1] for ckp in car_kpoints]
+    z = [ckp[2] for ckp in car_kpoints]
+
+    ax.plot(x,y,z)
+
+    # Label the paths.
+    sympt_labels = list(PP.lattice.symmetry_points.keys())
+    sympts = [np.dot(PP.lattice.reciprocal_vectors, p) for p in
+              list(PP.lattice.symmetry_points.values())]
+
+    x_list = [sp[0] for sp in sympts]
+    y_list = [sp[1] for sp in sympts]
+    z_list = [sp[2] for sp in sympts]
+    
+    for x,y,z,i in zip(x_list, y_list, z_list, sympt_labels):
+        ax.text(x,y,z,i)
+    
+    plt.show()

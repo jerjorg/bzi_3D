@@ -1,5 +1,13 @@
 # Revision History
 
+## Revision 0.1.8
+- Added a function `plot_paths` in plots that plots the lines between symmetry
+  points that are used in creating band structure plots.
+- Made `CohenEmpiricalPP` hamiltonian and eval methods faster by replacing
+  some Python for loops with numpy array arithmetic.
+- Added an attribute to the empirical pseudopotentials whose purpose is to
+  give a description of the pseudopotential.
+
 ## Revision 0.1.7
 - The function find_orbitals wasn't returning the correct symmetry reduction
   when the grid was centered at the origin. Fixed this by adding
