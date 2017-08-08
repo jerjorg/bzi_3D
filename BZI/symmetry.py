@@ -1344,7 +1344,8 @@ def point_group(lat_vecs):
     return get_lattice_pointGroup(lat_vecs)
 
 def shells(vector, lat_vecs):
-    """Find the vectors that are equivalent to another vector by symmetry
+    """Find the vectors that are equivalent to another vector by
+    symmetry
     
     Args:
         vector (list or numpy.ndarray): a vector in cartesian coordinates.
@@ -1356,7 +1357,7 @@ def shells(vector, lat_vecs):
     """
 
     pointgroup = point_group(lat_vecs)
-    all_shells = [np.dot(ptg,vector).tolist() for ptg in pointgroup]
+    all_shells = (np.dot(pointgroup, vector)).tolist()
     unique_shells = []
     for sh in all_shells:  
         if any([np.allclose(sh, us) for us in unique_shells]) == True:
@@ -1415,7 +1416,7 @@ def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False,
     # grid_cell = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], 15)%1)
     # I removed the mod 1, put it back in on monday (maybe)
     # Remove duplicates if necessary.
-    grid_lat = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], eps)%1)
+    grid_lat = (np.round(np.dot(inv(lat_vecs), grid_car.T).T, eps)%1).tolist()
         
     if duplicates:
         grid_copy = list(deepcopy(grid_lat))
@@ -1432,7 +1433,7 @@ def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False,
     nirr_kpts = 0
     grid_copy = list(deepcopy(grid_lat))
     pointgroup = point_group(lat_vecs)
-    pointgroup = [np.dot(np.dot(inv(lat_vecs), pg), lat_vecs) for pg in pointgroup]
+    pointgroup = np.matmul(np.matmul(inv(lat_vecs), pointgroup), lat_vecs)
 
     while len(grid_copy) != 0:
         # Grab a point and build its orbit but only include points from the grid.
@@ -1466,70 +1467,17 @@ def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False,
     else:
         raise ValueError("Coordinate options are 'cell' and 'lat'.")
 
-def nfind_orbitals(grid_car, lat_vecs, HNF, coord = "cart", duplicates=False):
-    """ Find the partial orbitals of the points in a grid, including only the
-    points that are in the grid.
-
-    Args:
-        grid_car (numpy.ndarray): a list of grid point positions in Cartesian 
-            coordinates.
-        lat_vecs (numpy.ndarray): the vectors that define the integration cell.
-        coord (str): a string that indicatese coordinate system of the points.
-            It can be in Cartesian ("cart") or lattice ("lat").
-        duplicates (bool): if there are points in the grid outside the first
-            unit cell, duplicates should be true.
-
-    Returns:
-        gp_orbitals (dict): the orbitals of the grid points in a dictionary. 
-            The keys of the dictionary are integer labels and the values are the
-            grid points in the orbital.
-    """
-    
-    # Put the grid in lattice coordinates.
-    grid_cell = np.dot(np.linalg.inv(lattice.vectors), np.array(grid_car).T).T
-    # grid_cell = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], 9)%1)
-
-    # Put the grid in group coordinates
-    S,L,R = SmithNormalForm(HNF)
-    grid_group = np.dot(L, grid_cell.T).T
-
-    # Remove duplicates if necessary.
-    if duplicates:
-        grid_copy = list(deepcopy(grid_cell))
-        grid_cell = []
-        while len(grid_copy) != 0:
-            gp = grid_copy.pop()
-            if any([np.allclose(gp, gc) for gc in grid_copy]):
-                continue
-            else:
-                grid_cell.append(gp)
-        
-    gp_orbitals = {}
-    nirr_kpts = 0
-    grid_copy = list(deepcopy(grid_cell))
-    pointgroup = point_group(lat_vecs)
-    pointgroup = [np.dot(np.dot(inv(lat_vecs), pg), lat_vecs) for pg in pointgroup]
-
-
-
-    return None
-    # if coord == "cart":
-    #     for i in range(1, len(gp_orbitals.keys()) + 1):
-    #         for j in range(len(gp_orbitals[i])):
-    #             gp_orbitals[i][j] = np.dot(lat_vecs, gp_orbitals[i][j])
-    #     return gp_orbitals# , pointgroup
-    # elif coord == "lat":
-    #     return gp_orbitals
-    # else:
-    #     raise ValueError("Coordinate options are 'cell' and 'lat'.")
-
-def find_full_orbitals(grid_car, lat_vecs, coord = "cart"):
+def find_full_orbitals(grid_car, lat_vecs, coord = "cart", unitcell=False):
     """ Find the complete orbitals of the points in a grid, including points
     not contained in the grid.
 
     Args:
         grid_car (list): a list of grid point positions in cartesian coordinates.
         lat_vecs (numpy.ndarray): the vectors that define the integration cell
+        coord (string): tell it to return the orbits in Cartesian ("cart",
+            default) or lattice ("lat") coordinates.
+        unitcell (string): return the points in the orbits in the first unit
+            cell when true.
 
     Returns:
         gp_orbitals (dict): the orbitals of the grid points in a dictionary. 
@@ -1537,12 +1485,16 @@ def find_full_orbitals(grid_car, lat_vecs, coord = "cart"):
             grid points in the orbital.
     """
 
-    grid_lat = [np.dot(np.linalg.inv(lat_vecs), gp) for gp in grid_car]
+    grid_car = np.array(grid_car)
+    grid_lat = (np.dot(inv(lat_vecs), grid_car.T).T).tolist()
     gp_orbitals = {}
     nirr_kpts = 0
     grid_copy = deepcopy(grid_lat)
     pointgroup = point_group(lat_vecs)
-    pointgroup = [np.dot(np.dot(inv(lat_vecs), pg), lat_vecs) for pg in pointgroup]    
+
+    # To move an operator into lattice coordinates you have to take the product
+    # L^(-1) O L where L is the lattice vectors and O is the operator.
+    pointgroup = np.matmul(np.matmul(inv(lat_vecs), pointgroup), lat_vecs)
     while grid_copy != []:
         # Grap a point and build its orbit but only include points from the grid.
         gp = grid_copy.pop()
@@ -1553,7 +1505,12 @@ def find_full_orbitals(grid_car, lat_vecs, coord = "cart"):
             # it back in.
             # I ran into floating point precision problems the last time I ran
             # %1. Just to be safe it's included here.
-            new_gp = np.round(np.dot(pg, gp), 15)%1
+            # Move the k-point into the first unit cell is requested.
+            if unitcell:
+                new_gp = np.round(np.dot(pg, gp), 15)%1
+            else:
+                new_gp = np.round(np.dot(pg, gp), 15)
+                
             if any([np.allclose(new_gp, gc) for gc in grid_copy]):
                 ind = np.where(np.array([np.allclose(new_gp, gc) for gc in grid_copy]) == True)[0][0]
                 del grid_copy[ind]
@@ -1567,7 +1524,7 @@ def find_full_orbitals(grid_car, lat_vecs, coord = "cart"):
             for j in range(len(gp_orbitals[i])):
                 gp_orbitals[i][j] = np.dot(lat_vecs, gp_orbitals[i][j])
         return gp_orbitals
-    elif coord == "cell":
+    elif coord == "lat":
         return gp_orbitals
     else:
         raise ValueError("Coordinate options are 'cell' and 'lat'.")
@@ -2303,25 +2260,17 @@ def brillouin_zone_mapper(grid, rlattice_vectors, grid_vectors, shift, eps=15):
 
     # Reduce the grid and move into the unit cell.
     reduced_grid, weights = reduce_kpoint_list(grid, rlattice_vectors, grid_vectors,
-                                      shift, eps)
-    
+                                      shift, eps)    
     reduced_grid = np.array(reduced_grid)
-    print("reduced_grid\n", np.round(reduced_grid, 3))
     
     # Find the Minkowski basis.
     mink_basis = minkowski_reduce_basis(rlattice_vectors, eps)
-    print("mink basis\n", mink_basis)
     
     # Find the transformation matrix that gets us to Minkowski space.
     M = np.dot(mink_basis, inv(rlattice_vectors))
-    print("M\n", np.round(M, 3))
 
     # Move the reduced grid points into Minkowski space.
-    print(reduced_grid[:,0])
-    print(np.dot(M, reduced_grid[:,0]))
     mreduced_grid = np.dot(M, reduced_grid.T).T
-
-    print("transformed grid\n", mreduced_grid)
 
     for i, pt1 in enumerate(mreduced_grid):
         norm_pt1 = np.dot(pt1, pt1)
@@ -2331,7 +2280,5 @@ def brillouin_zone_mapper(grid, rlattice_vectors, grid_vectors, shift, eps=15):
             if (norm_pt2 + 10**(-eps)) < norm_pt1:
                 norm_pt1 = norm_pt2
                 mreduced_grid[i] = pt2
-
-    
 
     return mreduced_grid, weights

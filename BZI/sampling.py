@@ -186,61 +186,8 @@ def sphere_pts(A, r2, offset=[0.,0.,0.], eps=1e-9):
                    range(-n[2] + oi[2], n[2] + oi[2] + 1))))
     
     grid = np.dot(A, ints.T).T - offset
-    # grid = np.array([np.dot(A, comb) - offset for comb in ints])
     norms = np.array([np.dot(p,p) for p in grid])
     return grid[np.where(norms < (r2 + eps))]
-
-
-# def sphere_pts(A,r2,offset=[0.,0.,0.]):
-#     """ Calculate all the points within a sphere that are
-#     given by an integer linear combination of the columns of 
-#     A.
-    
-#     Args:
-#         A (numpy.ndarray): the columns representing basis vectors.
-#         r2 (float): the squared radius of the sphere.
-#         offset(list or numpy.ndarray): a vector that points to the center
-#             of the sphere in Cartesian coordinates.
-        
-#     Returns:
-#         grid (list): an array of grid coordinates in cartesian
-#             coordinates.
-#     """
-
-#     # This is a parameter that should help deal with rounding error.
-#     eps = 1e-9
-#     offset = np.asarray(offset)
-    
-#     # Put the offset in cell coordinates
-#     oi= np.round(np.dot(inv(A),offset))
-#     # Find a cell point close to the offset
-#     oi = oi.astype(int)
-    
-#     r = np.sqrt(r2)
-#     V = np.linalg.det(A)
-#     n = [0,0,0]
-#     for i in range(3):
-#         # Add 1 because the offset was rounded to the nearest cell point.
-#         n[i] = int(np.ceil(norm(np.cross(A[:,(i+1)%3],A[:,(i+2)%3]))*r/V) + 1)
-
-#     ints = product(range(-n[0] + oi[0], n[0] + oi[0]),
-#                    range(-n[1] + oi[1], n[1] + oi[1]),
-#                    range(-n[2] + oi[2], n[2] + oi[2]))
-
-#     grid = np.array([np.dot(A, comb) for comb in ints])
-#     norms = np.array([np.dot(p,p) for p in grid])
-#     return grid[np.where(norms < (r2 + eps))]
-        
-#     # grid = []
-#     # for i,j,k in product(range(-n[0] + oi[0], n[0] + oi[0]),
-#     #                      range(-n[1] + oi[1], n[1] + oi[1]),
-#     #                      range(-n[2] + oi[2], n[2] + oi[2])):
-#     #     pt = np.dot(A,[i,j,k])
-#     #     if np.dot(pt+offset,pt+offset) <= r2 + eps:
-#     #         grid.append(np.array(pt))
-#     #     else:
-#     #         continue                
-#     return grid
 
 def large_sphere_pts(A,r2,offset=[0.,0.,0.]):
     """ Calculate all the points within a sphere that are 
