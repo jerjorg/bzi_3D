@@ -98,12 +98,20 @@ class EmpiricalPP(object):
                 shells.append(np.dot(rpt, rpt))
                 
         self.energy_shells = np.sort(shells)
+
                 
     def eval(self, kpoint, neigvals):
         """Evaluate the empirical pseudopotential eigenvalues at the provided
         k-point. Only return the lowest 'neigvals' eigenvalues.
         """
-        
+
+        # self.rlat_pts = sphere_pts(self.lattice.reciprocal_vectors,
+        #                            self.energy_cutoff, -np.array(kpoint))
+
+        # ihamiltonian = self.hamiltonian(kpoint)
+        # self.init_hamiltonian = ihamiltonian - np.diag(
+        #     np.diag(ihamiltonian))
+
         if np.allclose(self.atomic_positions, [[0.]*3]):
             diag = np.eye(len(self.rlat_pts))*np.apply_along_axis(
                 norm, 1, self.rlat_pts + kpoint)**2 
@@ -237,54 +245,92 @@ class CohenEmpiricalPP(object):
                 shells.append(np.dot(rpt, rpt))
         self.energy_shells = np.sort(shells)
                     
+    # def eval(self, kpoint, neigvals):
+    #     """Evaluate the empirical pseudopotential Hamiltonian at the provided
+    #     k-point. This function is typically used to verify the Hamiltonian is 
+    #     Hermitian.
+    #     """
+
+    #     self.rlat_pts = sphere_pts(self.lattice.reciprocal_vectors,
+    #                                self.energy_cutoff, -np.array(kpoint))
+
+    #     ihamiltonian = self.hamiltonian(kpoint)
+    #     self.init_hamiltonian = ihamiltonian - np.diag(
+    #         np.diag(ihamiltonian))
+                
+    #     # Calculate the diagonal elements of the Hamiltonian.
+    #     diag = np.eye(len(self.rlat_pts))*np.apply_along_axis(norm, 1,
+    #                                                           self.rlat_pts + kpoint)**2
+    #     # For some reason the lattice points need to be double nested for
+    #     # numpy.tile to work.
+    #     nested_rlatpts = np.array([[rlp] for rlp in self.rlat_pts])
+
+    #     # Create a matrix of reciprocal lattice points where the first lattice
+    #     # point is repeated acroass the first row, the second lattice point the
+    #     # second row, and so on.
+    #     rlatpt_mat = np.tile(nested_rlatpts,(len(self.rlat_pts),1))
+        
+    #     # Create a matrix of the differences of the lattice points. Each element
+    #     # is given by a_i - a_j.
+    #     rlp_diff = rlatpt_mat - np.transpose(rlatpt_mat, (1,0,2))
+
+    #     # Find the norm squared of the difference.
+    #     r2_mat = np.apply_along_axis(norm, 2, rlp_diff)**2
+
+    #     # The symmetric part of the Hamiltonian.
+    #     sff = np.zeros(np.shape(r2_mat))
+    #     for i in range(1,len(self.sym_form_factors)):
+    #         if self.sym_form_factors[i] == 0.:
+    #             continue
+    #         else:
+    #             sff[np.isclose(r2_mat, self.energy_shells[i])] = self.sym_form_factors[i]
+                
+    #     sff *= np.cos(np.sum(rlp_diff*np.sum(self.atomic_positions, 0), 2))
+
+    #     # The Anti-symmetric part of the Hamiltonian.
+    #     asff = np.zeros(np.shape(r2_mat), dtype=complex)
+    #     for i in range(1,len(self.antisym_form_factors)):
+    #         if self.antisym_form_factors[i] == 0.:
+    #             continue
+    #         else:
+    #             asff[np.isclose(r2_mat, self.energy_shells[i])] = self.antisym_form_factors[i]
+                
+    #     asff *= 1j*np.sin(np.sum(rlp_diff*np.sum(self.atomic_positions, 0), 2))
+
+    #     H = (diag + sff + asff)
+    #     return np.sort(np.linalg.eigvalsh(H))[:neigvals]*Ry_to_eV
+
+
     def eval(self, kpoint, neigvals):
-        """Evaluate the empirical pseudopotential Hamiltonian at the provided
-        k-point. This function is typically used to verify the Hamiltonian is 
-        Hermitian.
+        """Evaluate the empirical pseudopotential eigenvalues at the provided
+        k-point. Only return the lowest 'neigvals' eigenvalues.
         """
+
+        # self.rlat_pts = sphere_pts(self.lattice.reciprocal_vectors,
+        #                            self.energy_cutoff, -np.array(kpoint))
         
-        # Calculate the diagonal elements of the Hamiltonian.
-        diag = np.eye(len(self.rlat_pts))*np.apply_along_axis(norm, 1,
-                                                              self.rlat_pts + kpoint)**2
-        # For some reason the lattice points need to be double nested for
-        # numpy.tile to work.
-        nested_rlatpts = np.array([[rlp] for rlp in self.rlat_pts])
-
-        # Create a matrix of reciprocal lattice points where the first lattice
-        # point is repeated acroass the first row, the second lattice point the
-        # second row, and so on.
-        rlatpt_mat = np.tile(nested_rlatpts,(len(self.rlat_pts),1))
-        
-        # Create a matrix of the differences of the lattice points. Each element
-        # is given by a_i - a_j.
-        rlp_diff = rlatpt_mat - np.transpose(rlatpt_mat, (1,0,2))
-
-        # Find the norm squared of the difference.
-        r2_mat = np.apply_along_axis(norm, 2, rlp_diff)**2
-
-        # The symmetric part of the Hamiltonian.
-        sff = np.zeros(np.shape(r2_mat))
-        for i in range(1,len(self.sym_form_factors)):
-            if self.sym_form_factors[i] == 0.:
-                continue
-            else:
-                sff[np.isclose(r2_mat, self.energy_shells[i])] = self.sym_form_factors[i]
-                
-        sff *= np.cos(np.sum(rlp_diff*np.sum(self.atomic_positions, 0), 2))
-
-        # The Anti-symmetric part of the Hamiltonian.
-        asff = np.zeros(np.shape(r2_mat), dtype=complex)
-        for i in range(1,len(self.antisym_form_factors)):
-            if self.antisym_form_factors[i] == 0.:
-                continue
-            else:
-                asff[np.isclose(r2_mat, self.energy_shells[i])] = self.antisym_form_factors[i]
-                
-        asff *= 1j*np.sin(np.sum(rlp_diff*np.sum(self.atomic_positions, 0), 2))
-
-        H = (diag + sff + asff)
+        size = len(self.rlat_pts)
+        H = np.zeros([size, size], dtype=complex)
+        for i,rpt1 in enumerate(self.rlat_pts):
+            for j in range(i+1):
+                rpt2 = self.rlat_pts[j]
+                h = rpt2 - rpt1
+                r2 = np.dot(h,h)
+                for ap in self.atomic_positions:
+                    if i == j:
+                        H[i,j] = np.dot(kpoint + rpt1, kpoint + rpt1)
+                        break
+                    else:
+                        try:
+                            k = np.where(np.isclose(self.energy_shells, r2))[0][0]
+                            H[i,j] = self.sym_form_factors[k]*(
+                                np.cos(np.dot(h,ap))) + (
+                                    1j*self.antisym_form_factors[k]*(
+                                        np.sin(np.dot(h,ap))))
+                        except:
+                            continue
         return np.sort(np.linalg.eigvalsh(H))[:neigvals]*Ry_to_eV
-
+    
 
     def hamiltonian(self, kpoint):
         """Evaluate the empirical pseudopotential Hamiltonian at the provided

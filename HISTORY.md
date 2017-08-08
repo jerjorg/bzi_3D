@@ -1,5 +1,19 @@
 # Revision History
 
+## Revision 0.1.9
+- Fixed a bug in BZI/symmetry.py/sphere_pts where it wouldn't be able to find
+  the points within a sphere when the offset was large. At one point the offset
+  needed to be subtracted from the reciprocal lattice vectors but it was
+  missing.
+- Added a new function BZI.symmetry called `brillouin_zone_mapper`. This
+  function symmetry reduces a grid, moves the reduced points to the first
+  unit cell, finds the Minkowski basis of the provided reciprocal lattice
+  lattice vectors, moves the points into Minkowski space, and finally moves all
+  the points into the first Brillouin zone of the Minkowski basis.
+- Added a function `minkowski_reduce_basis` which is nothing more than the same
+  function from phenum.vector_utils except the basis input/output vectors are
+  columns instead of rows.
+
 ## Revision 0.1.8
 - Added a function `plot_paths` in plots that plots the lines between symmetry
   points that are used in creating band structure plots.

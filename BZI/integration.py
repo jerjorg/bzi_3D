@@ -66,7 +66,7 @@ def rectangular_fermi_level(PP, grid, weights, eps=1e-9):
     C = int(ceil(PP.nvalence_electrons*np.sum(weights)/2.))
     neigvals = int(np.ceil(PP.nvalence_electrons/2)+1)
     energies = np.array([])
-    for i,g in enumerate(grid):
+    for i,g in enumerate(grid):        
         energies = np.concatenate((energies, list(PP.eval(g, neigvals))*weights[i]))
     return np.sort(energies)[C-1] # + eps# C -1 since python is zero based
 

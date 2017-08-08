@@ -9,11 +9,12 @@ from numpy.linalg import norm, inv, det
 import math
 import itertools
 from copy import deepcopy
-from itertools import islice
+from itertools import islice, product
 from BZI.msg import err
 
 from phenum.symmetry import get_lattice_pointGroup
 from phenum.grouptheory import SmithNormalForm
+from phenum.vector_utils import _minkowski_reduce_basis
 
 class Lattice(object):
     """Create a lattice.
@@ -75,7 +76,7 @@ class Lattice(object):
                                            lattice_angles)
         self.volume = det(self.vectors)
         self.reciprocal_volume = det(self.reciprocal_vectors)
-    
+
 # Define the symmetry points for a simple-cubic lattice in lattice coordinates.
 sc_sympts = {"G": [0. ,0., 0.],
               "R": [1./2, 1./2, 1./2],
@@ -1413,17 +1414,19 @@ def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False,
     # Put the grid in lattice coordinates and move it into the first unit cell.
     # grid_cell = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], 15)%1)
     # I removed the mod 1, put it back in on monday (maybe)
-    grid_lat = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], 15))
     # Remove duplicates if necessary.
+    grid_lat = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], eps)%1)
+        
     if duplicates:
         grid_copy = list(deepcopy(grid_lat))
         grid_lat = []
         while len(grid_copy) != 0:
-            gp = np.round(grid_copy.pop(), eps)%1
+            gp = grid_copy.pop()
             if any([np.allclose(gp, gc) for gc in grid_copy]):
                 continue
             else:
                 grid_lat.append(gp)
+
 
     gp_orbitals = {}
     nirr_kpts = 0
@@ -1453,15 +1456,15 @@ def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False,
                     del grid_copy[ind]
                 else:
                     continue
-    # if coord == "cart":
-    #     for i in range(1, len(gp_orbitals.keys()) + 1):
-    #         for j in range(len(gp_orbitals[i])):
-    #             gp_orbitals[i][j] = np.dot(lat_vecs, gp_orbitals[i][j])
-    #     return gp_orbitals# , pointgroup
-    # elif coord == "lat":
-    return gp_orbitals
-    # else:
-    #     raise ValueError("Coordinate options are 'cell' and 'lat'.")
+    if coord == "cart":
+        for i in range(1, len(gp_orbitals.keys()) + 1):
+            for j in range(len(gp_orbitals[i])):
+                gp_orbitals[i][j] = np.dot(lat_vecs, gp_orbitals[i][j])
+        return gp_orbitals# , pointgroup
+    elif coord == "lat":
+        return gp_orbitals
+    else:
+        raise ValueError("Coordinate options are 'cell' and 'lat'.")
 
 def nfind_orbitals(grid_car, lat_vecs, HNF, coord = "cart", duplicates=False):
     """ Find the partial orbitals of the points in a grid, including only the
@@ -2048,12 +2051,11 @@ def find_kpt_index(kpt, invK, L, D, eps=9):
     return gpt[0]*D[1]*D[2] + gpt[1]*D[2] + gpt[2]
 
 
-def bring_into_cell(kpt, lat_vecs, eps=15):
+def bring_into_cell(kpt, lat_vecs, eps=10):
     """Bring a k-point into the first unit cell.
     """    
     k = np.round(np.dot(inv(lat_vecs), kpt), eps)%1
     return np.dot(lat_vecs, k)
-
 
 def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
                        eps=9):
@@ -2163,7 +2165,7 @@ def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
     for i in range(cOrbit):
         sum += kpoint_weights[i]
         reduced_kpoints[i] = kpoint_list[iFirst[i+1]]
-        
+
     return reduced_kpoints, kpoint_weights
 
 def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
@@ -2234,10 +2236,13 @@ def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
     nSymOps = len(pointgroup) # the number of symmetry operations
     nUR = len(kpoint_list) # the number of unreduced k-points
     # A dictionary to keep track of the number of symmetrically-equivalent
-    # k-points.
+    # k-points. It goes from the k-point index in the grid to the label of that
+    # k-point's orbit.
     hashtable = dict.fromkeys(range(nUR))
 
     # A dictionary to keep track of the k-points that represent each orbital.
+    # It goes from orbit label to the index of the k-point that represents
+    # the orbit.
     iFirst = {}
 
     # A dictionary to keep track of the number of symmetrically-equivalent
@@ -2251,7 +2256,7 @@ def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
         idx = find_kpt_index(ur_kpt - shift, invK, L, D, eps)
         if hashtable[idx] != None:
             continue
-        cOrbit += 1        
+        cOrbit += 1
         hashtable[idx] = cOrbit
         iFirst[cOrbit] = i
         iWt[cOrbit] = 1
@@ -2270,3 +2275,63 @@ def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
 
     hashtable = dict((k, v) for k, v in hashtable.items() if v)
     return hashtable, iFirst
+
+def minkowski_reduce_basis(basis, eps):
+    """Find the Minkowski representation of a basis.
+
+    Args:
+        basis(numpy.ndarray): a matrix with the generating vectors as columns.
+        eps (int): a finite precision parameter in 10**(-eps).
+    """
+    return _minkowski_reduce_basis(basis.T, 10**(-eps)).T
+
+def brillouin_zone_mapper(grid, rlattice_vectors, grid_vectors, shift, eps=15):
+    """Map a grid into the first Brillouin zone in Minkowski space.
+    
+    Args:
+        grid (list): a list of grid points in Cartesian coordinates.
+        rlattice_vectors (numpy.ndarray): a matrix whose columes are the
+            reciprocal lattice generating vectors.
+        grid_vectors (numpy.ndarray): the grid generating vectors.
+        eps (int): finite precision parameter that is the integer exponent in
+            10**(-eps).
+    Returns:
+        mgrid (numpy.ndarray): a numpy array of grid points in the first 
+            Brillouin zone in Minkowski space.
+        weights (numpy.ndarray): the k-point weights
+    """
+
+    # Reduce the grid and move into the unit cell.
+    reduced_grid, weights = reduce_kpoint_list(grid, rlattice_vectors, grid_vectors,
+                                      shift, eps)
+    
+    reduced_grid = np.array(reduced_grid)
+    print("reduced_grid\n", np.round(reduced_grid, 3))
+    
+    # Find the Minkowski basis.
+    mink_basis = minkowski_reduce_basis(rlattice_vectors, eps)
+    print("mink basis\n", mink_basis)
+    
+    # Find the transformation matrix that gets us to Minkowski space.
+    M = np.dot(mink_basis, inv(rlattice_vectors))
+    print("M\n", np.round(M, 3))
+
+    # Move the reduced grid points into Minkowski space.
+    print(reduced_grid[:,0])
+    print(np.dot(M, reduced_grid[:,0]))
+    mreduced_grid = np.dot(M, reduced_grid.T).T
+
+    print("transformed grid\n", mreduced_grid)
+
+    for i, pt1 in enumerate(mreduced_grid):
+        norm_pt1 = np.dot(pt1, pt1)
+        for n in product([-1,0,1], repeat=3):
+            pt2 = pt1 + np.dot(mink_basis, n)
+            norm_pt2 = np.dot(pt2, pt2)
+            if (norm_pt2 + 10**(-eps)) < norm_pt1:
+                norm_pt1 = norm_pt2
+                mreduced_grid[i] = pt2
+
+    
+
+    return mreduced_grid, weights
