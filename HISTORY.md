@@ -5,7 +5,7 @@
   after 70 characters.
 - Replaced conversions to different coordinate systems that involved
   single line for loops with numpy matrix multiplication in module
-  BZI/symmetry in `functions shells`, `find_orbitals`,
+  BZI/symmetry in `functions shells`, `find_orbitals`, and
   `find_full_orbitals`, 
 - Removed `nfind_orbitals`, an experimental symmetry reduction routine
   that was supposed to replace `find_orbitals`. Will return to replace

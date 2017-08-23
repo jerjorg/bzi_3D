@@ -344,8 +344,8 @@ def plot_band_structure(materials_list, PPlist, PPargs_list, lattice, npts,
     plot_xlabel_pos.append(np.sum(distances))    
 
     # Plot the energy dispersion curves one at a time.
-    colors = ["green", "blue", "red", "violet", "orange", "cyan", "black"]
-    for i in range(nPP):        
+    colors = ["blue", "green", "red", "violet", "orange", "cyan", "black"]
+    for i in range(nPP):
         for ne in range(neigvals):
             ienergy = []
             for nk in range(len(car_kpoints)):

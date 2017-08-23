@@ -1,4 +1,4 @@
-"""Generate quantities related to the symmetry of the lattice. This module
+"""Generate quantities reated to the symmetry of the lattice. This module
 draws heavily from Setyawan, Wahyu, and Stefano Curtarolo. "High-throughput 
 electronic band structure calculations: Challenges and tools." Computational 
 Materials Science 49.2 (2010): 299-312.
@@ -91,7 +91,7 @@ fcc_sympts = {"G": [0., 0., 0.], # G is the gamma point.
               "U": [5./8, 1./4, 5./8],              
               "W": [1./2, 1./4, 3./4],
               "X": [1./2, 0., 1./2],
-              "G2":[1., 1., 1.]}
+              "G2":[1., 1., 1.]}              
 
 # Define the symmetry points for a bcc lattice in lattice coordinates
 bcc_sympts = {"G": [0., 0., 0.],
@@ -2272,7 +2272,8 @@ def brillouin_zone_mapper(grid, rlattice_vectors, grid_vectors, shift, eps=15):
     # Move the reduced grid points into Minkowski space.
     mreduced_grid = np.dot(M, reduced_grid.T).T
 
-    for i, pt1 in enumerate(mreduced_grid):
+    mreduced_grid_copy = deepcopy(mreduced_grid)    
+    for i, pt1 in enumerate(mreduced_grid_copy):
         norm_pt1 = np.dot(pt1, pt1)
         for n in product([-1,0,1], repeat=3):
             pt2 = pt1 + np.dot(mink_basis, n)

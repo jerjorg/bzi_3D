@@ -155,7 +155,41 @@ def make_large_grid(cell_vectors, grid_vectors, offset, cart=True, eps = 1e-9):
             
     return (np.asarray(grid), np.asarray(null_grid))
 
-def sphere_pts(A, r2, offset=[0.,0.,0.], eps=1e-9):
+def large_sphere_pts(A, r2, offset=[0.,0.,0.], eps=1e-12):
+    """ Calculate all the points within a sphere that are
+    given by an integer linear combination of the columns of 
+    A.
+    
+    Args:
+        A (numpy.ndarray): the columns representing basis vectors.
+        r2 (float): the squared radius of the sphere.
+        offset(list or numpy.ndarray): a vector that points to the center
+            of the sphere in Cartesian coordinates.
+        
+    Returns:
+        grid (list): an array of grid coordinates in cartesian
+            coordinates.
+    """
+
+    offset = np.asarray(offset)
+    
+    # Put the offset in cell coordinates and find a cell point close to the
+    # offset.
+    oi= np.round(np.dot(inv(A),offset)).astype(int)
+    r = 2*np.sqrt(r2)
+    V = np.linalg.det(A)
+    n = [int(np.ceil(norm(np.cross(A[:,(i+1)%3],A[:,(i+2)%3]))*r/V) + 1)
+         for i in range(3)]
+
+    ints = np.array(list(product(range(-n[0] + oi[0], n[0] + oi[0] + 1),
+                   range(-n[1] + oi[1], n[1] + oi[1] + 1),
+                   range(-n[2] + oi[2], n[2] + oi[2] + 1))))
+    
+    grid = np.dot(A, ints.T).T - offset
+    norms = np.array([np.dot(p,p) for p in grid])
+    return grid[np.where(norms < (r2 + eps))] + offset
+
+def sphere_pts(A, r2, offset=[0.,0.,0.], eps=1e-12):
     """ Calculate all the points within a sphere that are
     given by an integer linear combination of the columns of 
     A.
@@ -178,7 +212,7 @@ def sphere_pts(A, r2, offset=[0.,0.,0.], eps=1e-9):
     oi= np.round(np.dot(inv(A),offset)).astype(int)
     r = np.sqrt(r2)
     V = np.linalg.det(A)
-    n = [int(np.ceil(norm(np.cross(A[:,(i+1)%3],A[:,(i+2)%3]))*r/V) + 1)
+    n = [int(np.ceil(norm(np.cross(A[:,(i+1)%3],A[:,(i+2)%3]))*r/V) + 10)
          for i in range(3)]
 
     ints = np.array(list(product(range(-n[0] + oi[0], n[0] + oi[0] + 1),
@@ -187,46 +221,7 @@ def sphere_pts(A, r2, offset=[0.,0.,0.], eps=1e-9):
     
     grid = np.dot(A, ints.T).T - offset
     norms = np.array([np.dot(p,p) for p in grid])
-    return grid[np.where(norms < (r2 + eps))]
-
-def large_sphere_pts(A,r2,offset=[0.,0.,0.]):
-    """ Calculate all the points within a sphere that are 
-    given by an integer linear combination of the columns of 
-    A.
-    
-    Args:
-        A (numpy.ndarray): the grid basis with the columns 
-            representing basis vectors.
-        r2 (float): the squared radius of the sphere.
-        offset(list or numpy.ndarray): a vector that points to the center
-            of the sphere in Cartesian coordinates.
-        
-    Returns:
-        grid (list): an array of grid coordinates in cartesian
-            coordinates.
-    """
-    
-    # This is a parameter that should help deal with rounding error.
-    eps = 1e-9
-    offset = np.asarray(offset)
-    # Put the offset in cell coordinates
-    oi= np.round(np.dot(inv(A),offset))
-    # Find a cell point close to the offset
-    oi = oi.astype(int)
-    # scale the integers by about 100% to ensure all points are enclosed.
-    scale = 2.
-    imax,jmax,kmax = map(int,np.ceil(scale*np.sqrt(r2/np.sum(np.dot(A,A),0))))
-    
-    grid = []
-    for i,j,k in product(range(-imax + oi[0],imax + oi[0]),
-                         range(-jmax + oi[1],jmax + oi[1]),
-                         range(-kmax + oi[2],kmax + oi[2])):
-        pt = np.dot(A,[i,j,k])
-        if np.dot(pt+offset,pt+offset) <= r2 + eps:
-            grid.append(pt)
-        else:
-            continue                
-    return grid
+    return grid[np.where(norms < (r2 + eps))] + offset
 
 def make_cell_points(lat_vecs, grid_vecs, offset=[0,0,0], cart=True):
     """Sample within a parallelepiped using any regular grid.
