@@ -106,7 +106,7 @@ def ScatterPlotSingle(func, ndivisions, cutoff=None):
     plt.show()
     
 def plot_mesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
-             indices=None):
+              indices=None, show=True, save=False, file_name=None):
     """Create a 3D scatter plot of a set of mesh points inside a cell.
     
     Args:
@@ -117,6 +117,10 @@ def plot_mesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
            also plotted, in Cartesian coordinates.
         indices (list or numpy.ndarray): the indices of the points. If
             provided, they will be plotted with the mesh points.
+        show (bool): if true, the plot will be shown.
+        save (bool): if true, the plot will be saved.
+        file_name (str): the file name under which the plot is saved. If not 
+            provided the plot is saved as "mesh.pdf".
     Returns:
         None
     """
@@ -156,7 +160,13 @@ def plot_mesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
 
     for l in ls:
         ax.plot3D(*l, c="blue")
-    plt.show()
+    if show:
+        plt.show()
+    elif save:
+        if file_name:
+            plt.savefig(file_name + ".pdf")
+        else:
+            plt.savefig("mesh.pdf")
     return None
 
 def PlotMeshes(mesh_points_list, cell_vecs, atoms, offset = np.asarray([0.,0.,0.])):

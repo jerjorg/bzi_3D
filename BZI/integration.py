@@ -2,7 +2,7 @@
 """
 
 import numpy as np
-from math import ceil
+from math import np.ceil
 from BZI.sampling import HermiteNormalForm
 
 def rectangular_method(PP, grid, weights):
@@ -15,8 +15,8 @@ def rectangular_method(PP, grid, weights):
     """
 
     integral = 0
-    neigvals = int(np.ceil(PP.nvalence_electrons/2.))
-    C = int(ceil(PP.nvalence_electrons*np.sum(weights)/2.))
+    neigvals = np.ceil(np.round(PP.nvalence_electrons/2., 3)).astype(int)
+    C = np.ceil(np.round(PP.nvalence_electrons*np.sum(weights)/2., 3)).astype(int)
     nstates = 0
     last_state_indices = []
     for i,kpt in enumerate(grid):
@@ -50,7 +50,6 @@ def rectangular_method(PP, grid, weights):
             break
     return np.linalg.det(PP.lattice.reciprocal_vectors)/np.sum(weights)*integral
     
-
 def rectangular_fermi_level(PP, grid, weights, eps=1e-9):
     """Find the energy at which the toy band structure it cut.
     
@@ -63,8 +62,8 @@ def rectangular_fermi_level(PP, grid, weights, eps=1e-9):
         (float) the Fermi level
     """
     
-    C = int(ceil(PP.nvalence_electrons*np.sum(weights)/2.))
-    neigvals = int(np.ceil(PP.nvalence_electrons/2)+1)
+    C = np.ceil(np.round(PP.nvalence_electrons*np.sum(weights)/2., 3)).astype(int)
+    neigvals = np.ceil(np.round(PP.nvalence_electrons/2+1, 3))).astype(int)
     energies = np.array([])
     for i,g in enumerate(grid):        
         energies = np.concatenate((energies, list(PP.eval(g, neigvals))*weights[i]))

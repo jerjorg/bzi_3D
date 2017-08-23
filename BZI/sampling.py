@@ -199,7 +199,7 @@ def sphere_pts(A, r2, offset=[0.,0.,0.], eps=1e-12):
         r2 (float): the squared radius of the sphere.
         offset(list or numpy.ndarray): a vector that points to the center
             of the sphere in Cartesian coordinates.
-        
+        offset (numpy.ndarray): the center of the sphere.
     Returns:
         grid (list): an array of grid coordinates in cartesian
             coordinates.
