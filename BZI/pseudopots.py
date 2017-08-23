@@ -873,7 +873,7 @@ Mg_cutoff_vec = (Mg_lattice.reciprocal_vectors[:,0] +
 
 # Added a little to the cutoff.
 Mg_energy_cutoff = np.dot(Mg_cutoff_vec, Mg_cutoff_vec) + (
-                          (np.pi/(Mg_lat_const_c + Mg_lat_const_a))**2) + 10
+                          (np.pi/(Mg_lat_const_c + Mg_lat_const_a))**2)
 Mg_atomic_positions = [[0.]*3]
 Mg_nvalence_electrons = 2
 Mg_PP = EmpiricalPP(Mg_lattice, Mg_pff, Mg_energy_cutoff, Mg_atomic_positions,
