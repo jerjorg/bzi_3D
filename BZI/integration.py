@@ -2,7 +2,6 @@
 """
 
 import numpy as np
-from math import np.ceil
 from BZI.sampling import HermiteNormalForm
 
 def rectangular_method(PP, grid, weights):
