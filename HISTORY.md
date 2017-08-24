@@ -1,5 +1,11 @@
 # Revision History
 
+## Revision 0.1.11
+- Had a problem with the Fermi level of different grids varying by
+  more than expected. The problem was stability of a ceiling call.
+- Added optional arguments to plot_mesh so that now it can be saved
+  to a file.
+
 ## Revision 0.1.10
 - Adjusted enforced line breaks in HISTORY.md such that they occur
   after 70 characters.
