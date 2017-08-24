@@ -1,5 +1,13 @@
 # Revision History
 
+## Revision 0.1.12
+- Fixed `brillouin_zone_mapper`. The k-points are symmetry reduced,
+  mapped into the first unit cell in the Minkowski basis, then looks
+  at the translationally equivalent k-points in the eight unit cells
+  that have a vertex at the origin to see if any them lie closer to
+  the origin.
+- Added notebook for creating unit tests `test_symmetry.ipynb`.
+
 ## Revision 0.1.11
 - Had a problem with the Fermi level of different grids varying by
   more than expected. The problem was stability of a ceiling call.

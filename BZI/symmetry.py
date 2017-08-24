@@ -2240,6 +2240,11 @@ def minkowski_reduce_basis(basis, eps):
         basis(numpy.ndarray): a matrix with the generating vectors as columns.
         eps (int): a finite precision parameter in 10**(-eps).
     """
+
+    if type(eps) != int:
+        msg = ("eps must be an integer, cooresponds to 10**-eps")
+        raise ValueError(msg.format(eps))
+
     return _minkowski_reduce_basis(basis.T, 10**(-eps)).T
 
 def brillouin_zone_mapper(grid, rlattice_vectors, grid_vectors, shift, eps=15):
@@ -2266,16 +2271,11 @@ def brillouin_zone_mapper(grid, rlattice_vectors, grid_vectors, shift, eps=15):
     # Find the Minkowski basis.
     mink_basis = minkowski_reduce_basis(rlattice_vectors, eps)
     
-    # Find the transformation matrix that gets us to Minkowski space.
-    # M = np.dot(mink_basis, inv(rlattice_vectors))
-
-    # Move the reduced grid points into Minkowski space.
-    # mreduced_grid = np.dot(M, reduced_grid.T).T
-
     reduced_grid_copy = deepcopy(reduced_grid)
     for i, pt1 in enumerate(reduced_grid_copy):
+        pt1 = bring_into_cell(pt1, mink_basis)
         norm_pt1 = np.dot(pt1, pt1)
-        for n in product([-1,0,1], repeat=3):
+        for n in product([-1,0], repeat=3):
             pt2 = pt1 + np.dot(mink_basis, n)
             norm_pt2 = np.dot(pt2, pt2)
             if (norm_pt2 + 10**(-eps)) < norm_pt1:
