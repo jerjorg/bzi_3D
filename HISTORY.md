@@ -1,5 +1,13 @@
 # Revision History
 
+## Revision 0.1.11
+- Made the function get_corrected_total_energy from tetrahedron.py
+  compatible with Python 2 by making the division of the number of
+  valence electrons by two become float division.
+- Made the function rectangular_fermi_level from integration.py
+  compatible with the Jupyter notebook Tetrahedra Convergence by
+  converting weights[i] from a numpy.float64 to an int.
+
 ## Revision 0.1.10
 - Adjusted enforced line breaks in HISTORY.md such that they occur
   after 70 characters.

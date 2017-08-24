@@ -64,8 +64,8 @@ def rectangular_fermi_level(PP, grid, weights, eps=1e-9):
     C = np.ceil(np.round(PP.nvalence_electrons*np.sum(weights)/2., 3)).astype(int)
     neigvals = np.ceil(np.round(PP.nvalence_electrons/2+1, 3)).astype(int)
     energies = np.array([])
-    for i,g in enumerate(grid):        
-        energies = np.concatenate((energies, list(PP.eval(g, neigvals))*weights[i]))
+    for i,g in enumerate(grid):
+        energies = np.concatenate((energies, list(PP.eval(g, neigvals))*int(np.round(weights[i]))))
     return np.sort(energies)[C-1] # + eps# C -1 since python is zero based
 
 def monte_carlo(PP, npts):
