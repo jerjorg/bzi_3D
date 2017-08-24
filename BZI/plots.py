@@ -386,7 +386,7 @@ def plot_band_structure(materials_list, PPlist, PPargs_list, lattice, npts,
     plt.title("%s Band Structure" %materials_list[0])
     plt.grid(linestyle="dotted")
     if save:
-        plt.savefig("%s_band_struct.pdf" %materials_list[0],
+        plt.savefig("%s_band_struct2.pdf" %materials_list[0],
                     bbox_extra_artists=(lgd,), bbox_inches='tight')
     if show:
         plt.show()
@@ -541,7 +541,8 @@ def PlotVaspBandStructure(file_loc, material, lat_type, lat_consts, lat_angles,
                     for j in range(1,nbands+1):
                         energies[nkpts_dr-1].append(float(f[i+j].split()[1]) - energy_shift)
                         occupancies[nkpts_dr-1].append(float(f[i+j].split()[2]))
-                        en_occ[nkpts_dr-1].append(energies[nkpts_dr-1][-1]*occupancies[nkpts_dr-1][-1]/2)
+                        en_occ[nkpts_dr-1].append(energies[nkpts_dr-1][-1]*(
+                            occupancies[nkpts_dr-1][-1]/2))
     car_kpoints = [np.dot(rlat_vecs,k) for k in lat_kpoints]
 
     # Find the distances between symmetry points.

@@ -2267,19 +2267,19 @@ def brillouin_zone_mapper(grid, rlattice_vectors, grid_vectors, shift, eps=15):
     mink_basis = minkowski_reduce_basis(rlattice_vectors, eps)
     
     # Find the transformation matrix that gets us to Minkowski space.
-    M = np.dot(mink_basis, inv(rlattice_vectors))
+    # M = np.dot(mink_basis, inv(rlattice_vectors))
 
     # Move the reduced grid points into Minkowski space.
-    mreduced_grid = np.dot(M, reduced_grid.T).T
+    # mreduced_grid = np.dot(M, reduced_grid.T).T
 
-    mreduced_grid_copy = deepcopy(mreduced_grid)    
-    for i, pt1 in enumerate(mreduced_grid_copy):
+    reduced_grid_copy = deepcopy(reduced_grid)
+    for i, pt1 in enumerate(reduced_grid_copy):
         norm_pt1 = np.dot(pt1, pt1)
         for n in product([-1,0,1], repeat=3):
             pt2 = pt1 + np.dot(mink_basis, n)
             norm_pt2 = np.dot(pt2, pt2)
             if (norm_pt2 + 10**(-eps)) < norm_pt1:
                 norm_pt1 = norm_pt2
-                mreduced_grid[i] = pt2
+                reduced_grid[i] = pt2
 
-    return mreduced_grid, weights
+    return reduced_grid, weights

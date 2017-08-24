@@ -5,6 +5,16 @@
   more than expected. The problem was stability of a ceiling call.
 - Added optional arguments to plot_mesh so that now it can be saved
   to a file.
+- Made the function `get_corrected_total_energy` from tetrahedron.py
+  compatible with Python 2 by making the division of the number of
+  valence electrons by two become float division.
+- Made the function `rectangular_fermi_level` from integration.py
+  compatible with the Jupyter notebook Tetrahedra Convergence by
+  converting weights[i] from a numpy.float64 to an int.
+- Temporarily modified the the method `eval` in `EmpiricalPP` to make
+  comparisons between different basis sets.
+- Changed `brillouin_zone_mapper` so that it no longer maps points
+  into Minkowski space.
 
 ## Revision 0.1.10
 - Adjusted enforced line breaks in HISTORY.md such that they occur

@@ -100,36 +100,64 @@ class EmpiricalPP(object):
         self.energy_shells = np.sort(shells)
 
                 
-    def eval(self, kpoint, neigvals):
+    def eval(self, kpoint, neigvals, adjust=False):
         """Evaluate the empirical pseudopotential eigenvalues at the provided
         k-point. Only return the lowest 'neigvals' eigenvalues.
         """
 
-        if np.allclose(self.atomic_positions, [[0.]*3]):
-            diag = np.eye(len(self.rlat_pts))*np.apply_along_axis(
-                norm, 1, self.rlat_pts + kpoint)**2 
-            H = self.init_hamiltonian + diag*Ry_to_eV
-        else:
+        if adjust:
+            rlat_pts = sphere_pts(self.lattice.reciprocal_vectors,
+                                  self.energy_cutoff)
             # Calculate the diagonal elements of the Hamiltonian.
-            diag = np.eye(len(self.rlat_pts))*np.apply_along_axis(
-                norm, 1, self.rlat_pts + kpoint)**2
+            diag = np.eye(len(rlat_pts))*np.apply_along_axis(norm, 1,
+                                                             rlat_pts + kpoint)**2
             # For some reason the lattice points need to be double nested for
             # numpy.tile to work.
-            # nested_rlatpts = np.array([[rlp] for rlp in self.rlat_pts])
-            # Create a matrix of reciprocal lattice points where the first
-            # lattice point is repeated acroass the first row, the second
-            # lattice point the second row, and so on.
-            # rlatpt_mat = np.tile(nested_rlatpts,(len(self.rlat_pts),1))
-            # Create a matrix of the differences of the lattice points. Each
-            # element is given by a_i - a_j.
-            # rlp_diff = rlatpt_mat - np.transpose(rlatpt_mat, (1,0,2))
-            # Calculate the phase portion of the Hamiltonian matrix elements.
-            # phase_mat = np.dot(rlp_diff, np.sum(self.atomic_positions,0))
-            
-            # H = self.init_hamiltonian*np.exp(-1j*phase_mat) + diag*Ry_to_eV
-            H = self.init_hamiltonian + diag*Ry_to_eV
-        return np.sort(np.linalg.eigvalsh(H))[:neigvals]
+            nested_rlatpts = np.array([[rlp] for rlp in rlat_pts])
+            # Create a matrix of reciprocal lattice points where the first lattice
+            # point is repeated acroass the first row, the second lattice point the
+            # second row, and so on.
+            rlatpt_mat = np.tile(nested_rlatpts,(len(rlat_pts),1))
+            # Create a matrix of the differences of the lattice points. Each element
+            # is given by a_i - a_j.
+            rlp_diff = rlatpt_mat - np.transpose(rlatpt_mat, (1,0,2))
+            # Find the norm squared of the difference.
+            r2_mat = np.apply_along_axis(norm, 2, rlp_diff)**2
+            H = np.zeros(np.shape(r2_mat))
+            for i in range(1,len(self.form_factors)):
+                if self.form_factors[i] == 0.:
+                    continue
+                else:
+                    H[np.isclose(r2_mat, self.energy_shells[i])] = self.form_factors[i]
+                
+            return np.sort(np.linalg.eigvalsh(H + diag))[:neigvals]*Ry_to_eV
 
+        else:
+            if np.allclose(self.atomic_positions, [[0.]*3]):
+                diag = np.eye(len(self.rlat_pts))*np.apply_along_axis(
+                    norm, 1, self.rlat_pts + kpoint)**2 
+                H = self.init_hamiltonian + diag*Ry_to_eV
+            else:
+                # Calculate the diagonal elements of the Hamiltonian.
+                diag = np.eye(len(self.rlat_pts))*np.apply_along_axis(
+                    norm, 1, self.rlat_pts + kpoint)**2
+                # For some reason the lattice points need to be double nested for
+                # numpy.tile to work.
+                # nested_rlatpts = np.array([[rlp] for rlp in self.rlat_pts])
+                # Create a matrix of reciprocal lattice points where the first
+                # lattice point is repeated acroass the first row, the second
+                # lattice point the second row, and so on.
+                # rlatpt_mat = np.tile(nested_rlatpts,(len(self.rlat_pts),1))
+                # Create a matrix of the differences of the lattice points. Each
+                # element is given by a_i - a_j.
+                # rlp_diff = rlatpt_mat - np.transpose(rlatpt_mat, (1,0,2))
+                # Calculate the phase portion of the Hamiltonian matrix elements.
+                # phase_mat = np.dot(rlp_diff, np.sum(self.atomic_positions,0))
+                
+                # H = self.init_hamiltonian*np.exp(-1j*phase_mat) + diag*Ry_to_eV
+                H = self.init_hamiltonian + diag*Ry_to_eV
+            return np.sort(np.linalg.eigvalsh(H))[:neigvals]
+    
     def hamiltonian(self, kpoint):
         """Evaluate the empirical pseudopotential Hamiltonian at the provided
         k-point. This function is typically used to verify the Hamiltonian is 
