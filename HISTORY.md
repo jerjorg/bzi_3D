@@ -1,5 +1,11 @@
 # Revision History
 
+## Revision 0.113
+- Fixed 'brillouin_zone_mapper' in symmetry.py. The reduced_grid
+  contained points outside of the Minkowski unit cell, so, in cases
+  where the original pt1 was the shortest point, the translationally
+  equivalent point in reduced_grid was never replaced.
+
 ## Revision 0.1.12
 - Fixed `brillouin_zone_mapper`. The k-points are symmetry reduced,
   mapped into the first unit cell in the Minkowski basis, then looks

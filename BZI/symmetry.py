@@ -2275,6 +2275,7 @@ def brillouin_zone_mapper(grid, rlattice_vectors, grid_vectors, shift, eps=15):
     for i, pt1 in enumerate(reduced_grid_copy):
         pt1 = bring_into_cell(pt1, mink_basis)
         norm_pt1 = np.dot(pt1, pt1)
+        reduced_grid[i] = pt1
         for n in product([-1,0], repeat=3):
             pt2 = pt1 + np.dot(mink_basis, n)
             norm_pt2 = np.dot(pt2, pt2)
