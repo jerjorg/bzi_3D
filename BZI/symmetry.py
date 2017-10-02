@@ -1416,8 +1416,21 @@ def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False,
     # grid_cell = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], 15)%1)
     # I removed the mod 1, put it back in on monday (maybe)
     # Remove duplicates if necessary.
-    grid_lat = (np.round(np.dot(inv(lat_vecs), grid_car.T).T, eps)%1).tolist()
+    if type(grid_car) == list:
+        if type(grid_car[1]) == list:
+            grid_car = np.array(grid_car)
+        else:
+            grid_car = np.array([g.tolist() for g in grid_car])
+    else:
+        if type(grid_car[1]) == list:
+            grid_car = np.array([g.tolist() for g in grid_car])
+        else:
+            pass
+            
         
+    # grid_car = np.array([g.tolist() for g in grid_car])
+    grid_lat = (np.round(np.dot(inv(lat_vecs), grid_car.T).T, eps)%1).tolist()
+    
     if duplicates:
         grid_copy = list(deepcopy(grid_lat))
         grid_lat = []
@@ -1457,6 +1470,7 @@ def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False,
                     del grid_copy[ind]
                 else:
                     continue
+        
     if coord == "cart":
         for i in range(1, len(gp_orbitals.keys()) + 1):
             for j in range(len(gp_orbitals[i])):

@@ -13,7 +13,11 @@ from BZI.sampling import make_cell_points
 from BZI.symmetry import (get_sympts, get_sympaths, make_ptvecs, make_rptvecs,
                           make_lattice_vectors, find_orbitals,
                           reduce_kpoint_list)
-            
+from conftest import run
+
+tests = run("all symmetry")
+
+@pytest.mark.skipif("test_make_ptvecs" not in tests, reason="different tests")            
 def test_make_ptvecs():
     """Verify the primitive translation vectors are correct.
     """
@@ -141,6 +145,7 @@ def test_make_ptvecs():
                     assert np.isclose(np.dot(v1,v2), b*c*np.cos(alpha))
                     assert np.isclose(np.dot(v2,v0), a*c*np.cos(beta))
 
+@pytest.mark.skipif("test_make_lattice_vectors" not in tests, reason="different tests")     
 def test_make_lattice_vectors():
     """Check that make_lattice_vectors agrees with what is obtained with
     make_ptvecs."""
@@ -727,6 +732,7 @@ def test_make_lattice_vectors():
     with pytest.raises(ValueError) as error:
         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
                               
+@pytest.mark.skipif("test_sympts_sympaths" not in tests, reason="different tests")     
 def test_sympts_sympaths():
     """Verify the symmetry points for the various Brillouin zones are at the
     correct positions. and that the symmetry paths are correct.
@@ -1470,6 +1476,7 @@ def test_sympts_sympaths():
     for p1, p2 in zip(sympath1, sympath2):
         assert p1 == p2
 
+@pytest.mark.skipif("test_find_orbitals" not in tests, reason="different tests")     
 def test_find_orbitals():
 
     # Make sure duplicate points get removed from the grid.
@@ -1484,6 +1491,7 @@ def test_find_orbitals():
             [0,-.5,-.5], [-.5,-.5,0], [-.5,0,-.5]]
 
     orbitals = find_orbitals(grid, lat_vecs, duplicates=True)
+    
     assert len(orbitals.keys()) == 1
     assert np.allclose(orbitals[1], [0,0,0])
 
@@ -1514,6 +1522,7 @@ def test_find_orbitals():
     assert np.allclose(orbitals[1], [0,0,0])    
 
 
+@pytest.mark.skipif("test_reduce_simple_cubic" not in tests, reason="different tests")     
 def test_reduce_simple_cubic():
 
     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
@@ -1636,6 +1645,8 @@ def test_reduce_simple_cubic():
                 del irrkpts[ind]
     assert irrkpts == []
 
+@pytest.mark.skipif("test_reduce_body_centered_cubic" not in tests,
+                    reason="different tests")     
 def test_reduce_body_centered_cubic():
     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
 
@@ -1754,6 +1765,8 @@ def test_reduce_body_centered_cubic():
     assert irrkpts == []
     
 
+@pytest.mark.skipif("test_reduce_face_centered_cubic" not in tests,
+                    reason="different tests")     
 def test_reduce_face_centered_cubic():
     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
     
@@ -1870,6 +1883,8 @@ def test_reduce_face_centered_cubic():
                 del irrkpts[ind]
     assert irrkpts == []
     
+@pytest.mark.skipif("test_reduce_orthorhombic" not in tests,
+                    reason="different tests")     
 def test_reduce_orthorhombic():
     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
 
@@ -1989,6 +2004,8 @@ def test_reduce_orthorhombic():
                 del irrkpts[ind]
     assert irrkpts == []
     
+@pytest.mark.skipif("test_reduce_base_centered_orthorhombic" not in tests,
+                    reason="different tests")     
 def test_reduce_base_centered_orthorhombic():
     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
 
@@ -2092,6 +2109,8 @@ def test_reduce_base_centered_orthorhombic():
                 del grid_copy[ind]
                 del irrkpts[ind]
                 
+@pytest.mark.skipif("test_reduce_body_centered_orthorhombic" not in tests,
+                    reason="different tests")     
 def test_reduce_body_centered_orthorhombic():
     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
 
@@ -2195,6 +2214,8 @@ def test_reduce_body_centered_orthorhombic():
                 del irrkpts[ind]
     assert irrkpts == []
 
+@pytest.mark.skipif("test_reduce_face_centered_orthorhombic" not in tests,
+                    reason="different tests")     
 def test_reduce_face_centered_orthorhombic():
     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
     
@@ -2298,7 +2319,8 @@ def test_reduce_face_centered_orthorhombic():
                 ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
                 del grid_copy[ind]
                 del irrkpts[ind]
-                
+@pytest.mark.skipif("test_reduce_monoclinic" not in tests,
+                    reason="different tests")                     
 def test_reduce_monoclinic():
     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
 
@@ -2415,6 +2437,8 @@ def test_reduce_monoclinic():
                 del irrkpts[ind]
     assert irrkpts == []
 
+@pytest.mark.skipif("test_reduce_base_centered_monoclinic" not in tests,
+                    reason="different tests")                     
 def test_reduce_base_centered_monoclinic():
     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
     
@@ -2526,6 +2550,8 @@ def test_reduce_base_centered_monoclinic():
                 del irrkpts[ind]
     assert irrkpts == []
                 
+@pytest.mark.skipif("test_reduce_tetragonal" not in tests,
+                    reason="different tests")                     
 def test_reduce_tetragonal():
     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
     
@@ -2624,7 +2650,9 @@ def test_reduce_tetragonal():
                 del irrkpts[ind]
     assert irrkpts == []
     
-def test_body_centered_tetragonal():
+@pytest.mark.skipif("test_reduce_body_centered_tetragonal" not in tests,
+                    reason="different tests")                     
+def test_reduce_body_centered_tetragonal():
     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
     ### Body-centered tetragonal ###
     lat_consts = [4.93777, 4.93777, 7.461038]

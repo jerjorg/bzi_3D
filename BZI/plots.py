@@ -2,13 +2,24 @@
 """
 
 import numpy as np
-from numpy.linalg import norm
+from numpy.linalg import norm, inv
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
-import itertools
-# from BZI.pseudopots import Toy_PP, W1
+from itertools import product, chain
+import time
+import pickle
+import os
+
+from BZI.pseudopots import free_PP
 from BZI.symmetry import (bcc_sympts, fcc_sympts, sc_sympts, make_ptvecs,
                           make_rptvecs, sym_path)
+from BZI.sampling import make_grid
+from BZI.integration import (rectangular_fermi_level, rectangular_method,
+                             rec_dos_nos)
+from BZI.tetrahedron import (grid_and_tetrahedra, calc_fermi_level,
+                             calc_total_energy, get_extended_tetrahedra,
+                             get_corrected_total_energy, density_of_states,
+                             number_of_states, tet_dos_nos)
 
 def ScatterPlotMultiple(func, states, ndivisions, cutoff=None):
     """Plot the energy states of a multivalued toy pseudo-potential using 
@@ -23,10 +34,10 @@ def ScatterPlotMultiple(func, states, ndivisions, cutoff=None):
         None
         
     Example:
-        >>> from BZI import ScatterPlotToyPP
+        >>> from BZI import ScatterPlotMultiple
         >>> nstates = 2
         >>> ndivisions = 11
-        >>> ScatterPlotToyPP(nstates, ndivisions)
+        >>> ScatterPlotMultiple(nstates, ndivisions)
     """
     
     kxs = np.linspace(-1./2, 1./2, ndivisions)
@@ -63,6 +74,79 @@ def ScatterPlotMultiple(func, states, ndivisions, cutoff=None):
             ax = plt.subplot(prows,pcols,p,projection="3d")
             ax.scatter(kxlist, kylist, estates,s=.5);
     plt.show()
+
+    
+def scatter_plot_pp(PP, states, nbands, ndivisions, grid_vectors,
+                    plane_value, offset, cutoff=None):
+    """Plot the energy states of a multivalued toy pseudo-potential using 
+    matplotlib's function scatter.
+    
+    Args:
+        PP (:py:obj:`BZI.pseudopots.EmpiricalPP`): a pseudopotential object.
+        states (list): a list of states to plot.
+        nbands (int): the number of bands to include. No value in states can be 
+            greater than nbands.
+        ndivisions (int): the number of divisions along each coordinate direction.
+        grid_vectors(list): two integers that indicate which reciprocal lattice
+            vectors to take as the plane over which to plot the band structure.       
+        plane_value (float): the value along the axis perpendicular to the plane
+            at which to plot. It is given in reciprocal lattic coordinates.
+        offset (numpy.ndarray): the offset of the grid in lattice coordinates.
+        cutoff (float): the value at which the states get cutoff.
+        
+    Returns:
+        None
+        
+    Example:
+        >>> from BZI import ScatterPlotMultiple
+        >>> nstates = 2
+        >>> ndivisions = 11
+        >>> ScatterPlotMultiple(nstates, ndivisions)
+    """
+
+    g1 = PP.lattice.reciprocal_vectors[:, grid_vectors[0]]/ndivisions
+    g2 = PP.lattice.reciprocal_vectors[:, grid_vectors[1]]/ndivisions
+
+    orth_vec = np.setdiff1d([0, 1, 2], grid_vectors)[0]    
+    orthogonal_vector = PP.lattice.reciprocal_vectors[orth_vec]
+
+    # Distance in the direction orthogonal to the plane.
+    d = plane_value*orthogonal_vector
+
+    grid = []
+    kxlist = []
+    kylist = []
+    for i,j in product(range(ndivisions+1), repeat=2):
+        grid.append(i*g1 + j*g2 + d + offset)
+        kxlist.append(grid[-1][grid_vectors[0]])
+        kylist.append(grid[-1][grid_vectors[1]])
+    
+    all_estates = [PP.eval(kpt, nbands) for kpt in grid]
+    prows = int(np.sqrt(len(states)))
+    pcols = int(np.ceil(len(states)/prows))
+    
+    p = 0
+    if cutoff == None:
+        for n in states:
+            p += 1
+            estates = np.array([], dtype=complex)
+            for es in all_estates:
+                estates = np.append(np.real(estates), es[n])
+            ax = plt.subplot(prows,pcols,p,projection="3d")
+            ax.scatter(kxlist, kylist, estates,s=.5);
+    else:
+        for n in states:
+            p += 1
+            estates = np.array([], dtype=complex)
+            for es in all_estates:
+                if es[n] > cutoff:
+                    estates = np.append(np.real(estates), 0.)
+                else:
+                    estates = np.append(np.real(estates), es[n])
+            ax = plt.subplot(prows,pcols,p,projection="3d")
+            ax.scatter(kxlist, kylist, estates,s=.5);
+    plt.show()
+    return grid
     
 def ScatterPlotSingle(func, ndivisions, cutoff=None):
     """Plot the energy states of a single valued toy pseudo-potential using 
@@ -386,7 +470,7 @@ def plot_band_structure(materials_list, PPlist, PPargs_list, lattice, npts,
     plt.title("%s Band Structure" %materials_list[0])
     plt.grid(linestyle="dotted")
     if save:
-        plt.savefig("%s_band_struct2.pdf" %materials_list[0],
+        plt.savefig("%s_band_structure.pdf" %materials_list[0],
                     bbox_extra_artists=(lgd,), bbox_inches='tight')
     if show:
         plt.show()
@@ -633,3 +717,505 @@ def plot_paths(PP, npts, save=False):
         ax.text(x,y,z,i)
     
     plt.show()
+
+
+def create_convergence_plot(PP, ndivisions, degree, exact_fl, improved, symmetry,
+                            PP_name, file_names, location, err_correlation=False):
+    """Create a convergence plot of the total energy fermi level convergence for the
+    free elecetron model.
+    
+    Args:
+        ndivisions (list): a list of integers that gives the size of the grid.
+        degree (int): the degree of the free electron dispersion relation.
+        exact_fl (bool): if true fix the Fermi level at the exact value.
+        improved (bool): if true include the improved tetrahedron method.
+        symmetry (bool): if true, use symmetry reduction with tetrahedron method.
+        PP_name (str): the name of the pseudopotential, and the folder in which
+            it is saved.
+        file_names (list): a list of file name strings. The first corresponds to 
+            the name of the ferme level plot; the second the total energy.
+        location (str): the file path to where the plots are saved.
+        err_correlation (bool): if true, generate a plot of Fermi level error against
+            total energy error, and must include three strings in file names.
+    """
+    
+    if err_correlation:
+        if len(file_names) != 3:
+            msg = "There must be three file names when error correlation is included."
+            raise ValueError(msg.format(err_correlation))
+
+    # Lists for storing errors
+    rec_fl_err = []
+    rec_te_err = []
+    tet_fl_err = []
+    tet_te_err = []
+    ctet_te_err = []
+    sym_rec_fl_err = []
+    sym_rec_te_err = []
+    sym_tet_fl_err = []
+    sym_tet_te_err = []
+    
+    # Figures
+    fermi_fig = plt.figure()
+    fermi_axes = fermi_fig.add_subplot(1,1,1)
+    energy_fig = plt.figure()
+    energy_axes = energy_fig.add_subplot(1,1,1)
+
+    # Offsets for the tetrahedron method.
+    lat_shift = [-1./2]*3
+    grid_shift = [0,0,0]
+    
+    
+    if PP_name == "Single Free Electron":
+        PP.set_degree(degree)
+    if exact_fl:
+        PP.fermi_level = PP.fermi_level_ans
+    
+    tot_timei = time.time()
+    for ndivs in ndivisions:
+        print("Divisions ", ndivs)
+        t0 = time.time()
+        
+        # Create the grid for rectangles
+        grid_consts = [ndivs]*3
+        grid_angles = [np.pi/2]*3
+        grid_centering = "prim"
+        grid_vecs = make_ptvecs(grid_centering, grid_consts, grid_angles)
+        rgrid_vecs = make_rptvecs(grid_vecs)
+        offset = np.dot(inv(rgrid_vecs), -np.sum(PP.lattice.reciprocal_vectors, 1)/2) + (
+                                                 [0.5]*3)
+        # Calculate the Fermi level, if applicable, and total energy for the rectangular method.
+        # Calculate percent error for each.
+        grid = make_grid(PP.lattice.reciprocal_vectors, rgrid_vecs, offset)
+        weights = np.ones(len(grid), dtype=int)
+        
+        # Calculate errors using rectangle method with symmetry.
+        if symmetry:
+            sym_grid, sym_weights = reduce_kpoint_list(grid, PP.lattice.reciprocal_vectors, 
+                                                        rgrid_vecs, offset)
+            if not exact_fl:
+                PP.fermi_level = rectangular_fermi_level(PP, sym_grid, sym_weights)
+                sym_rec_fl_err.append( abs(PP.fermi_level - 
+                                           PP.fermi_level_ans)/PP.fermi_level_ans*100)
+            PP.total_energy = rectangular_method(PP, sym_grid, sym_weights)
+            sym_rec_te_err.append( abs(PP.total_energy - 
+                                       PP.total_energy_ans)/PP.total_energy_ans*100)
+
+        # Rectangle Fermi level
+        if not exact_fl:
+            PP.fermi_level = rectangular_fermi_level(PP, grid, weights)
+            print("rectangles: ", PP.fermi_level)
+            rec_fl_err.append( abs(PP.fermi_level - PP.fermi_level_ans)/PP.fermi_level_ans*100)
+            
+        # Rectangle Total energy
+        PP.total_energy = rectangular_method(PP, grid, weights)
+        rec_te_err.append( abs(PP.total_energy - PP.total_energy_ans)/PP.total_energy_ans*100)
+
+        # Calculate grid, tetrahedra, and weights for tetrahedron method.
+        grid, tetrahedra = grid_and_tetrahedra(PP, ndivs, lat_shift, grid_shift)
+        weights = np.ones(len(tetrahedra), dtype=int)
+        
+        # Calculate errors using tetrahedron method and symmetry reduction.
+        if symmetry:
+            irr_tet, tet_weights = find_irreducible_tetrahedra(PP, tetrahedra, grid)
+            if not exact_fl:
+                PP.fermi_level = calc_fermi_level(PP, irr_tet, tet_weights, grid, tol=1e-8)
+                sym_tet_fl_err.append( abs(PP.fermi_level - PP.fermi_level_ans)/PP.fermi_level_ans*100)
+        
+            PP.total_energy = calc_total_energy(PP, irr_tet, tet_weights, grid)
+            sym_tet_te_err.append( abs(PP.total_energy - PP.total_energy_ans)/PP.total_energy_ans*100)
+
+        if not exact_fl:
+            PP.fermi_level = calc_fermi_level(PP, tetrahedra, weights, grid, tol=1e-8)
+            print("tetrahedra: ", PP.fermi_level)
+            tet_fl_err.append( abs(PP.fermi_level - PP.fermi_level_ans)/PP.fermi_level_ans*100)
+
+        # Calculate the error for the tetrahedron method.
+        PP.total_energy = calc_total_energy(PP, tetrahedra, weights, grid)
+        tet_te_err.append( abs(PP.total_energy - PP.total_energy_ans)/PP.total_energy_ans*100)
+
+        # Calculate the error for the corrected tetrahedron method.
+        if improved:
+            ndiv0 = [ndivs]*3
+            extended_grid, extended_tetrahedra = get_extended_tetrahedra(PP, ndivs, lat_shift, grid_shift)
+            PP.total_energy = get_corrected_total_energy(PP, tetrahedra, extended_tetrahedra,
+                                                         grid, extended_grid, ndiv0)
+            ctet_te_err.append( abs(PP.total_energy - PP.total_energy_ans)/PP.total_energy_ans*100)
+        print("run time", time.time() - t0)            
+    
+    # Location where plots are saved.
+    loc = location + "/" + PP.name + "/"
+    
+    # Plot errors.
+    if not exact_fl:
+        fermi_axes.loglog(np.array(ndivisions)**3, rec_fl_err,label="Rectangles")
+        fermi_axes.loglog(np.array(ndivisions)**3, tet_fl_err,label="Tetrahedra")
+        if symmetry:
+            fermi_axes.loglog(np.array(ndivisions)**3, sym_rec_fl_err,label="Reduced Rectangles")
+            fermi_axes.loglog(np.array(ndivisions)**3, sym_tet_fl_err,label="Reduced Tetrahedra")
+        
+        fermi_axes.set_title(PP_name + " Fermi Level Convergence")
+        fermi_axes.set_xlabel("Number of k-points")
+        fermi_axes.set_ylabel("Percent Error")
+        fermi_axes.legend(loc="best")    
+        
+        fermi_fig.savefig(loc + "degree_" + "%i"%degree + "/" + file_names[0]+".pdf")
+
+        
+    energy_axes.loglog(np.array(ndivisions)**3, rec_te_err,label="Rectangles")
+    energy_axes.loglog(np.array(ndivisions)**3, tet_te_err,label="Tetrahedra")
+    
+    if improved:
+        energy_axes.loglog(np.array(ndivisions)**3, ctet_te_err,label="Improved Tetrahedra")
+    
+    if symmetry:
+        energy_axes.loglog(np.array(ndivisions)**3, sym_rec_te_err,label="Reduced Rectangles")
+        energy_axes.loglog(np.array(ndivisions)**3, sym_tet_te_err,label="Reduced Tetrahedra")
+    
+    energy_axes.set_title(PP_name + " Total Energy Convergence")
+    energy_axes.set_xlabel("Number of k-points")
+    energy_axes.set_ylabel("Percent Error")
+    energy_axes.legend(loc="best")
+    
+    energy_fig.savefig(loc + "degree_" + "%i"%degree + "/" + file_names[1]+".pdf")
+    
+    if (not exact_fl) and err_correlation:
+        corr_fig = plt.figure()
+        corr_axes = corr_fig.add_subplot(1,1,1)
+        
+        corr_axes.scatter(rec_fl_err, rec_te_err, label="Rectangles")
+        corr_axes.scatter(tet_fl_err, tet_te_err, label="Tetrahedra")
+
+        corr_axes.set_xscale("log")
+        corr_axes.set_yscale("log")
+        corr_axes.set_title(PP_name + " Error Correlation")
+        corr_axes.set_xlabel("Percent Error Fermi Level")
+        corr_axes.set_ylabel("Percent Error Total Energy")
+        corr_axes.legend(loc="best")
+        
+        corr_fig.savefig(loc + "degree_" + "%i"%degree + "/" + file_names[2]+".pdf")
+
+    tot_timef = time.time()
+
+    print("total elapsed time: ", (tot_timef - tot_timei)/60, " minutes")
+
+
+def plot_states(PP, grid, tetrahedra, weights, method, energy_list, quantity, nbands, answer,
+                           title, xlimits, ylimits, labels, bin_size=0.1, show=True, save=False,
+                           root_dir=None):
+    """Plot the density of states and the correct density of states.
+
+    Args:
+        PP (:py:obj:`BZI.pseudopots.EmpiricalPP`): an instance of a pseudopotential class.
+        grid (numpy.ndarray): a list of grid point over which the density of states is calculated.
+        tetrahedra (list or numpy.ndarray): a list of tetrahedra given district labels by a quadruple
+            of grid indices
+        weights (numpy.ndarray or list): a list of tetrahedron weights.
+        method (str): the method used to calculate the density of states.
+        energy_list (list): a list of energies at which to calculate the density of states.
+        quantity (str): the quantity to plot. Can be density or number of states.
+        nbands (int): the number of bands included in the calculation.
+        answer (function): a function of energy that returns the exact density of states.
+        title (str): the title of the plot.
+        xlimits (tuple): the x-axis limits.
+        ylimits (tuple): the y-axis limits.
+        labels (tuple): the labels for the plots, first comes the calculated DOS label.
+        bin_size (float): the size of the energy bins. Only applicable to rectangles.
+        show (bool): display the density of states.
+        save (str): save the plot with this file name. If not provided, the plot isn't saved. The
+            string must include the file format, such as .pdf or .png.
+        root_dir (str): the root directory where the plot is saved.
+    """
+
+    if method == "rectangles":        
+        energies = np.sort(np.array([PP.eval(g, nbands) for g in grid]).flatten())
+        dE = bin_size
+        dV = PP.lattice.reciprocal_volume/len(grid)
+        V = PP.lattice.reciprocal_volume
+        Ei = 0
+        Ef = 0
+        dos = [] # density of states
+        nos = [] # number of states
+        dos_energies = [] # energies
+        while max(energies) > Ef:
+            Ef += dE
+            dos_energies.append(Ei + (Ef-Ei)/2.)
+            dos.append( len(energies[(Ei <= energies) & (energies < Ef)])/(len(grid)*dE)*2)
+            nos.append(np.sum(dos)*dE)
+            Ei += dE
+        if PP.degree:
+            answer_list = [answer(en, PP.degree) for en in energy_list]
+        else:
+            answer_list = [answer(en) for en in energy_list]
+
+        if quantity == "dos":
+            plt.scatter(dos_energies, dos, label=labels[0], c="blue")
+            plt.ylabel("Density of States")
+        elif quantity == "nos":
+            plt.scatter(dos_energies, nos, label=labels[0], c="blue")
+            plt.ylabel("Number of States")
+        else:
+            msg = "The supported quantities are dos and nos."
+            raise ValueError(msg.format(quantity))
+            
+        plt.plot(energy_list, answer_list, label=labels[1], c="black")
+        plt.xlabel("Energy (eV)")
+        plt.title(title)
+        plt.xlim(xlimits[0], xlimits[1])
+        plt.ylim(ylimits[0], ylimits[1])
+        plt.legend(loc="best")
+        if save:
+            plt.savefig(root_dir + save)
+        elif show:
+            plt.show()
+
+    elif method == "tetrahedra":
+        VG = PP.lattice.reciprocal_volume
+        VT = VG/len(weights)
+        dos = np.zeros(len(energy_list))
+        nos = np.zeros(len(energy_list))
+
+
+        if quantity == "dos":
+            for i,energy in enumerate(energy_list):
+                for tet in tetrahedra:
+                    for band in range(nbands):
+                        tet_energies = np.sort([PP.eval(grid[j], nbands)[band] for j in tet])
+                        dos[i] += density_of_states(VG, VT, tet_energies, energy)
+
+        elif quantity == "nos":
+            for i,energy in enumerate(energy_list):
+                for tet in tetrahedra:
+                    for band in range(nbands):
+                        tet_energies = np.sort([PP.eval(grid[j], nbands)[band] for j in tet])
+                        nos[i] += number_of_states(VG, VT, tet_energies, energy)
+        else:
+            msg = "The supported quantities are dos and nos."
+            raise ValueError(msg.format(quantity))
+                                
+        if PP.degree:
+            answer_list = [answer(en, PP.degree) for en in energy_list]
+        else:
+            answer_list = [answer(en) for en in energy_list]
+            
+        if quantity == "dos":
+            plt.plot(energy_list, dos, label=labels[0], c="blue")
+            plt.ylabel("Density of States")
+        else:
+            plt.plot(energy_list, nos, label=labels[0], c="blue")
+            plt.ylabel("Number of States")            
+        plt.plot(energy_list, answer_list, label=labels[1], c="black")
+        plt.xlabel("Energy (eV)")
+        plt.xlim(xlimits[0], xlimits[1])
+        plt.ylim(ylimits[0], ylimits[1])
+        plt.title(title)
+        plt.legend(loc="best")
+        if save:
+            plt.savefig(root_dir + save)
+        elif show:
+            plt.show()
+        else:
+            None
+    else:
+        msg = "The supported methods are rectangles and tetrahedra."
+        raise ValueError(msg.format(methods))
+
+
+def generate_states_data(EPM, nbands, grid, methods_list, weights_list,
+                         energy_list, file_location, file_number,
+                         bin_size=0.1, tetrahedra=None):
+
+    """Generate data needed to plot the density of states and number of states
+    of a pseudopotential.
+
+    Args:
+        EPM (obj): an instance of a pseudopotential class.
+        nbands (int): the number of bands included in the calculation.
+        grid (list or numpy.ndarray): a list of grid points over which the quantity
+            provided is calculated.
+        methods_list (str): a list of methods used to calculate the provided quantity.
+        weights_list (list): a list of symmetry reduction weights. Must be in the same
+            order as methods_list.
+        energy_list (list): a list of energies at which the provided quantity is
+            calculated.
+        file_location (str): the file path to where the data is saved. Exclude the last
+            backslash.
+        file_number (str): the number of the file. This should avoid overwriting 
+            previous data.
+        quantity (str): the quantity whose data is saved.
+        function_list (list): a list of functions that provide the exact value of the
+            quantities provide. It must be in the same order as quantity_list.
+        bin_size (float): the bin size for the rectangular method.
+        tetrahedra (list): a list of tetrahedra vertices.
+        weights (list): a list of tetrahedron weights.
+    """
+    
+    # The file structure is as follows: potential/potential_variations/valency_#
+    # There may not be any potential variations, such as different degrees for the
+    # free electron model.
+    file_prefix = file_location + "/data"
+    # If the data folder doesn't exist, make one.
+    if not os.path.isdir(file_prefix):
+        os.mkdir(file_prefix)
+    
+    file_prefix += "/" + EPM.name
+    # If the pseudopotential folder doesn't exist, make one.
+    if not os.path.isdir(file_prefix):
+        os.mkdir(file_prefix)
+    
+    # If the variation of the potential folder doesn't exist, make one.
+    if EPM.degree:
+        file_prefix += "/degree_" + str(EPM.degree)
+        if not os.path.isdir(file_prefix):
+            os.mkdir(file_prefix)
+    
+    # If the considered valency folder doesn't exist, make one.
+    file_prefix += "/" + "valency_" + str(EPM.nvalence_electrons)
+    if not os.path.isdir(file_prefix):
+        os.mkdir(file_prefix)
+        
+    # Generate the energies, density of states, and number of states with
+    # the rectangular method if it is one of the methods provided.
+    if "rectangles" in methods_list:
+        rec_weights = weights_list[0]
+        # Remove rectangles from methods_list.
+        del methods_list[methods_list == "rectangles"]
+        
+        # Make sure that the method folder exists. If not, make one.
+        rec_prefix = file_prefix + "/rectangles"
+        if not os.path.isdir(rec_prefix):
+            os.mkdir(rec_prefix)
+        
+        # The energies of the potential at each point in the grid.
+        rec_energies = np.array(list(chain(*[EPM.eval(grid[i], nbands)*rec_weights[i]
+                                             for i in range(len(grid))])))
+        energies, dos, nos = rec_dos_nos(rec_energies, nbands, bin_size)
+
+        # Generate and save the exact values of the quantities provided at the energies
+        # provided.
+        exact_dos_list = [EPM.density_of_states(en) for en in energy_list]
+        exact_nos_list = [EPM.number_of_states(en) for en in energy_list]
+
+        # Add all these quantities to the data dictionary and pickle it.
+        data = {}
+        data["energies"] = energy_list
+        data["binned energies"] = energies
+        data["density of states"] = dos
+        data["number of states"] = nos
+        data["analytic density of states"] = exact_dos_list
+        data["analytic number of states"] = exact_nos_list
+        with open(rec_prefix + "/run_" + file_number + ".p", "w") as file:
+            pickle.dump(data, file)
+
+    # Generate the energies, density of states, and number of states with
+    # the rectangular method if it is one of the methods provided.
+    if "tetrahedra" in methods_list:        
+        # Remove rectangles from methods_list.
+        del methods_list[methods_list == "tetrahedra"]
+
+        # The tetrahedral weights should always come second in the weights list.
+        if len(weights_list) > 1:
+            tet_weights = weights_list[1]
+        else:
+            tet_weights = weights_list[0]
+        
+        # Make sure that the method folder exists. If not, make one.
+        tet_prefix = file_prefix + "/tetrahedra"
+        if not os.path.isdir(tet_prefix):
+            os.mkdir(tet_prefix)
+
+        # Generate and save the exact values of the quantities provided at the energies
+        # provided, as well as the numerical values.
+        energies, dos, nos = tet_dos_nos(EPM, nbands, grid, energy_list, tetrahedra,
+                                         tet_weights)        
+        exact_dos_list = [EPM.density_of_states(en) for en in energy_list]
+        exact_nos_list = [EPM.number_of_states(en) for en in energy_list]
+                
+        data = {}
+        data["energies"] = energy_list
+        data["density of states"] = dos
+        data["number of states"] = nos
+        data["analytic density of states"] = exact_dos_list
+        data["analytic number of states"] = exact_nos_list
+        with open(tet_prefix + "/run_" + file_number + ".p", "w") as file:
+            pickle.dump(data, file)
+
+    if methods_list != []:
+        msg = "The allowed methods are 'rectangles' and 'tetrahedra'."
+        raise ValueError(msg.format(methods_list))
+                
+    
+def plot_states_data(EPM, file_location, file_number, file_name, quantity, method,
+                     title, xlimits, ylimits, labels):
+    """Plot the density of states or number of states of a pseudopotential with
+    data retrieved from file.
+
+    Args:
+        file_location (str): the file path to where the data is saved.
+        file_number (str): the number of the file. This should avoid overwriting
+            previous data.
+        quantity (str): the quantity whose data is plotted.
+        method (str): the method used to generate the data.
+        title (str): the title of the plot.
+        xlimits (tuple): the x-axis limits.
+        ylimits (tuple): the y-axis limits.
+        labels (tuple): the labels for the plots, first comes the analytic label, and then
+            numeric label.
+        save_location (str): the location where the plot is saved.
+        save_name (str): the file name of the plot.
+    """
+    
+    
+    if EPM.degree:
+        data_file = (file_location + "/data/" + EPM.name + "/degree_" + str(EPM.degree) +
+                         "/" "valency_" + str(EPM.nvalence_electrons) + "/" + method +
+                     "/run_" + str(file_number) + ".p")
+    else:
+        data_file = (file_location + "/data/" + EPM.name + "/degree_" + "valency_" +
+                         str(EPM.nvalence_electrons) + "/" + method + "/run_" +
+                     str(file_number) + ".p")
+        
+    file_prefix = file_location + "/plots"
+    # If the plots directory doesn't exist, make one.
+    if not os.path.isdir(file_prefix):
+        os.mkdir(file_prefix)
+
+    file_prefix += "/" + EPM.name    
+    # If the pseudopotential folder doesn't exist, make one.
+    if not os.path.isdir(file_prefix):
+        os.mkdir(file_prefix)
+
+    # If the variation of the potential folder doesn't exist, make one.
+    if EPM.degree:
+        file_prefix += "/degree_" + str(EPM.degree)
+        if not os.path.isdir(file_prefix):
+            os.mkdir(file_prefix)
+
+    # If the considered valency folder doesn't exist, make one.
+    file_prefix += "/" + "valency_" + str(EPM.nvalence_electrons)
+    if not os.path.isdir(file_prefix):
+        os.mkdir(file_prefix)
+
+    # Get the dictionary with the data.
+    print("data", data_file)
+    data = pickle.load(open(data_file, "r"))
+    
+    
+    if method == "rectangles":
+        plt.scatter(data["binned energies"], data[quantity], label=labels[0], c="blue")
+    else:
+        plt.scatter(data["energies"], data[quantity], label = labels[0], c="blue")
+
+    plt.plot(data["energies"], data["analytic " + quantity], label=labels[1], c="black")
+    
+    plt.xlabel("Energy (eV)")
+
+
+    ylabel_dict = {"density of states": "Density of States",
+                   "number of states": "Number of States"}
+    plt.ylabel(ylabel_dict[quantity])
+    plt.title(title)
+    plt.xlim(xlimits[0], xlimits[1])
+    plt.ylim(ylimits[0], ylimits[1])
+    plt.legend(loc="best")
+    plt.savefig(file_prefix + "/" + file_name + ".pdf")

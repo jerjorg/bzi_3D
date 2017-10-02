@@ -100,7 +100,7 @@ def make_grid(lat_vecs, grid_vecs, offset, cart=True):
                     grid.append(gpt + offset)
         return grid
                     
-def make_large_grid(cell_vectors, grid_vectors, offset, cart=True, eps = 1e-9):
+def make_large_grid(cell_vectors, grid_vectors, offset, cart=True):
     """This function is similar to make_grid except it samples a volume
     that is larger and saves the points that are thrown away in make_grid.
     It returns two grids: the first is the unique points within the first unit

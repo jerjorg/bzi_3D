@@ -402,18 +402,177 @@ class FreeElectronModel():
         self.nvalence_electrons = 1
         self.energy_shift = energy_shift or 0.
         self.fermi_level = fermi_level or 0.
-        occupied_volume = self.lattice.reciprocal_volume*self.nvalence_electrons/2
-        self.fermi_level_ans = (3*occupied_volume/(4*np.pi))**(self.degree/3.)
+        self.name = "free electron model"
+        # occupied_volume = self.lattice.reciprocal_volume*self.nvalence_electrons/2.
+        # self.fermi_level_ans = (3*occupied_volume/(4*np.pi))**(self.degree/3.)
+        
+        nfilled_states = self.nvalence_electrons/2.
+        
+        # self.fermi_level_ans = (3*nfilled_states/(4*np.pi))**(self.degree/3.)
+        # self.fermi_level_ans = (3*nfilled_states/(4*np.pi*c))**(self.degree/3.)
+        self.fermi_level_ans = (3*np.pi**2*self.nvalence_electrons)**(self.degree/3.)
+        self.total_energy_ans = ((4.*np.pi*(3.*np.pi**2*self.nvalence_electrons)**
+                                  ((self.degree + 3.)/3.))/(self.degree + 3.))
+        
         self.total_energy = total_energy or 0.
-        rf = self.fermi_level_ans**(1./degree)
-        self.total_energy_ans = 4*np.pi/(3. + self.degree)*rf**(3. + self.degree)
+        # rf = self.fermi_level_ans**(1./degree)
+        # self.total_energy_ans = 4*np.pi/(3. + self.degree)*rf**(3. + self.degree)
+
+        
+    def eval(self, kpoint, neigvals):
+        # There's only one eigenvalue so neigvals isn't needed in general but
+        # it is when running tests on functions that take an instance of the
+        # pseudopotential classes.
+
+        return [np.linalg.norm(kpoint)**self.degree]
+
+    def set_degree(self, degree):
+        self.degree = degree
+        self.fermi_level_ans = (3*np.pi**2*self.nvalence_electrons)**(self.degree/3.)
+        self.total_energy_ans = ((4.*np.pi*(3.*np.pi**2*self.nvalence_electrons)**
+                                  ((self.degree + 3.)/3.))/(self.degree + 3.))
+        
+    def number_of_states(self, energy):
+        """Evaluate the exact number of states for the free electron model.
+        """
+        return energy**(3./self.degree)/(3*np.pi**2)
+
+    def density_of_states(self, energy):
+        """Evaluate the exact density of states for the free electron model.
+        """
+        return energy**((3. - self.degree)/self.degree)/(self.degree*np.pi**2)
+        
+class SingleFreeElectronModel():
+    """This is the popular free electron model. In this model the potential is
+    zero everywhere. It is useful for testing.
+
+    Args:
+        lattice (:py:obj:`BZI.symmetry.lattice`): an instance of Lattice.
+        nvalence_electrons (int): the number of valence electrons.
+        degree (int): the degree of the radial dispersion relation.
+        energy_shift (float): an energy shift typically used to place the Fermi
+            level at the correct position.
+        fermi_level (float): the fermi level.
+        total_enery(float): the total energy
+
+    Attributes:
+        lattice (:py:obj:`BZI.symmetry.lattice`): an instance of Lattice.
+        nvalence_electrons (int): the number of valence electrons is 1.
+        degree (int): the degree of the radial dispersion relation.
+        energy_shift (float): an energy shift typically used to place the Fermi
+            level at the correct position.
+        fermi_level (float): the fermi level.
+        fermi_level_ans (float): the exact, analytical value for the Fermi 
+            level.
+        total_enery (float): the total energy
+        total_enery_ans (float): the exact, analytical value for the total
+            energy.
+        name (str): the name of the pseudopotential.
+    """
+    
+    def __init__(self, lattice, degree, energy_shift=None,
+                 fermi_level=None, total_energy=None):
+        self.lattice = lattice
+        self.degree = degree
+        # The free electron pseudopotential can only have one valence electron
+        # because the energy dispersion relation isn't periodic and with two
+        # valence electrons the Fermi surface would extend outside the unit 
+        # cell.
+        self.name = "free electron model"
+        self.nvalence_electrons = 1
+        self.energy_shift = energy_shift or 0.
+        self.fermi_level = fermi_level or 0.
+        nfilled_states = self.nvalence_electrons/2.
+        self.fermi_level_ans = (3*np.pi**2*self.nvalence_electrons)**(self.degree/3.)
+        self.total_energy_ans = ((4.*np.pi*(3.*np.pi**2*self.nvalence_electrons)**
+                                  ((self.degree + 3.)/3.))/(self.degree + 3.))        
+        self.total_energy = total_energy or 0.
 
     def eval(self, kpoint, neigvals):
         # There's only one eigenvalue so neigvals isn't needed in general but
         # it is when running tests on functions that take an instance of the
         # pseudopotential classes.
+        
         return [np.linalg.norm(kpoint)**self.degree]
+
+    def set_degree(self, degree):
+        self.degree = degree
+        self.fermi_level_ans = (3*np.pi**2*self.nvalence_electrons)**(self.degree/3.)
+        self.total_energy_ans = ((4.*np.pi*(3.*np.pi**2*self.nvalence_electrons)**
+                                  ((self.degree + 3.)/3.))/(self.degree + 3.))
+
+class MultipleFreeElectronModel():
+    """This is the popular free electron model. In this model the potential is
+    zero everywhere. It is useful for testing.
+
+    Args:
+        lattice (:py:obj:`BZI.symmetry.lattice`): an instance of Lattice.
+        nvalence_electrons (int): the number of valence electrons.
+        degree (int): the degree of the radial dispersion relation.
+        energy_shift (float): an energy shift typically used to place the Fermi
+            level at the correct position.
+        fermi_level (float): the fermi level.
+        total_enery(float): the total energy
+
+    Attributes:
+        lattice (:py:obj:`BZI.symmetry.lattice`): an instance of Lattice.
+        nvalence_electrons (int): the number of valence electrons is 1.
+        degree (int): the degree of the radial dispersion relation.
+        energy_shift (float): an energy shift typically used to place the Fermi
+            level at the correct position.
+        fermi_level (float): the fermi level.
+        fermi_level_ans (float): the exact, analytical value for the Fermi 
+            level.
+        total_enery (float): the total energy
+        total_enery_ans (float): the exact, analytical value for the total
+            energy.
+    """
     
+    def __init__(self, lattice, degree, nvalence_electrons, energy_shift=None,
+                 fermi_level=None, total_energy=None):
+        self.lattice = lattice
+        self.degree = degree
+        # The free electron pseudopotential can only have one valence electron
+        # because the energy dispersion relation isn't periodic and with two
+        # valence electrons the Fermi surface would extend outside the unit 
+        # cell.
+        self.nvalence_electrons = nvalence_electrons
+        self.energy_shift = energy_shift or 0.
+        self.fermi_level = fermi_level or 0.        
+        nfilled_states = self.nvalence_electrons/2.        
+        self.fermi_level_ans = (3*np.pi**2*self.nvalence_electrons)**(self.degree/3.)
+        self.total_energy_ans = ((4.*np.pi*(3.*np.pi**2*self.nvalence_electrons)**
+                                  ((self.degree + 3.)/3.))/(self.degree + 3.))
+        
+        self.total_energy = total_energy or 0.
+        
+    def eval(self, kpoint, neigvals):
+        # There's only one eigenvalue so neigvals isn't needed in general but
+        # it is when running tests on functions that take an instance of the
+        # pseudopotential classes.
+
+        kpoint = np.array(kpoint)
+        l0 = np.linalg.norm(self.lattice.reciprocal_vectors[:,0])
+        l1 = np.linalg.norm(self.lattice.reciprocal_vectors[:,1])
+        l2 = np.linalg.norm(self.lattice.reciprocal_vectors[:,2])
+        pts = np.array([[0,0,0], [-l0, 0, 0], [l0, 0, 0],
+                        [0, -l1, 0], [0, l1, 0],
+                        [0, 0, -l2], [0, 0, l2],
+                        [l0, l1, 0], [l0, -l1, 0],
+                        [-l0, l1, 0], [-l0, -l1, 0],
+                        [l0, 0, l2], [l0, 0, -l2],
+                        [-l0, 0, l2], [-l0, 0, -l2],
+                        [0, l1, l2], [0, l1, -l2],
+                        [0, -l1, l2], [0, -l1, -l2]])
+        
+        return [np.linalg.norm(kpoint - pt)**self.degree for pt in pts][:neigvals]
+        
+    def set_degree(self, degree):
+        self.degree = degree
+        self.fermi_level_ans = (3*np.pi**2*self.nvalence_electrons)**(self.degree/3.)
+        self.total_energy_ans = ((4.*np.pi*(3.*np.pi**2*self.nvalence_electrons)**
+                                  ((self.degree + 3.)/3.))/(self.degree + 3.))
+                
 #### W pseudopotentials ####
 def W1(spt):
     """W1 is another toy model that we often work with. It is also convenient
@@ -704,7 +863,7 @@ Toy_nvalence_electrons = 3
 Toy_PP = EmpiricalPP(Toy_lattice, Toy_pff, Toy_energy_cutoff, Toy_atomic_positions,
                      Toy_nvalence_electrons, material="Toy")
 
-# Free electron Pseudopotential ####
+#### Free electron Pseudopotential ####
 free_lat_centering = "prim"
 free_lat_const = 1.
 free_lat_consts = [free_lat_const]*3
@@ -717,6 +876,39 @@ free_atomic_positions = [[0.]*3]
 free_nvalence_electrons = 1
 free_degree = 2
 free_PP = FreeElectronModel(free_lattice, free_degree)
+
+# #### Single Free electron Pseudopotential #
+# single_free_lat_centering = "prim"
+# single_free_lat_const = 1.
+# single_free_lat_consts = [single_free_lat_const]*3
+# single_free_lat_angles = [np.pi/2]*3
+# single_free_lattice = Lattice(single_free_lat_centering,
+#                               single_free_lat_consts, single_free_lat_angles)
+
+# single_free_pff = [0.0]
+# single_free_energy_cutoff = 2*(2*np.pi/single_free_lat_const)**2
+# single_free_atomic_positions = [[0.]*3]
+# single_free_nvalence_electrons = 1
+# single_free_degree = 2
+# single_free_PP = SingleFreeElectronModel(single_free_lattice, single_free_degree)
+
+#### Multiple Free electron Pseudopotential ####
+multiple_free_lat_centering = "prim"
+multiple_free_lat_const = 1.
+multiple_free_lat_consts = [multiple_free_lat_const]*3
+multiple_free_lat_angles = [np.pi/2]*3
+multiple_free_lattice = Lattice(multiple_free_lat_centering,
+                                multiple_free_lat_consts, multiple_free_lat_angles)
+
+multiple_free_pff = [0.0]
+multiple_free_energy_cutoff = 2*(2*np.pi/multiple_free_lat_const)**2
+multiple_free_atomic_positions = [[0.]*3]
+multiple_free_nvalence_electrons = 2
+multiple_free_degree = 2
+multiple_free_PP = MultipleFreeElectronModel(multiple_free_lattice,
+                                             multiple_free_degree,
+                                             multiple_free_nvalence_electrons)
+
 
 # The following pseudopotentials come from: 
 # Marvin L. Cohen and Volker Heine. "The fitting of pseudopotentials to
@@ -733,7 +925,7 @@ Al_lattice = Lattice(Al_centering_type, Al_lat_consts, Al_lat_angles)
 Al_pff = [0.0, 0.0179, 0.0562]
 Al_energy_cutoff = (4+1)*(2*np.pi/Al_lat_const)**2
 Al_energy_cutoff = norm(2*Al_lattice.reciprocal_vectors[:,0])**2 + (
-                            (2*np.pi/Al_lat_const)**2)
+                            (2*np.pi/Al_lat_const)**2) + 20
 
 Al_atomic_positions = [[0.,0.,0.]]
 Al_nvalence_electrons = 3
@@ -901,7 +1093,7 @@ Mg_cutoff_vec = (Mg_lattice.reciprocal_vectors[:,0] +
 
 # Added a little to the cutoff.
 Mg_energy_cutoff = np.dot(Mg_cutoff_vec, Mg_cutoff_vec) + (
-                          (np.pi/(Mg_lat_const_c + Mg_lat_const_a))**2)
+                          (np.pi/(Mg_lat_const_c + Mg_lat_const_a))**2) + 20
 Mg_atomic_positions = [[0.]*3]
 Mg_nvalence_electrons = 2
 Mg_PP = EmpiricalPP(Mg_lattice, Mg_pff, Mg_energy_cutoff, Mg_atomic_positions,

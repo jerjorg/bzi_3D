@@ -1,6 +1,36 @@
 # Revision History
 
-## Revision 0.113
+## Revision 0.2.1
+- Fixed density of states and number of states weights by adding 
+  multiplying their weights by two. I believe that Blochl didn't
+  account for spin degeneracy in these weights.
+- Fixed `integration_weights` by removing division by primitive
+  cell volume.
+- Added a `conftest.py` module that should help with filtering
+  unit test runs.
+- Added a new method to `FreeElectronModel` that changes the degree
+  of the free electron dispersion relation, the exact Fermi level
+  and band energy.
+- Added a new pseudopotential class called
+  `MultipleFreeElectronModel` that is the same as the free electron 
+  model except it has more than one band.
+- Added `free_dos` and `free_nos` to pseudopots. They calculate
+  the exact density of states and number of states for the free
+  electron model.
+- Added `plot_states` to plots. This plots the density of states
+  and number of states of the free electron pseudopotential. The
+  hope is to extend it to others in the future.
+- Created `generate_states_data` and `plot_states_data` which 
+  generate and plot the density of states and number of states.
+
+## Revision 0.2.0
+- Fixed a bug in `calc_total_states` in tetrahedra.py. The volume
+  of the tetrahedra was incorrectly calculated when the weights
+  were anything but all ones.
+- Added many more unit tests to `find_irreducible_tetrahedra`. It 
+  is now working.
+
+## Revision 0.1.13
 - Fixed 'brillouin_zone_mapper' in symmetry.py. The reduced_grid
   contained points outside of the Minkowski unit cell, so, in cases
   where the original pt1 was the shortest point, the translationally

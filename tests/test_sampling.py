@@ -14,50 +14,65 @@ from BZI.sampling import (make_grid, make_large_grid, sphere_pts,
 
 
 from BZI.symmetry import make_ptvecs, make_rptvecs
+from conftest import run
 
+tests = run("all sampling")
+
+@pytest.mark.skipif("test_make_grid" not in tests, reason="different tests")
 def test_make_grid():
-    """Verify the grid satisfies various properties, such as verifying
-    the neighbors of each point are withing the grid as long as the 
-    neighbors lie within the unit cell. Also verify none of the points
-    lie outside the unit cell.
-    """
-
-    # At the moment it only tests the cubic lattices.
-    grid_center_list = ["prim", "face", "body"]
-    grid_constants = [1, 1.1, 12./11, .7]
-    grid_consts_list = [[m]*3 for m in grid_constants]
+    grid_centering = "prim"
+    grid_consts = [1,1,1]
     grid_angles = [np.pi/2]*3
-    cell_center_list = ["prim", "face", "body"]
-    cell_constants = [2*np.sqrt(2)]
-    cell_consts_list = [[c]*3 for c in cell_constants]
-    cell_angles = [np.pi/2]*3
-    offsets = [[0., 0., 0.], [1./2, 1./2, 1./2]]
-    
-    # for grid_constant in grid_constants:
-    for grid_consts in grid_consts_list:
-        for grid_center in grid_center_list:
-            grid_vectors = make_ptvecs(grid_center, grid_consts, grid_angles)
-            grid_lengths = [np.linalg.norm(lv) for lv in grid_vectors]
-            for cell_consts in cell_consts_list:
-                for cell_center in cell_center_list:
-                    cell_vectors = make_ptvecs(cell_center,
-                                               cell_consts, cell_angles)
-                    cell_lengths = [np.linalg.norm(cv) for cv in
-                                        cell_vectors]
-                    for offset in offsets:
-                        grid = make_grid(cell_vectors, grid_vectors, offset)
-                        large_grid = make_large_grid(cell_vectors,
-                                                  grid_vectors, offset)
-                        
-                        # Verify all the points in the cell for the large grid
-                        # are contained in grid.
-                        for lg in large_grid[0]:
-                            included = False
-                            for g in grid:
-                                if np.allclose(lg,g) == True:
-                                    included = True
-                            assert included == True
+    grid_vecs = make_ptvecs(grid_centering, grid_consts, grid_angles)
 
+    lat_centering = "prim"
+    lat_consts = [2]*3
+    lat_angles = [np.pi/2]*3
+    lat_vecs = make_ptvecs(lat_centering, lat_consts, lat_angles)
+
+    offset = [0]*3
+    grid0 = [[0,0,0], [0,0,1], [0,1,0], [0,1,1],
+             [1,0,0], [1,0,1], [1,1,0], [1,1,1]]
+    grid1 = make_grid(lat_vecs, grid_vecs, offset)
+
+    assert len(grid0) == len(grid1)
+    
+    for g0 in grid0:
+        contained = False
+        for g1 in grid1:
+            if np.allclose(g0,g1):
+                contained = True
+        assert contained == True
+
+
+    grid_centering = "body"
+    grid_consts = [1.]*3
+    grid_angles = [np.pi/2]*3
+    grid_vecs = make_ptvecs(grid_centering, grid_consts, grid_angles)
+
+    lat_centering = "body"
+    lat_consts = [2.]*3
+    lat_angles = [np.pi/2]*3
+    lat_vecs = make_ptvecs(lat_centering, lat_consts, lat_angles)
+
+    offset = [0]*3
+
+    a = 0.5
+    grid0 = [[0,0,0], [-a,a,a], [a,-a,a], [0,0,2*a], [a,a,-a],
+             [0,2*a,0], [2*a,0,0],[a,a,a]]
+    grid1 = make_grid(lat_vecs, grid_vecs, offset)
+
+    assert len(grid0) == len(grid1)
+
+    for g0 in grid0:
+        contained = False
+        for g1 in grid1:
+            if np.allclose(g0,g1):
+                contained = True
+        assert contained == True
+        
+        
+@pytest.mark.skipif("test_make_cell_points" not in tests, reason="different tests")
 def test_make_cell_points():
     """Verify the grid satisfies various properties, such as verifying
     the neighbors of each point are withing the grid as long as the 
@@ -107,6 +122,7 @@ def test_make_cell_points():
                             assert included == True
 
                             
+@pytest.mark.skipif("test_get_minmax_indices" not in tests, reason="different tests")
 def test_get_minmax_indices():
     """Various tests taxen from symlib."""
     ntests =50
@@ -135,6 +151,7 @@ def test_get_minmax_indices():
 
         assert np.allclose(get_minmax_indices(np.array(vec)), np.asarray([min-1, max-1])) == True
 
+@pytest.mark.skipif("test_swap_columns" not in tests, reason="different tests")
 def test_swap_columns():
     """Various tests taxen from symlib."""    
     import csv
@@ -184,6 +201,7 @@ def test_swap_columns():
                 
         assert np.allclose(swap_column(Min,Bin,kin-1), (Mout, Bout)) == True
 
+@pytest.mark.skipif("test_swap_rows" not in tests, reason="different tests")
 def test_swap_rows():
     """Various tests taxen from symlib."""    
     import csv
@@ -240,6 +258,7 @@ def test_swap_rows():
         assert np.allclose((Min, Bin), (Mout, Bout)) == True
 
         
+@pytest.mark.skipif("test_HermiteNormalForm" not in tests, reason="different tests")
 def test_HermiteNormalForm():
     """Various tests taxen from symlib."""
     import csv
@@ -276,6 +295,7 @@ def test_HermiteNormalForm():
 
         assert np.allclose(HermiteNormalForm(Sin), (Hout, Bout)) == True
 
+@pytest.mark.skipif("test_UpperHermiteNormalForm" not in tests, reason="different tests")
 def test_UpperHermiteNormalForm():
     """Various tests taxen from symlib."""
     import csv
@@ -299,7 +319,8 @@ def test_UpperHermiteNormalForm():
         assert (H[1,2] < H[2,2]) == True
 
 
-def test_make_grid():
+@pytest.mark.skipif("test_make_grid2" not in tests, reason="different tests")
+def test_make_grid2():
     # This unit test doesn't pass because the primitive translation vectors
     # changed when I updated the code (I think).
 

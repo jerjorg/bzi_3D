@@ -65,16 +65,51 @@ def rectangular_fermi_level(PP, grid, weights, eps=1e-9):
     neigvals = np.ceil(np.round(PP.nvalence_electrons/2+1, 3)).astype(int)
     energies = np.array([])
     for i,g in enumerate(grid):
-        energies = np.concatenate((energies, list(PP.eval(g, neigvals))*int(np.round(weights[i]))))
+        energies = np.concatenate((energies, list(PP.eval(g, neigvals))*
+                                   int(np.round(weights[i]))))
     return np.sort(energies)[C-1] # + eps# C -1 since python is zero based
 
-def monte_carlo(PP, npts):
+def monte_carlo(PP, npts, nbands):
     """Integrate a function using Monte Carlo sampling. Only works for integrations
-    from 0 to 1 in all 3 directions.
+    from 0 to 1 in all 3 directions..
     """
     
     integral = 0.
     for _ in range(npts):
         kpt = [np.random.random() - .5 for _ in range(3)]
-        integral += sum(filter(lambda x: x <= Fermi_level, PP(kpt)))
+        integral += sum(filter(lambda x: x <= Fermi_level, PP.eval(kpt, nbands)))
     return np.linalg.det(cell_vecs)/(npts)*integral
+
+
+
+def rec_dos_nos(energies, nbands, dE):
+    """Calculate the density of states and number of states using the
+    rectangluar method.
+
+    Args:
+        energies (list): a list of energies.
+        nbands (int): the number of bands included in the calculation.
+        dE (float): the size of the energy bins
+    
+    Returns:
+        binned_energies (list): a list of the energy bins.
+        dos (list): a list of density of states at the energies in binned_energies.
+        nos (list): a list of number of states at the energies in binned_energies.
+    """
+    Ei = 0
+    Ef = 0
+    dos = [] # density of states
+    nos = [] # number of states
+    binned_energies = [] # energies
+    
+    weight = len(energies)/nbands
+    
+    while max(energies) > Ef:
+        Ef += dE
+        binned_energies.append(Ei + (Ef-Ei)/2.)
+        dos.append( len(energies[(Ei <= energies) &
+                                     (energies < Ef)])/(weight*dE)*2)
+        nos.append(np.sum(dos)*dE)
+        Ei += dE
+        
+    return binned_energies, dos, nos
