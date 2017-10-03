@@ -1,4 +1,4 @@
-"""Unit tests for integration module."""
+"""Unit tests for tetrahedron module."""
 
 import numpy as np
 import pytest

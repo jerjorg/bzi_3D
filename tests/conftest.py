@@ -70,6 +70,10 @@ def run(tests):
                  "test_reduce_base_centered_monoclinic",
                  "test_reduce_tetragonal",
                  "test_reduce_body_centered_tetragonal"]
+
+    # Read and write tests
+    elif tests == "all read_and_write":
+        tests = ["test_QE_data"]
     else:
         tests = []
     
