@@ -9,54 +9,54 @@ tests = run("all read_and_write")
 
 @pytest.mark.skipif("test_QE_data" not in tests, reason="different tests")
 def test_QE_data():
-    QE_data = read_QE("Al.out")
+    QE_data_Al = read_QE(".", "Al")
 
-    assert QE_data["bravais-lattice index"] == 2.0
-    assert QE_data["lattice parameter"] == "4.0460 a.u."
-    assert QE_data["unit-cell volume"] == "16.5584 (a.u.)^3"
-    assert QE_data["number of atoms/cell"] == 4.0
-    assert QE_data["number of atomic types"] == 1.0
-    assert QE_data["number of electrons"] == 12.0
-    assert QE_data["number of Kohn-Sham states"] == 10.0
-    assert QE_data["kinetic-energy cutoff"] == "40.0000 Ry"
-    assert QE_data["charge density cutoff"] == "160.0000 Ry"
-    assert QE_data["convergence threshold"] == 1.0E-08
-    assert QE_data["mixing beta"] == 0.7
-    assert QE_data["number of iterations used"] == ["8 plain", "0 mixing"]
-    assert QE_data["Exchange-correlation"] == "SLA-PW-PBX-PBC ( 1  4  3  4 0 0)"
-    assert QE_data["crystallographic constants"] == [4.046, 0.0, 0.0, 0.0, 0.0, 0.0]
-    assert (QE_data["crystal axes"] == np.transpose([[-0.500000, 0.000000, 0.500000],
+    assert QE_data_Al["bravais-lattice index"] == 2.0
+    assert QE_data_Al["lattice parameter"] == "4.0460 a.u."
+    assert QE_data_Al["unit-cell volume"] == "16.5584 (a.u.)^3"
+    assert QE_data_Al["number of atoms/cell"] == 4.0
+    assert QE_data_Al["number of atomic types"] == 1.0
+    assert QE_data_Al["number of electrons"] == 12.0
+    assert QE_data_Al["number of Kohn-Sham states"] == 10.0
+    assert QE_data_Al["kinetic-energy cutoff"] == "40.0000 Ry"
+    assert QE_data_Al["charge density cutoff"] == "160.0000 Ry"
+    assert QE_data_Al["convergence threshold"] == 1.0E-08
+    assert QE_data_Al["mixing beta"] == 0.7
+    assert QE_data_Al["number of iterations used"] == ["8 plain", "0 mixing"]
+    assert QE_data_Al["Exchange-correlation"] == "SLA-PW-PBX-PBC ( 1  4  3  4 0 0)"
+    assert QE_data_Al["crystallographic constants"] == [4.046, 0.0, 0.0, 0.0, 0.0, 0.0]
+    assert (QE_data_Al["crystal axes"] == np.transpose([[-0.500000, 0.000000, 0.500000],
                                                     [0.000000, 0.500000, 0.500000],
                                                     [-0.500000, 0.500000, 0.000000]])).all()
-    assert (QE_data["reciprocal axes"] == np.transpose([[-1.000000, -1.000000, 1.000000],
+    assert (QE_data_Al["reciprocal axes"] == np.transpose([[-1.000000, -1.000000, 1.000000],
                                                        [1.000000, 1.000000, 1.000000],
                                                        [-1.000000, 1.000000, -1.000000]])).all()
-    assert QE_data["Sym. Ops."] == 6.0
-    assert QE_data["number of k-points"] == 4.0
-    assert QE_data["k-points"] == [[0.0, 0.0, 0.0],
+    assert QE_data_Al["Sym. Ops."] == 6.0
+    assert QE_data_Al["number of k-points"] == 4.0
+    assert QE_data_Al["k-points"] == [[0.0, 0.0, 0.0],
                                    [0.5, -0.5, 0.5],
                                    [0.0, -1.0, 0.0],
                                    [0.5, 0.5, 0.5]]
-    assert QE_data["k-point weights"] == [0.25, 0.75, 0.75, 0.25]
-    assert QE_data["Dense grid"] == "537 G-vectors"
-    assert QE_data["FFT dimensions"] == (12.0, 12.0, 12.0)
-    assert QE_data["self-consistent calculation time"] == ["0.2 secs"]*4 + ["0.3 secs"]*7
-    assert QE_data["k-point plane waves"] == [65.0, 70.0, 64.0, 70.0]
-    assert QE_data["k-point energies"] == [[8.4972, 13.4207, 13.6719, 13.6719, 37.6953, 37.6953, 37.7436, 43.5118, 43.5118, 84.4353],
+    assert QE_data_Al["k-point weights"] == [0.25, 0.75, 0.75, 0.25]
+    assert QE_data_Al["Dense grid"] == "537 G-vectors"
+    assert QE_data_Al["FFT dimensions"] == (12.0, 12.0, 12.0)
+    assert QE_data_Al["self-consistent calculation time"] == ["0.2 secs"]*4 + ["0.3 secs"]*7
+    assert QE_data_Al["k-point plane waves"] == [65.0, 70.0, 64.0, 70.0]
+    assert QE_data_Al["k-point energies"] == [[8.4972, 13.4207, 13.6719, 13.6719, 37.6953, 37.6953, 37.7436, 43.5118, 43.5118, 84.4353],
                                            [-6.3826, 4.6733, 7.5091, 7.7205, 35.8214, 35.9668, 39.5326, 48.0515, 48.1570, 80.9232],
                                            [3.2720, 12.9556, 13.1129, 15.8590, 27.2614, 31.5269, 56.3308, 56.7839, 56.7942, 117.8606],
                                            [-6.6101, 4.7046, 7.7376, 7.7376, 35.9858, 35.9858, 39.5725, 47.9988, 47.9988, 81.0608]]
-    assert QE_data["Fermi energy"] == "37.6961 ev"
-    assert QE_data["total energy"] == "172.57397669 Ry"
-    assert QE_data["one-electron contribution"] == "-13.72740223 Ry"
-    assert QE_data["hartree contribution"] == "29.48566464 Ry"
-    assert QE_data["xc contribution"] == "-23.69388655 Ry"
-    assert QE_data["ewald contribution"] == "180.50960083 Ry"
-    assert QE_data["number of self-consistent iterations"] == 10.0
+    assert QE_data_Al["Fermi energy"] == "37.6961 ev"
+    assert QE_data_Al["total energy"] == "172.57397669 Ry"
+    assert QE_data_Al["one-electron contribution"] == "-13.72740223 Ry"
+    assert QE_data_Al["hartree contribution"] == "29.48566464 Ry"
+    assert QE_data_Al["xc contribution"] == "-23.69388655 Ry"
+    assert QE_data_Al["ewald contribution"] == "180.50960083 Ry"
+    assert QE_data_Al["number of self-consistent iterations"] == 10.0
+    assert QE_data_Al["total k-points"] == 8.0
 
 
-
-    QE_data_Si = read_QE("Si.out")
+    QE_data_Si = read_QE(".", "Si")
 
     assert QE_data_Si["bravais-lattice index"] == 2.0
     assert QE_data_Si["lattice parameter"] == "10.2600 a.u."
@@ -231,3 +231,4 @@ def test_QE_data():
     assert QE_data_Si["xc contribution"] == "-12.25651922 Ry"
     assert QE_data_Si["ewald contribution"] == "-16.80092959 Ry"
     assert QE_data_Si["number of self-consistent iterations"] == 6.0
+    assert QE_data_Si["total k-points"] == 216.0

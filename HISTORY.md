@@ -1,5 +1,13 @@
 # Revision History
 
+## Revision 0.2.2
+- Created a module named `read_and_write.py`, which will be used
+  to read data from DFT output files. It will also take data
+  generated from empirical pseudopotential calculations and 
+  write it to file.
+- Added a function `plot_QE_data` that will create convergence 
+  plots of the various energies from Quantum espresso data.
+
 ## Revision 0.2.1
 - Fixed density of states and number of states weights by adding 
   multiplying their weights by two. I believe that Blochl didn't
