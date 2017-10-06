@@ -1,10 +1,169 @@
 import os
+import subprocess
 import numpy as np
 import pandas as pd
 import pickle
+import matplotlib.pyplot as plt
+
+
+#######
+####### =========================================================================
+####### You must already have the element directories with populated initial_data
+####### =========================================================================
+#######
+
+def run_QE(element, parameters):
+    """A function that will take the values contained in parameters, create the
+    file structure, and submit a series of Quantum Espresso jobs. The directory
+    from which this command is run must contain run.py and run.sh files. It
+    must contain a directory named 'element', and this directory must contain
+    a directory named 'initial data' in which is located the template Quantum
+    Espresso input file.
+    
+    Args:
+        parameters (dict): a dictionary of adjustable parameters. The following
+            key strings must be present: 'grid type list', 'offset list',
+            'occupation list', 'smearing list', 'smearing value list',
+            and 'k-points list'. Their corresponding values must be lists.
+    """
+    
+    home_dir = os.getcwd()
+    
+    # Make and move into the element directory.
+    element_dir = home_dir + "/" + element
+    os.chdir(element_dir)
+    
+    # Locate the inital data.
+    idata_loc = element_dir + "/" + "initial_data"
+    
+    # Make and move into the grid type directory.
+    for grid_type in parameters["grid type list"]:
+        grid_dir = element_dir + "/" + grid_type
+        if not os.path.isdir(grid_dir):
+            os.mkdir(grid_dir)
+        os.chdir(grid_dir)
+        
+        # Make and move into the offset directory
+        for offset in parameters["offset list"]:
+            offset_name = str(offset).strip("[").strip("]")
+            offset_name = offset_name.replace(",", "")
+            
+            offset_dir = grid_dir + "/" + offset_name
+            if not os.path.isdir(offset_dir):
+                os.mkdir(offset_dir)
+            os.chdir(offset_dir)
+            
+            # Make and move into the occupation directory.
+            for occupation in parameters["occupation list"]:
+                occupation_dir = offset_dir + "/" + occupation
+                if not os.path.isdir(occupation_dir):
+                    os.mkdir(occupation_dir)
+                os.chdir(occupation_dir)
+                
+                # Make and move into the smearing type directory.
+                for smearing in parameters["smearing list"]:
+                    smearing_dir = occupation_dir + "/" + smearing
+                    if not os.path.isdir(smearing_dir):
+                        os.mkdir(smearing_dir)
+                    os.chdir(smearing_dir)
+                    
+                    # Make and move into the smearing value directory.
+                    for smearing_value in parameters["smearing value list"]:
+                        smearing_value_dir = smearing_dir + "/" + str(smearing_value)
+                        if not os.path.isdir(smearing_value_dir):
+                            os.mkdir(smearing_value_dir)
+                        os.chdir(smearing_value_dir)
+                            
+                        # Make and move into the number of k-points directory.
+                        for kpoints in parameters["k-point list"]:
+                            nkpoints = np.prod(kpoints)
+                            kpoints_dir = smearing_value_dir + "/" + str(nkpoints)
+                            if not os.path.isdir(kpoints_dir):
+                                os.mkdir(kpoints_dir)
+                            os.chdir(kpoints_dir)
+
+                            # Copy initial_data, run.sh and run.py to current directory.
+                            subprocess.call("cp " + idata_loc + "/* ./", shell=True)
+                            subprocess.call("cp " + home + "/run.sh ./", shell=True)
+                            subprocess.call("cp " + home + "/run.py ./", shell=True)
+                            subprocess.call('chmod +x run.py', shell=True)                            
+                                                        
+                            # Correctly label this job.
+                            # Read in the file.
+                            with open('run.sh', 'r') as file :
+                                filedata = file.read()
+
+                            # Replace the target string.
+                            filedata = filedata.replace('ELEMENT', str(element))
+                            filedata = filedata.replace('GRIDTYPE', grid_type)
+                            filedata = filedata.replace('OFFSET', str(offset))
+                            filedata = filedata.replace('OCCUPATION', occupation)
+                            filedata = filedata.replace('SMEAR', smearing)
+                            filedata = filedata.replace('SMRVALUE', str(smearing_value))
+                            filedata = filedata.replace('KPOINT', str(nkpoints))
+                            
+                            # Write the file out again.
+                            with open('run.sh', 'w') as file:
+                                file.write(filedata)
+                            
+                            # Replace values in the input file.
+                            # Read in the file.
+                            with open(element + '.in', 'r') as file:
+                                filedata = file.read()
+
+                            # Replace the target string.
+                            filedata = filedata.replace("occupation type", occupation)
+                            filedata = filedata.replace("smearing method", smearing)
+                            filedata = filedata.replace("smearing value", str(smearing_value))
+                            
+                            for i,kp in enumerate(kpoints):
+                                kp_name = "kpoint" + str(i + 1)
+                                filedata = filedata.replace(kp_name, str(kp))
+                                
+                            for j,off in enumerate(offset):
+                                off_name = "offset" + str(j + 1)
+                                filedata = filedata.replace(off_name, str(off))
+                            
+                            # Write the file out again.
+                            with open(element + '.in', 'w') as file:
+                                file.write(filedata)
+                                
+                            # Adjust time to run and memory
+                            with open("run.sh", "r") as file:
+                                filedata = file.read()
+                            
+                            if nkpoints <= 8000:    
+                                filedata = filedata.replace("12:00:00", "4:00:00")
+                                filedata = filedata.replace("4096", "8192")
+                                
+                            elif nkpoints > 8000 and nkpoints < 27000:                                    
+                                filedata = filedata.replace("12:00:00", "6:00:00")
+                                filedata = filedata.replace("4096", "16384")                                
+                                
+                            elif nkpoints >= 27000 and nkpoints < 64000:
+                                filedata = filedata.replace("12:00:00", "12:00:00")
+                                filedata = filedata.replace("4096", "32768")
+                                
+                            elif nkpoints >= 64000:
+                                filedata = filedata.replace("12:00:00", "24:00:00")
+                                filedata = filedata.replace("4096", "65536")
+                                
+                            os.chdir(smearing_value_dir)
+                        os.chdir(smearing_dir)
+                    os.chdir(occupation_dir)
+                os.chdir(offset_dir)
+            os.chdir(grid_dir)
+        os.chdir(element_dir)
+    os.chdir(home_dir)
+
 
 def read_QE(location, file_prefix):
-    """
+    """Create a dictionary of most of the data created during a
+    single Quantum Espresso calculation.
+
+    Args:
+        location (str): the location of the Quantum Espresso calculation.
+        file_prefix (str): the prefix of the input and output files.
     """
     
     QE_data = {}
@@ -292,7 +451,7 @@ def plot_QE_data(home, grid_type_list, occupation_list, energy_list):
     grid_integral_panel = pd.Panel(grid_integral_dict)
 
     # Save the pandas panel.
-    panel_file = open(home + "/panel.p", "w")
+    panel_file = open(home + "/panel.p", "wb")
     pickle.dump(grid_integral_panel, panel_file)
     panel_file.close()
 

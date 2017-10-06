@@ -1,5 +1,11 @@
 # Revision History
 
+## Revision 0.2.3
+- Updated setup.py version, install_requires and classifiers.
+- Minor fixes to unit tests.
+- Added `run_QE`, which will create file structure and submit
+  Quantum Espresso jobs according to template input file
+
 ## Revision 0.2.2
 - Created a module named `read_and_write.py`, which will be used
   to read data from DFT output files. It will also take data

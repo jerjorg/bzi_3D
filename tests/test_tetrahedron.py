@@ -85,7 +85,7 @@ def test_number_of_states():
     assert number_of_states(VG, VT, energies, 1) == 0
     assert number_of_states(VG, VT, energies, 3) == (VT/VG)/48*2
     assert number_of_states(VG, VT, energies, 5) == (VT/VG)/2.*2
-    assert number_of_states(VG, VT, energies, 7) == 47*(VT/VG)/48*2
+    assert np.isclose(number_of_states(VG, VT, energies, 7), (47.*VT)/(VG*48.)*2.)
     assert number_of_states(VG, VT, energies, 9) == (VT/VG)*2
 
     VT = np.log(3)
@@ -559,9 +559,6 @@ def test_integrals():
         # of Kittel.
         occupied_volume = free.lattice.reciprocal_volume*free.nvalence_electrons/2
 
-        print("sphere volume: ", sphere_volume)
-        print("occupied volume: ", occupied_volume)
-        
         assert np.isclose(sphere_volume, occupied_volume, 1e-1, 1e-1)
         assert np.isclose(free.fermi_level, free.fermi_level_ans, 1e-2,1e-2)
 

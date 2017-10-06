@@ -20,7 +20,7 @@ except ImportError:
 
 from os import path
 setup(name='BZI',
-      version='0.0.4',
+      version='0.2.3',
       description='Brillouin zone integration.',
       long_description= "" if not path.isfile("README.md") else read_md('README.md'),
       author='Jeremy J Jorgensen',
@@ -35,7 +35,8 @@ setup(name='BZI',
           "numpy",
           "matplotlib",
           "phenum",
-          "pytest"
+          "pytest",
+          "pandas"
       ],
       packages=['BZI'],
 #       scripts=['/solve.py'],
@@ -47,9 +48,7 @@ setup(name='BZI',
           'Natural Language :: English',
           'Operating System :: MacOS',
           'Programming Language :: Python',
-          'Programming Language :: Python :: 2',
-          'Programming Language :: Python :: 2.7',
           'Programming Language :: Python :: 3',
-          'Programming Language :: Python :: 3.5',
+          'Programming Language :: Python :: 3.6',
       ],
      )

@@ -78,11 +78,14 @@ def number_of_states(VG, VT, energies, e):
     Returns:
         (float): the number of states from a given tetrahedron.
     """
-    
-    e1 = energies[0]
-    e2 = energies[1]
-    e3 = energies[2]
-    e4 = energies[3]
+
+    VG = float(VG)
+    VT = float(VT)
+    e = float(e)
+    e1 = float(energies[0])
+    e2 = float(energies[1])
+    e3 = float(energies[2])
+    e4 = float(energies[3])
     
     if e < e1:
         return 0.
@@ -106,7 +109,7 @@ def number_of_states(VG, VT, energies, e):
         e41 = e4 - e1
         e42 = e4 - e2
         e43 = e4 - e3
-        return 2.*(VT/VG)*(1 - (e4 - e)**3/(e41*e42*e43))
+        return 2.*(VT/VG)*(1 - (e4 - e)**(3.)/(e41*e42*e43))
     
     else:
         return 2.*(VT/VG)

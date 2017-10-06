@@ -32,7 +32,7 @@ def test_QE_data():
                                                        [1.000000, 1.000000, 1.000000],
                                                        [-1.000000, 1.000000, -1.000000]])).all()
     assert QE_data_Al["Sym. Ops."] == 6.0
-    assert QE_data_Al["number of k-points"] == 4.0
+    assert QE_data_Al["number of reduced k-points"] == 4.0
     assert QE_data_Al["k-points"] == [[0.0, 0.0, 0.0],
                                    [0.5, -0.5, 0.5],
                                    [0.0, -1.0, 0.0],
@@ -53,7 +53,7 @@ def test_QE_data():
     assert QE_data_Al["xc contribution"] == "-23.69388655 Ry"
     assert QE_data_Al["ewald contribution"] == "180.50960083 Ry"
     assert QE_data_Al["number of self-consistent iterations"] == 10.0
-    assert QE_data_Al["total k-points"] == 8.0
+    assert QE_data_Al["number of unreduced k-points"] == 8.0
 
 
     QE_data_Si = read_QE(".", "Si")
@@ -79,7 +79,7 @@ def test_QE_data():
                                                         [1.000000,  1.000000,  1.000000],
                                                         [-1.000000,  1.000000, -1.000000]])).all()
     assert QE_data_Si["Sym. Ops."] == 48.0
-    assert QE_data_Si["number of k-points"] == 28.0
+    assert QE_data_Si["number of reduced k-points"] == 28.0
     assert QE_data_Si["k-points"] == [[-0.0833333,   0.0833333,   0.0833333],
                                    [-0.2500000,   0.2500000,  -0.0833333],
                                    [-0.4166667,   0.4166667,  -0.2500000],
@@ -231,4 +231,4 @@ def test_QE_data():
     assert QE_data_Si["xc contribution"] == "-12.25651922 Ry"
     assert QE_data_Si["ewald contribution"] == "-16.80092959 Ry"
     assert QE_data_Si["number of self-consistent iterations"] == 6.0
-    assert QE_data_Si["total k-points"] == 216.0
+    assert QE_data_Si["number of unreduced k-points"] == 216.0
