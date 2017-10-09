@@ -1,5 +1,8 @@
 # Revision History
 
+Revision 0.2.4
+- Added `remove_QE_save` that removes the save file from QE runs.
+
 ## Revision 0.2.3
 - Updated setup.py version, install_requires and classifiers.
 - Minor fixes to unit tests.

@@ -84,8 +84,8 @@ def run_QE(element, parameters):
 
                             # Copy initial_data, run.sh and run.py to current directory.
                             subprocess.call("cp " + idata_loc + "/* ./", shell=True)
-                            subprocess.call("cp " + home + "/run.sh ./", shell=True)
-                            subprocess.call("cp " + home + "/run.py ./", shell=True)
+                            subprocess.call("cp " + home_dir + "/run.sh ./", shell=True)
+                            subprocess.call("cp " + home_dir + "/run.py ./", shell=True)
                             subprocess.call('chmod +x run.py', shell=True)                            
                                                         
                             # Correctly label this job.
@@ -148,6 +148,8 @@ def run_QE(element, parameters):
                                 filedata = filedata.replace("12:00:00", "24:00:00")
                                 filedata = filedata.replace("4096", "65536")
                                 
+                            subprocess.call('sbatch run.sh', shell=True)
+                            
                             os.chdir(smearing_value_dir)
                         os.chdir(smearing_dir)
                     os.chdir(occupation_dir)
@@ -379,6 +381,68 @@ def read_QE(location, file_prefix):
     return QE_data
 
 
+def remove_QE_save(element, parameters):
+    """A function that will remove the save folder created during a Quantum Espresso
+    run.
+    
+    Args:
+        parameters (dict): a dictionary of adjustable parameters. The following
+            key strings must be present: 'grid type list', 'offset list',
+            'occupation list', 'smearing list', 'smearing value list',
+            and 'k-points list'. Their corresponding values must be lists.
+    """
+
+    save_file_name = element + ".save"
+    
+    home_dir = os.getcwd()
+    
+    # Make and move into the element directory.
+    element_dir = home_dir + "/" + element
+    os.chdir(element_dir)
+        
+    # Move into the grid type directory.
+    for grid_type in parameters["grid type list"]:
+        grid_dir = element_dir + "/" + grid_type
+        os.chdir(grid_dir)
+        
+        # Make and move into the offset directory
+        for offset in parameters["offset list"]:
+            offset_name = str(offset).strip("[").strip("]")
+            offset_name = offset_name.replace(",", "")
+            offset_dir = grid_dir + "/" + offset_name
+            os.chdir(offset_dir)
+            
+            # Make and move into the occupation directory.
+            for occupation in parameters["occupation list"]:
+                occupation_dir = offset_dir + "/" + occupation
+                os.chdir(occupation_dir)
+                
+                # Make and move into the smearing type directory.
+                for smearing in parameters["smearing list"]:
+                    smearing_dir = occupation_dir + "/" + smearing
+                    os.chdir(smearing_dir)
+                    
+                    # Make and move into the smearing value directory.
+                    for smearing_value in parameters["smearing value list"]:
+                        smearing_value_dir = smearing_dir + "/" + str(smearing_value)
+                        os.chdir(smearing_value_dir)
+                            
+                        # Make and move into the number of k-points directory.
+                        for kpoints in parameters["k-point list"]:
+                            nkpoints = np.prod(kpoints)
+                            kpoints_dir = smearing_value_dir + "/" + str(nkpoints)
+                            os.chdir(kpoints_dir)
+                            
+                            subprocess.call('rm -r ' + save_file_name, shell=True)
+                            os.chdir(smearing_value_dir)
+                        os.chdir(smearing_dir)
+                    os.chdir(occupation_dir)
+                os.chdir(offset_dir)
+            os.chdir(grid_dir)
+        os.chdir(element_dir)
+    os.chdir(home_dir)
+
+
 def plot_QE_data(home, grid_type_list, occupation_list, energy_list):
     """Create convergence plots of Quantum Espresso data. The file 
     structure must be grid_types/occupation_types/kpoint_runs/.
@@ -403,12 +467,12 @@ def plot_QE_data(home, grid_type_list, occupation_list, energy_list):
     for grid_type in grid_type_list:
         grid_dir = home + "/" + grid_type
         for occupation in occupation_list:
-            occ_dir = grid_dir + "/" + occupation        
+            occ_dir = grid_dir + "/" + occupation
             # Find all the k-point directories.
             kpoint_list = os.listdir(occ_dir)
             
             # Find the k-point run that contains the converged values.
-            max_kpts = max([float(k.strip("k")) for k in kpoint_list])**3        
+            max_kpts = max([float(k.strip("k")) for k in kpoint_list])**3
             
             # Initialize a dictionary of series.
             df_dict = {}
