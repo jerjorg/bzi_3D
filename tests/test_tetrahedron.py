@@ -10,8 +10,7 @@ from BZI.integration import rectangular_fermi_level
 from BZI.symmetry import make_ptvecs, make_rptvecs, Lattice
 from conftest import run
 
-tests = run("tetrahedra physics")
-
+tests = run("all tetrahedra")
 @pytest.mark.skipif("test_find_tetrahedra" not in tests, reason="different tests")
 def test_find_tetrahedra():
     vertices = np.array([[.5,0,0],[1,0,0], [0,1,0], [1,1,0], [0,0,1], [1,0,1],
@@ -1025,71 +1024,56 @@ def test_corrections():
     free.fermi_level = fermi_level
 
     energies = [0, 1, np.sqrt(2), np.sqrt(3)]
+    VG = free.lattice.reciprocal_volume
     VT = free.lattice.reciprocal_volume/len(tetrahedra)
     uncorrected_weights = integration_weights(VT, energies, fermi_level)
 
     # Cell 0
     energies0 = [0,1,np.sqrt(2),np.sqrt(3)]
     EST0 = np.sum(energies0)
-    DOS0 = density_of_states(free.lattice.reciprocal_volume/6, 
-                             energies0, 
-                             fermi_level)
+    DOS0 = density_of_states(VG, VT, energies0, fermi_level)
     correction0 = 6*DOS0*EST0
 
     # Cell 1
     energies1 = [0,1,1,np.sqrt(2)]
     EST1 = np.sum(energies1)
-    DOS1 = density_of_states(free.lattice.reciprocal_volume/6, 
-                             energies1, 
-                             fermi_level)
+    DOS1 = density_of_states(VG, VT, energies1, fermi_level)
     correction1 = 2*DOS1*EST1
 
     # Cell 2
     energies2 = [0,1,1,np.sqrt(2)]
     EST2 = np.sum(energies2)
-    DOS2 = density_of_states(free.lattice.reciprocal_volume/6, 
-                             energies2, 
-                             fermi_level)
-    correction2 = 2*DOS2*EST2    
+    DOS2 = density_of_states(VG, VT, energies2, fermi_level)
+    correction2 = 2*DOS2*EST2
 
     # Cell 3
     energies3 = [0,1,1,np.sqrt(2)]
     EST3 = np.sum(energies3)
-    DOS3 = density_of_states(free.lattice.reciprocal_volume/6,
-                             energies3,
-                             fermi_level)
+    DOS3 = density_of_states(VG, VT, energies3, fermi_level)
     correction3 = 2*DOS3*EST3
 
     # Cell 4
     energies4 = [0,1,1,np.sqrt(2)]
     EST4 = np.sum(energies4)
-    DOS4 = density_of_states(free.lattice.reciprocal_volume/6,
-                             energies4,
-                             fermi_level)
+    DOS4 = density_of_states(VG, VT, energies4, fermi_level)
     correction4 = 2*DOS4*EST4
 
     # Cell 5
     energies5 = [0,1,1,np.sqrt(2)]
     EST5 = np.sum(energies5)
-    DOS5 = density_of_states(free.lattice.reciprocal_volume/6,
-                             energies5,
-                             fermi_level)
+    DOS5 = density_of_states(VG, VT, energies5, fermi_level)
     correction5 = 2*DOS5*EST5
 
     # Cell 6
     energies6 = [0,1,1,np.sqrt(2)]
     EST6 = np.sum(energies6)
-    DOS6 = density_of_states(free.lattice.reciprocal_volume/6,
-                             energies6,
-                             fermi_level)
+    DOS6 = density_of_states(VG, VT, energies6, fermi_level)
     correction6 = 2*DOS6*EST6
 
     # Cell 7
     energies7 = [0,1,np.sqrt(2), np.sqrt(3)]
     EST7 = np.sum(energies7)
-    DOS7 = density_of_states(free.lattice.reciprocal_volume/6,
-                             energies7,
-                             fermi_level)
+    DOS7 = density_of_states(VG, VT, energies7, fermi_level)
     correction7 = 6*DOS7*EST7
 
     correction = (correction0 + 
@@ -1129,6 +1113,7 @@ def test_corrections():
     free.fermi_level = fermi_level
 
     energies = [0, 1, 2, 3]
+    VG = free.lattice.reciprocal_volume
     VT = free.lattice.reciprocal_volume/len(tetrahedra)
     uncorrected_weights = integration_weights(VT, energies, fermi_level)
 
@@ -1137,15 +1122,9 @@ def test_corrections():
     enT2 = [1, 2, 3, 6]
     enT3 = [1, 4, 5, 6]
 
-    DOST1 = density_of_states(free.lattice.reciprocal_volume/6,
-                              enT1,
-                              fermi_level)
-    DOST2 = density_of_states(free.lattice.reciprocal_volume/6,
-                              enT2,
-                              fermi_level)
-    DOST3 = density_of_states(free.lattice.reciprocal_volume/6,
-                              enT3,
-                              fermi_level)
+    DOST1 = density_of_states(VG, VT, enT1, fermi_level)
+    DOST2 = density_of_states(VG, VT, enT2, fermi_level)
+    DOST3 = density_of_states(VG, VT, enT3, fermi_level)
 
     correction0 = 2*DOST1*(np.sum(enT1)-4) + (
                   2*DOST2*(np.sum(enT2)-4) +
@@ -1153,60 +1132,42 @@ def test_corrections():
 
     # Cell 1
     enT4 = [0, 1, 2, 3]
-    DOST4 = density_of_states(free.lattice.reciprocal_volume/6,
-                              enT4,
-                              fermi_level)
+    DOST4 = density_of_states(VG, VT, enT4, fermi_level)
     correction1 = 2*DOST4*(np.sum(enT4) - 4)
 
     # Cell 2
     enT5 = [1, 2, 4, 5]
     enT6 = [1, 2, 2, 5]
-    DOST5 = density_of_states(free.lattice.reciprocal_volume/6,
-                              enT5,
-                              fermi_level)
-    DOST6 = density_of_states(free.lattice.reciprocal_volume/6,
-                              enT6,
-                              fermi_level)
+    DOST5 = density_of_states(VG, VT, enT5, fermi_level)
+    DOST6 = density_of_states(VG, VT, enT6, fermi_level)
 
     correction2 = DOST5*(np.sum(enT5) - 4) + DOST6*(np.sum(enT6) - 4)
     
     # Cell 3
     enT7 = [1, 1, 2, 2]
     enT8 = [0, 1, 1, 2]
-    DOST7 = density_of_states(free.lattice.reciprocal_volume/6,
-                              enT7,
-                              fermi_level)
-    DOST8 = density_of_states(free.lattice.reciprocal_volume/6,
-                              enT8,
-                              fermi_level)
+    DOST7 = density_of_states(VG, VT, enT7, fermi_level)
+    DOST8 = density_of_states(VG, VT, enT8, fermi_level)
 
     correction3 = DOST7*(np.sum(enT7) - 4) + DOST8*(np.sum(enT8) - 4)
 
     # Cell 4
     enT10 = [1, 2, 2, 5]
     enT11 = [1, 2, 4, 5]
-    DOST10 = density_of_states(free.lattice.reciprocal_volume/6,
-                              enT10,
-                              fermi_level)
-    DOST11 = density_of_states(free.lattice.reciprocal_volume/6,
-                              enT11,
-                              fermi_level)
+    DOST10 = density_of_states(VG, VT, enT10, fermi_level)
+    DOST11 = density_of_states(VG, VT, enT11, fermi_level)
 
     correction4 = DOST10*(np.sum(enT10) - 4) + DOST11*(np.sum(enT11) - 4)
     
     # Cell 5
     enT12 = [1, 1, 2, 2]
-    DOST12 = density_of_states(free.lattice.reciprocal_volume/6,
-                              enT12,
-                              fermi_level)
+    DOST12 = density_of_states(VG, VT, enT12, fermi_level)
 
     correction5 = DOST12*(np.sum(enT12) - 4)
 
     # Cell 6
     enT9 = [1, 2, 3, 4]
-    DOST9 = density_of_states(free.lattice.reciprocal_volume/6,
-                              enT9,
-                              fermi_level)
+    DOST9 = density_of_states(VG, VT, enT9, fermi_level)
 
     correction6 = 2*DOST9*(np.sum(enT9) - 4)
 
@@ -1214,12 +1175,8 @@ def test_corrections():
     enT13 = [1, 1, 2, 2]
     enT14 = [1, 2, 2, 3]
     enT16 = [0, 1, 1, 2]
-    DOST13 = density_of_states(free.lattice.reciprocal_volume/6,
-                              enT13,
-                              fermi_level)
-    DOST14 = density_of_states(free.lattice.reciprocal_volume/6,
-                              enT14,
-                              fermi_level)
+    DOST13 = density_of_states(VG, VT, enT13, fermi_level)
+    DOST14 = density_of_states(VG, VT, enT14, fermi_level)
 
 
     correction7 = 2*DOST13*(np.sum(enT13) - 4) + (

@@ -1,13 +1,13 @@
 # Revision History
 
 
-Revision 0.2.5
+## Revision 0.2.5
 - Added `read_VASP` that will read many relevant values from
   the VASP input and output files. It isn't comprehensive yet,
   and more could be added later. Wrote one unit test, could stand
   to have another.
 
-Revision 0.2.4
+## Revision 0.2.4
 - Added `remove_QE_save` that removes the save file from QE runs.
 
 ## Revision 0.2.3
