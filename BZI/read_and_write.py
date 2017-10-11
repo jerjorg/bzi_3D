@@ -29,7 +29,7 @@ def run_QE(element, parameters):
     
     home_dir = os.getcwd()
     
-    # Make and move into the element directory.
+    # Move into the element directory.
     element_dir = home_dir + "/" + element
     os.chdir(element_dir)
     
@@ -441,7 +441,7 @@ def remove_QE_save(element, parameters):
             os.chdir(grid_dir)
         os.chdir(element_dir)
     os.chdir(home_dir)
-
+    
 
 def plot_QE_data(home, grid_type_list, occupation_list, energy_list):
     """Create convergence plots of Quantum Espresso data. The file 
