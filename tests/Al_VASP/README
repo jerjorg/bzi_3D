@@ -1,0 +1,10 @@
+Because of VASP license restrictions, we cannot distribute the
+pseudopotential files (POTCAR) as part of the Materials Project file output. Instead,
+we have provided a POTCAR.spec file, which specifies the POTCARs used in the
+Materials Project. To generate an actual POTCAR file, you may either manually
+do it using the files provided as part of your VASP license, or you can use the
+gen_potcar.py script in the scripts directory of the pymatgen package
+(http://pypi.python.org/pypi/pymatgen)
+that powers the Materials Project.
+Please note that even if you use the pymatgen package, you will still need to
+do the necessary configuration setups to point to your pseudopotential files.

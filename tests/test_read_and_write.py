@@ -2,13 +2,13 @@
 
 import numpy as np
 import pytest
-from BZI.read_and_write import read_QE
+from BZI.read_and_write import read_QE, read_VASP
 from conftest import run
 
 tests = run("all read_and_write")
 
-@pytest.mark.skipif("test_QE_data" not in tests, reason="different tests")
-def test_QE_data():
+@pytest.mark.skipif("test_read_QE" not in tests, reason="different tests")
+def test_read_QE():
     QE_data_Al = read_QE(".", "Al")
 
     assert QE_data_Al["bravais-lattice index"] == 2.0
@@ -232,3 +232,316 @@ def test_QE_data():
     assert QE_data_Si["ewald contribution"] == "-16.80092959 Ry"
     assert QE_data_Si["number of self-consistent iterations"] == 6.0
     assert QE_data_Si["number of unreduced k-points"] == 216.0
+
+
+@pytest.mark.skipif("test_read_VASP" not in tests, reason="different tests")
+def test_read_VASP():
+
+    location = "./Al_VASP"
+    vasp_data = read_VASP(location)
+
+
+    assert vasp_data['number of unreduced k-points'] == 512
+    assert vasp_data['offset'] == [0.5, 0.5, 0.5]
+    assert vasp_data['name of system'] == "Cu4"
+    assert vasp_data['scaling factor'] == 1.0
+    assert (vasp_data['lattice vectors'] == np.transpose([[3.616407, 0.000000, 0.000000],
+                                                    [0.000000, 3.616407, 0.000000],
+                                                     [0.000000, 0.000000, 3.616407]])).all()
+    assert vasp_data['atomic bases'] == [{"atomic species": "Cu",
+                                          "number of atoms": 4,
+                                          "coordinates": "direct",
+                                          "positions": [[0.000000, 0.000000, 0.000000],
+                                                        [0.000000, 0.500000, 0.500000],
+                                                        [0.500000, 0.000000, 0.500000],
+                                                        [0.500000, 0.500000, 0.000000]]}]
+    assert vasp_data['ALGO'] == "Fast"
+    assert vasp_data['EDIFF'] == "0.0002"
+    assert vasp_data['ENCUT'] == "520"
+    assert vasp_data['IBRION'] == "2"
+    assert vasp_data['ISIF'] == "3"
+    assert vasp_data['ISMEAR'] == "-5"
+    assert vasp_data['LORBIT'] == "11"
+    assert vasp_data['LREAL='] == "False"
+    assert vasp_data['LWAVE'] == "False"
+    assert vasp_data['NELM'] == "100"
+    assert vasp_data['NSW'] == "99"
+    assert vasp_data['PREC'] == "Accurate"
+    assert vasp_data['SIGMA'] == "0.05"
+    assert vasp_data['number of reduced k-points'] == 20
+    weights = [0.1562500E-01,
+               0.4687500E-01,
+               0.4687500E-01,
+               0.4687500E-01,
+               0.4687500E-01,
+               0.9375000E-01,
+               0.9375000E-01,
+               0.4687500E-01,
+               0.9375000E-01,
+               0.4687500E-01,
+               0.1562500E-01,
+               0.4687500E-01,
+               0.4687500E-01,
+               0.4687500E-01,
+               0.9375000E-01,
+               0.4687500E-01,
+               0.1562500E-01,
+               0.4687500E-01,
+               0.4687500E-01,
+               0.1562500E-01]
+    assert (vasp_data['k-point weights'] == weights)
+
+    rkpts = [[0.062500, 0.062500, 0.062500],
+             [0.187500, 0.062500, 0.062500],
+             [0.312500, 0.062500, 0.062500],
+             [0.437500, 0.062500, 0.062500],
+             [0.187500, 0.187500, 0.062500],
+             [0.312500, 0.187500, 0.062500],
+             [0.437500, 0.187500, 0.062500],
+             [0.312500, 0.312500, 0.062500],
+             [0.437500, 0.312500, 0.062500],
+             [0.437500, 0.437500, 0.062500],
+             [0.187500, 0.187500, 0.187500],
+             [0.312500, 0.187500, 0.187500],
+             [0.437500, 0.187500, 0.187500],
+             [0.312500, 0.312500, 0.187500],
+             [0.437500, 0.312500, 0.187500],
+             [0.437500, 0.437500, 0.187500],
+             [0.312500, 0.312500, 0.312500],
+             [0.437500, 0.312500, 0.312500],
+             [0.437500, 0.437500, 0.312500],
+             [0.437500, 0.437500, 0.437500]]
+    
+    assert vasp_data['reduced k-points'] == rkpts
+    assert (vasp_data['k-point degeneracy'] ==
+            np.array(weights)*vasp_data['number of unreduced k-points']).all()
+    assert vasp_data['NBANDS'] == 26    
+    assert vasp_data['alpha Z'] == 242.15273653
+    assert vasp_data['Ewald energy'] == -4386.48630246
+    assert vasp_data['-1/2 Hartree'] == -1372.67615408
+    assert vasp_data['-exchange'] == 0.00000000
+    assert vasp_data['-V(xc)+E(xc)'] == 178.50223159
+    assert vasp_data['PAW double counting'] == 5237.15909487
+    assert vasp_data['entropy T*S'] == 0.00000000
+    assert vasp_data['eigenvalues'] == 190.83068261
+    assert vasp_data['atomic energy'] == 5563.90821598
+    assert vasp_data['free energy'] == -14.91203703
+    assert vasp_data['energy without entropy'] == -14.91203703
+    assert vasp_data['energy(sigma->0)'] == -14.91203703
+    assert vasp_data['Elapsed time'] == 137.826
+    
+    pw = [1288,
+          1278,
+          1273,
+          1268,
+          1280,
+          1272,
+          1267,
+          1280,
+          1274,
+          1272,
+          1277,
+          1271,
+          1275,
+          1264,
+          1275,
+          1273,
+          1265,
+          1272,
+          1275,
+          1283]
+    assert vasp_data["number of plane waves"] == pw
+
+    ops = [np.array([[1,   0,   0], # 1
+                     [0,   1,   0],
+                     [0,   0,   1]]),
+
+           np.array([[-1,   0,   0], # 2
+                     [0,  -1,   0],
+                     [0,   0,  -1]]),
+
+           np.array([[0,   0,   1], # 3
+                     [1,   0,   0],
+                     [0,   1,   0]]),
+
+           np.array([[0,   0,  -1], # 4
+                     [-1,   0,   0],
+                     [0,  -1,   0]]),
+
+           np.array([[0,   1,   0], # 5
+                     [0,   0,   1],
+                     [1,   0,   0]]),
+
+           np.array([[0,  -1,   0], # 6
+                     [0,   0,  -1],
+                     [-1,   0,   0]]),
+                        
+           np.array([[0,  -1,   0], # 7
+                     [1,   0,   0],
+                     [0,   0,   1]]),
+
+           np.array([[0,   1,   0], # 8
+                     [-1,   0,   0],
+                     [0,   0,  -1]]),
+
+           np.array([[-1,   0,   0], # 9
+                     [0,   0,   1],
+                     [0,   1,   0]]),
+
+           np.array([[1,   0,   0], # 10
+                     [0,   0,  -1],
+                     [0,  -1,   0]]),
+
+           np.array([[0,   0,  -1], # 11
+                     [0,   1,   0],
+                     [1,   0,   0]]),
+
+           np.array([[0,   0,   1], # 12
+                     [0,  -1,   0],
+                     [-1,   0,   0]]),
+
+           np.array([[-1,   0,   0], # 13
+                     [0,  -1,   0],
+                     [0,   0,   1]]),
+
+           np.array([[1,   0,   0], # 14
+                     [0,   1,   0],
+                     [0,   0,  -1]]),
+
+           np.array([[0,   0,  -1], # 15
+                     [-1,   0,   0],
+                     [0,   1,   0]]),
+
+           np.array([[0,   0,   1], # 16
+                     [1,   0,   0],
+                     [0,  -1,   0]]),
+
+           np.array([[0,  -1,   0], # 17
+                     [0,   0,  -1],
+                     [1,   0,   0]]),
+
+           np.array([[0,   1,   0], # 18
+                     [0,   0,   1],
+                     [-1,   0,   0]]),
+
+           np.array([[0,   1,   0], # 19
+                    [-1,   0,   0],
+                    [0,   0,   1]]),
+
+           np.array([[0,  -1,   0], # 20
+                     [1,   0,   0],
+                     [0,   0,  -1]]),
+
+           np.array([[1,   0,   0], # 21
+                     [0,   0,  -1],
+                     [0,   1,   0]]),
+
+           np.array([[-1,   0,   0], # 22
+                     [0,   0,   1],
+                     [0,  -1,   0]]),
+
+           np.array([[0,   0,   1], # 23
+                     [0,  -1,   0],
+                     [1,   0,   0]]),
+
+           np.array([[0,   0,  -1], # 24
+                     [0,   1,   0],
+                     [-1,   0,   0]]),
+
+           np.array([[0,   0,   1], # 25
+                     [-1,   0,   0],
+                     [0,  -1,   0]]),
+
+           np.array([[0,   0,  -1], # 26
+                     [1,   0,   0],
+                     [0,   1,   0]]),
+
+           np.array([[0,   1,   0], # 27
+                     [0,   0,  -1],
+                     [-1,   0,   0]]),
+
+           np.array([[0,  -1,   0], # 28
+                     [0,   0,   1],
+                     [1,   0,   0]]),
+
+           np.array([[1,   0,   0], # 29
+                     [0,  -1,   0],
+                     [0,   0,  -1]]),
+
+           np.array([[-1,   0,   0], # 30
+                     [0,   1,   0],
+                     [0,   0,   1]]),
+
+           np.array([[0,   0,   1], # 31
+                     [0,   1,   0],
+                     [-1,   0,   0]]),
+
+           np.array([[0,   0,  -1], # 32
+                     [0,  -1,   0],
+                     [1,   0,   0]]),
+
+           np.array([[0,   1,   0], # 33
+                     [1,   0,   0],
+                     [0,   0,  -1]]),
+
+           np.array([[0,  -1,   0], # 34
+                     [-1,   0,   0],
+                     [0,   0,   1]]),
+
+           np.array([[1,   0,   0], # 35
+                     [0,   0,   1],
+                     [0,  -1,   0]]),
+
+           np.array([[-1,   0,   0], # 36
+                     [0,   0,  -1],
+                     [0,   1,   0]]),
+
+           np.array([[0,  -1,   0], # 37
+                     [0,   0,   1],
+                     [-1,   0,   0]]),
+
+           np.array([[0,   1,   0], # 38
+                     [0,   0,  -1],
+                     [1,   0,   0]]),
+
+           np.array([[-1,   0,   0], # 39
+                     [0,   1,   0],
+                     [0,   0,  -1]]),
+
+           np.array([[1,   0,   0], # 40
+                     [0,  -1,   0],
+                     [0,   0,   1]]),
+
+           np.array([[0,   0,  -1], # 41
+                     [1,   0,   0],
+                     [0,  -1,   0]]),
+
+           np.array([[0,   0,   1], #42
+                     [-1,   0,   0],
+                     [0,   1,   0]]),
+
+           np.array([[-1,   0,   0], # 43
+                     [0,   0,  -1],
+                     [0,  -1,   0]]),
+
+           np.array([[1,   0,   0], # 44
+                     [0,   0,   1],
+                     [0,   1,   0]]),
+
+           np.array([[0,  -1,   0], # 45
+                     [-1,   0,   0],
+                     [0,   0,  -1]]),
+
+           np.array([[0,   1,   0], #46
+                     [1,   0,   0],
+                     [0,   0,   1]]),
+                        
+           np.array([[0,   0,  -1], # 47
+                     [0,  -1,   0],
+                     [-1,   0,   0]]),
+                        
+           np.array([[0,   0,   1], # 48
+                     [0,   1,   0],
+                     [1,   0,   0]])]
+
+    assert np.allclose(vasp_data['symmetry operators'], ops)

@@ -73,7 +73,7 @@ def run(tests):
 
     # Read and write tests
     elif tests == "all read_and_write":
-        tests = ["test_QE_data"]
+        tests = ["test_read_QE", "test_read_VASP"]
     else:
         tests = []
     
