@@ -10,7 +10,7 @@ tests = run("all read_and_write")
 
 @pytest.mark.skipif("test_read_QE" not in tests, reason="different tests")
 def test_read_QE():
-    location = os.getcwd()
+    location = os.path.join(os.getcwd(), "tests")
     QE_data_Al = read_QE(location, "Al")
 
     assert QE_data_Al["bravais-lattice index"] == 2.0
@@ -309,7 +309,7 @@ def test_read_QE():
 @pytest.mark.skipif("test_read_VASP" not in tests, reason="different tests")
 def test_read_VASP():
 
-    location = "./Al_VASP"
+    location = os.path.join(os.getcwd(), "tests", "Al_VASP")
     vasp_data = read_VASP(location)
 
 
