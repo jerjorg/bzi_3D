@@ -18,7 +18,7 @@ def run_QE(element, parameters):
     from which this command is run must contain run.py and run.sh files. It
     must contain a directory named 'element', and this directory must contain
     a directory named 'initial data' in which is located the template Quantum
-    Espresso input file.
+    Espresso input file. The run.sh file runs the run.py script.
     
     Args:
         parameters (dict): a dictionary of adjustable parameters. The following
@@ -596,7 +596,6 @@ def plot_QE_data(home, grid_type_list, occupation_list, energy_list):
                 fig.savefig(file_name, bbox_extra_artists=(lgd,), bbox_inches="tight")
 
 
-
 def read_VASP(location):
     """Create a dictionary of most of the data created during a
     single VASP calculation.
@@ -787,3 +786,158 @@ def read_VASP(location):
         VASP_data["symmetry operators"] = sym_group
         
     return VASP_data
+
+
+def run_VASP(element, parameters):
+    """A function that will take the values contained in parameters, create the
+    file structure, and submit a series of VASP jobs. The directory from which 
+    this command is run must contain run.py and run.sh files. It must contain a 
+    directory named 'element', and this directory must contain a directory named 
+    'initial data' in which is located the template VASP input files. The run.sh
+    file runs the run.py script.
+    
+    Args:
+        parameters (dict): a dictionary of adjustable parameters. The following
+            key strings must be present: 'grid type list', 'offset list',
+            'smearing list', 'smearing value list', and 'k-points list'. 
+            Their corresponding values must be lists.
+    """
+
+    # A dictionary to give the folders more meaningful names
+    smearing_dict = {"-1": "Fermi-Dirac smearing", 
+                     "0": "Gaussian smearing", 
+                     "1": "1st order Methfessel-Paxton smearing", 
+                     "2": "2nd order Methfessel-Paxton smearing", 
+                     "3": "3rd order Methfessel-Paxton smearing", 
+                     "4": "4th order Methfessel-Paxton smearing", 
+                     "5": "5th order Methfessel-Paxton smearing", 
+                     "-4": "Tetrahedron method without Blochl corrections",
+                     "-5": "Tetrahedron method with Blochl corrections"}
+
+    home_dir = os.getcwd()
+    
+    # Move into the element directory.
+    element_dir = os.path.join(home_dir, element)
+    os.chdir(element_dir)
+
+    # Locate the inital data.
+    idata_loc = os.path.join(element_dir, "initial_data")
+
+    # Make and move into the grid type directory.
+    for grid_type in parameters["grid type list"]:
+        grid_dir = os.path.join(element_dir, grid_type)
+        if not os.path.isdir(grid_dir):
+            os.mkdir(grid_dir)
+        os.chdir(grid_dir)
+
+        # Make and move into the offset directory
+        for offset in parameters["offset list"]:
+            offset_name = str(offset).strip("[").strip("]")
+            offset_name = offset_name.replace(",", "")
+
+            offset_dir = os.path.join(grid_dir, offset_name)
+            if not os.path.isdir(offset_dir):
+                os.mkdir(offset_dir)
+            os.chdir(offset_dir)
+
+            # Make and move into the smearing type directory.
+            for smearing in parameters["smearing list"]:
+                smearing_dir = os.path.join(offset_dir, smearing_dict[smearing])
+                if not os.path.isdir(smearing_dir):
+                    os.mkdir(smearing_dir)
+                os.chdir(smearing_dir)
+
+                # Make and move into the smearing value directory.
+                for smearing_value in parameters["smearing value list"]:
+                    smearing_value_dir = os.path.join(smearing_dir, str(smearing_value))
+                    if not os.path.isdir(smearing_value_dir):
+                        os.mkdir(smearing_value_dir)
+                    os.chdir(smearing_value_dir)
+
+                    # Make and move into the number of k-points directory.
+                    for kpoints in parameters["k-point list"]:
+                        nkpoints = np.prod(kpoints)
+                        kpoints_dir = os.path.join(smearing_value_dir, str(nkpoints))
+                        if not os.path.isdir(kpoints_dir):
+                            os.mkdir(kpoints_dir)
+                        os.chdir(kpoints_dir)
+
+                        # Copy initial_data, run.sh and run.py to current directory.
+                        subprocess.call("cp " + idata_loc + "/* ./", shell=True)
+                        subprocess.call("cp " + home_dir + "/run.sh ./", shell=True)
+                        subprocess.call("cp " + home_dir + "/run.py ./", shell=True)
+                        subprocess.call('chmod +x run.py', shell=True)
+
+                        # Correctly label this job.
+                        # Read in the file.
+                        with open('run.sh', 'r') as file:
+                            filedata = file.read()
+
+                        # Replace the target string.
+                        filedata = filedata.replace('ELEMENT', str(element))
+                        filedata = filedata.replace('GRIDTYPE', grid_type)
+                        filedata = filedata.replace('OFFSET', str(offset))
+                        filedata = filedata.replace('SMEAR', smearing_dict[smearing])
+                        filedata = filedata.replace('SMRVALUE', str(smearing_value))
+                        filedata = filedata.replace('KPOINT', str(nkpoints))
+
+                        # Write the file out again.
+                        with open('run.sh', 'w') as file:
+                            file.write(filedata)
+
+                        incar_dir = os.path.join(kpoints_dir, "INCAR")
+                        # Replace values in the INCAR.
+                        with open(incar_dir, "r") as file:
+                            filedata = file.read()
+
+                        filedata = filedata.replace("smearing method", smearing)
+                        filedata = filedata.replace("smearing value",
+                                                    str(smearing_value))
+
+                        with open(incar_dir, "w") as file:
+                            file.write(filedata)
+
+                        # Replace values in the KPOINTS file.
+                        vkpts_dir = os.path.join(kpoints_dir, "KPOINTS")
+                        with open(vkpts_dir, "r") as file:
+                            filedata = file.read()
+
+                        for i,kp in enumerate(kpoints):
+                            kp_name = "kpoint" + str(i + 1)
+                            filedata = filedata.replace(kp_name, str(kp))
+
+                        for j,off in enumerate(offset):
+                            off_name = "offset" + str(j + 1)
+                            filedata = filedata.replace(off_name, str(off))
+
+                        with open(vkpts_dir, "w") as file:
+                            file.write(filedata)
+
+                        # Adjust time to run and memory
+                        with open("run.sh", "r") as file:
+                            filedata = file.read()
+
+                        if nkpoints <= 8000:
+                            filedata = filedata.replace("12:00:00", "4:00:00")
+                            filedata = filedata.replace("4096", "8192")
+
+                        elif nkpoints > 8000 and nkpoints < 27000:
+                            filedata = filedata.replace("12:00:00", "6:00:00")
+                            filedata = filedata.replace("4096", "16384")                                
+
+                        elif nkpoints >= 27000 and nkpoints < 64000:
+                            filedata = filedata.replace("12:00:00", "12:00:00")
+                            filedata = filedata.replace("4096", "32768")
+
+                        elif nkpoints >= 64000:
+                            filedata = filedata.replace("12:00:00", "24:00:00")
+                            filedata = filedata.replace("4096", "65536")
+
+                        subprocess.call('sbatch run.sh', shell=True)
+
+                        os.chdir(smearing_value_dir)
+                    os.chdir(smearing_dir)
+                os.chdir(offset_dir)
+            os.chdir(grid_dir)
+        os.chdir(element_dir)
+    os.chdir(home_dir)

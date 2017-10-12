@@ -6,11 +6,8 @@ try:
     args = {}
 except ImportError:
     from distutils.core import setup
-    print("""\
-*** WARNING: setuptools is not found.  Using distutils...
-""")
+    print("""\*** WARNING: setuptools is not found.  Using distutils...""")
 
-from setuptools import setup
 try:
     from pypandoc import convert
     read_md = lambda f: convert(f, 'rst')
@@ -20,7 +17,7 @@ except ImportError:
 
 from os import path
 setup(name='BZI',
-      version='0.2.3',
+      version='0.2.6',
       description='Brillouin zone integration.',
       long_description= "" if not path.isfile("README.md") else read_md('README.md'),
       author='Jeremy J Jorgensen',
@@ -36,10 +33,10 @@ setup(name='BZI',
           "matplotlib",
           "phenum",
           "pytest",
-          "pandas"
+          "pandas",
+          "xarray"
       ],
       packages=['BZI'],
-#       scripts=['/solve.py'],
       package_data={'BZI': []},
       include_package_data=True,
       classifiers=[
@@ -48,6 +45,8 @@ setup(name='BZI',
           'Natural Language :: English',
           'Operating System :: MacOS',
           'Programming Language :: Python',
+          'Programming Language :: Python :: 2',
+          'Programming Language :: Python :: 2.7',
           'Programming Language :: Python :: 3',
           'Programming Language :: Python :: 3.6',
       ],
