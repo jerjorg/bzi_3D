@@ -611,7 +611,8 @@ def read_VASP(location):
     ibzkpt_file = location + "/IBZKPT"
     eigenval_file = location + "/EIGENVAL"
     outcar_file = location + "/OUTCAR"
-
+    potcar_file = location + "/POTCAR"
+    
     # Get the number of unreduced k-points. This only works for one of 
     # the automatic k-mesh generation methods, where the number of k-points
     # and offset of the k-mesh are provided.
@@ -778,7 +779,34 @@ def read_VASP(location):
                 sigma_line = no_entropy_line
                 sigma_name = sigma_line[5]
                 VASP_data[sigma_name] = float(sigma_line[7])
-            
+
+            if "VOLUME and BASIS-vectors are now" in line:
+                VASP_data["final unit cell volume"] = float(f[i+3].split()[-1])
+
+                a1 = [float(a) for a in f[i+5].split()[:3]]
+                b1 = [float(b) for b in f[i+5].split()[3:]]
+                
+                a2 = [float(a) for a in f[i+6].split()[:3]]
+                b2 = [float(b) for b in f[i+6].split()[3:]]
+
+                a3 = [float(a) for a in f[i+6].split()[:3]]
+                b3 = [float(b) for b in f[i+6].split()[3:]]
+                
+                VASP_data["final lattice vectors"] = np.transpose([a1, a2, a3])
+                VASP_data["final reciprocal lattice vectors"] = np.transpose([b1, b2, b3])
+                VASP_data["final reciprocal unit cell volume"] = np.linalg.det(
+                    np.transpose([b1, b2, b3]))
+
+            if "FORCES acting on ions" in line:
+                forces = []
+                forces.append({"electron-ion force": [float(fi) for fi in
+                                                      f[i + natoms + 4].split()[:3]]})
+                forces.append({"ewald-force": [float(fi) for fi in
+                                               f[i + natoms + 4].split()[3:6]]})
+                forces.append({"non-local-force": [float(fi) for fi in
+                                                   f[i + natoms + 4].split()[6:]]})
+                VASP_data["net forces acting on ions"] = forces
+
             if "Elapsed time" in line:
                 VASP_data["Elapsed time"] = float(line.split()[-1])
                 
@@ -786,6 +814,172 @@ def read_VASP(location):
         VASP_data["symmetry operators"] = sym_group
         
     return VASP_data
+
+
+def create_INCAR(location):
+    """ Create a template INCAR energy convergence tests.
+    
+    Args:
+        location (str): the location of the VASP input files
+    """
+
+    incar_file = os.path.join(location, "INCAR")
+    system = "Cu"
+    new_EAUG = 2*EAUG
+    with open(incar_file, "w") as file:
+        file.write("Determine the correct number of bands. \n \n")
+
+        file.write("Start parameters \n")
+        file.write("  SYSTEM = " + system + " \n \n")
+
+        file.write("Read WAVECAR (default = 1 or 0) \n")
+        file.write("  ISTART = 0 \n \n")
+
+        file.write("Set up initial orbitals (default = 1) \n")
+        file.write("  INIWAV = 1 \n \n")
+
+        file.write("Type of charge mixing (default = 4)\n")
+        file.write("  IMIX = 4 \n \n")
+        
+        file.write("The l-quantum number of the one-center PAW charge densities "
+                   "that pass to charge density mixer (default = 2) \n")
+        file.write("  LMAXMIX = 6 \n \n")
+
+        file.write("Charge density extrapolation (default = 1)\n")
+        file.write("  IWAVPR = 1 \n \n")
+
+        file.write("Number of bands (default = (NELECT + NIONS)/2 \n")
+        file.write("  NBANDS =  \n \n")
+
+        file.write("Projection operators (default = .FALSE.) \n")
+        file.write("  LREAL = .False. \n \n")    
+
+        file.write("Spin polarization (default = 1) \n")
+        file.write("  ISPIN = 1 \n \n")
+
+        file.write("van der Waals corrections (default = 0) \n")
+        file.write("  IVDW = 0 \n \n")
+
+        file.write("Write wavefunctions (default = .TRUE. \n")
+        file.write("  LWAVE = .False. \n \n")
+
+        file.write("Aspherical charge distribution correction (default = .FALSE.) \n")
+        file.write("  LASPH = True \n \n")
+
+        file.write("Local spin density approximation with strong intra-atomic "
+                   "interaction (default = .FALSE.) \n")
+        file.write("  LDAU = .FALSE. \n \n")
+
+        file.write("Subspace diagonalization within the main algorithm "
+                   "(default = .TRUE.) \n")
+        file.write("  LDIAG = .TRUE. \n \n")
+
+        file.write("Symmetry (default = 1 for USPP) \n")
+        file.write("  ISYM = 1 \n \n")
+
+        file.write("Write charge densities (default = .TRUE.) \n")
+        file.write("  LCHARG = False \n \n")
+
+        file.write("Electronic relaxation algorithm (default = Normal) \n")
+        file.write("  ALGO = Normal \n \n")
+
+        file.write("Algorithm to optimize the orbitals (default = 38 or "
+                   "blocked-Davison algorithm) \n")
+        file.write("  IALGO = 38 \n \n")
+
+        file.write("Number of bands optimized simultaneously (default = 4) \n")
+        file.write("  NSIM = 1 \n \n")
+
+        file.write("Global break condition for electronic self-consistency loop "
+                   "(default = 1E-4) \n")
+        file.write("  EDIFF = 1E-10 \n \n")
+
+        file.write("The minimum number of electronic self-consistency steps "
+                   "(default = 4) \n")
+        file.write("  NELMIN = 6 \n \n")
+
+        file.write("The maximum number of electronic self-consistency steps "
+                   "(default = 60) \n")
+        file.write("  NELM = 60 \n \n")
+
+        file.write("The number of non-self-consistency steps taken at the beginning "
+                   "(default = -12 for IALGO = 48) \n")
+        file.write("  NELMDL = -12 \n \n")
+
+        file.write("Algorithm for how ions are updated and moved \n")
+        file.write("  IBRION = 2 \n \n")
+
+        file.write("Determines which principal degrees of freedom are allowed to "
+                   "change (default = 2) \n")
+        file.write("  ISIF = 3 \n \n")
+
+        file.write("Global break condition for the ionic relaxation "
+                   "(default = EDIFF*10) \n")
+        file.write("  EDIFFG = 1E-9 \n \n")
+
+        file.write("The maximum number of ionic steps (default = 0) \n")
+        file.write("  NSW = 0 \n \n")
+
+        file.write("Determines how the partial occupancies are set for each orbital "
+                   "(default = 1) \n")  
+        file.write("  ISMEAR = 0 \n \n")
+
+        file.write("The width of the smearing parameter in eV (default = 0.2) \n")
+        file.write("  SIGMA = 1E-3")
+
+        file.write("Add an support grid for the evaluation of augmentation charges "
+                   "(default = .FALSE.) \n")
+        file.write("  ADDGRID = .TRUE. \n \n")
+
+        file.write("The cut-off energy of the plane wave representation of the "
+                   "augmentation charges (default = EAUG) \n")
+        file.write("  ENAUG = %f \n \n" %new_EAUG)
+
+        file.write("Set the FFT grids used in the exact exchange routines "
+                   "(default = Normal) \n")
+        file.write("  PRECFOCK = Accurate \n \n")
+
+        file.write("Number of grid points for density of states (default = 301) \n")
+        file.write("  NEDOS = 2000 \n \n")
+
+        file.write("A relative stopping criterion for the optimization of an eigenvalue "
+                   "(default = 0.3) \n")
+        file.write("  DEPER = 1E-2 \n \n")
+
+        file.write("The maximum weight for a band to be considered empty "
+                   "(default = 0.001) \n")
+        file.write("  WEIMIN = 1E-6 \n \n")
+
+        
+def read_potcar(location):
+    """Read values from the POTCAR
+
+    Args:
+        location (str): the file path to the POTCAR
+    """
+
+    # Get EAUG from POTCAR.
+    potcar_file = os.path.join(location, "POTCAR")
+
+    
+    data = {}
+    ZVAL_list = []
+    EAUG_list = []
+
+    with open(potcar_file, "r") as file:
+        f = file.readlines()
+        for i, line in enumerate(f):
+            if "EAUG" in line:
+                EAUG_list.append(float(line.split()[-1]))
+
+            if "ZVAL" in line:
+                for j, elem in enumerate(line.split()):
+                    if elem == "ZVAL":
+                        ZVAL_list.append(float(line.split()[j+2]))
+
+    data["ZVAL list"] = ZVAL_list
+    data["EAUG list"] = EAUG_list
+    return data
 
 
 def run_VASP(element, parameters):

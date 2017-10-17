@@ -1,5 +1,13 @@
 # Revision History
 
+## Revision 0.2.7
+- Added `create_incar` and `read_potcar` to `read_and_write.py`.
+
+## Revision 0.2.6
+- Added `run_VASP` that will build a file structure for DFT
+  calculations and then run them with VASP.
+- Minor changes to .travis.yml
+
 ## Revision 0.2.5
 - Added `read_VASP` that will read many relevant values from
   the VASP input and output files. It isn't comprehensive yet,
