@@ -1,5 +1,9 @@
 # Revision History
 
+## Revision 0.2.8
+- Created functions that will test the `NBANDS` and `ENCUT` input
+  parameters in the VASP INCAR.
+
 ## Revision 0.2.7
 - Added `create_incar` and `read_potcar` to `read_and_write.py`.
 
