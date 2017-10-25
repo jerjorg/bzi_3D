@@ -1,5 +1,10 @@
 # Revision History
 
+## Revision 0.2.9
+- Created a function that will plot the convergence of various
+  values as a function of the energy cutoff. This should help
+  determine the value of `ENCUT` in the VASP INCAR file.
+
 ## Revision 0.2.8
 - Created functions that will test the `NBANDS` and `ENCUT` input
   parameters in the VASP INCAR.

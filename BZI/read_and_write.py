@@ -751,7 +751,8 @@ def read_vasp(location):
     Returns:
         VASP_data (dict): a dictionary of parameters.
     """
-    
+
+    job_finished = False
     VASP_data = read_vasp_input(location)
     natoms = len(VASP_data["atomic basis"]["atom positions"])
     outcar_file = os.path.join(location, "OUTCAR")
@@ -839,11 +840,14 @@ def read_vasp(location):
                 VASP_data[entropy_name] = float(entropy_line[-1])
                 
                 eigval_line = f[i+9].split()
+
+                # I ran into problems where VASP would calculate very large
+                # values for the band energy that eventually prevented it from
+                # converging.
                 try:                    
                     VASP_data[eigval_line[0]] = float(eigval_line[-1])
                 except:
-                    VASP_data = None
-                    return VASP_data
+                    return None
                 
                 atomic_line = f[i+10].split()
                 atomic_name = atomic_line[0] + " " + atomic_line[1]
@@ -870,7 +874,7 @@ def read_vasp(location):
                     VASP_data[sigma_name] = float(sigma_line[5].strip("="))
 
             if "VOLUME and BASIS-vectors are now" in line:
-                VASP_data["final unit cell volume"] = float(f[i+3].split()[-1])
+                VASP_data["Final unit cell volume"] = float(f[i+3].split()[-1])
 
                 a1 = [float(a) for a in f[i+5].split()[:3]]
                 b1 = [float(b) for b in f[i+5].split()[3:]]
@@ -881,27 +885,65 @@ def read_vasp(location):
                 a3 = [float(a) for a in f[i+6].split()[:3]]
                 b3 = [float(b) for b in f[i+6].split()[3:]]
                 
-                VASP_data["final lattice vectors"] = np.transpose([a1, a2, a3])
-                VASP_data["final reciprocal lattice vectors"] = np.transpose([b1, b2, b3])
-                VASP_data["final reciprocal unit cell volume"] = np.linalg.det(
+                VASP_data["Final lattice vectors"] = np.transpose([a1, a2, a3])
+                VASP_data["Final reciprocal lattice vectors"] = np.transpose([b1, b2, b3])
+                VASP_data["Final reciprocal unit cell volume"] = np.linalg.det(
                     np.transpose([b1, b2, b3]))
 
             if "FORCES acting on ions" in line:
                 forces = []
-                forces.append({"electron-ion force": [float(fi) for fi in
+                forces.append({"Electron-ion force": [float(fi) for fi in
                                                       f[i + natoms + 4].split()[:3]]})
-                forces.append({"ewald-force": [float(fi) for fi in
+                forces.append({"Ewald-force": [float(fi) for fi in
                                                f[i + natoms + 4].split()[3:6]]})
-                forces.append({"non-local-force": [float(fi) for fi in
+                forces.append({"Non-local-force": [float(fi) for fi in
                                                    f[i + natoms + 4].split()[6:]]})
-                VASP_data["net forces acting on ions"] = forces
+                VASP_data["Net forces acting on ions"] = forces
 
             if "Elapsed time" in line:
                 VASP_data["Elapsed time"] = float(line.split()[-1])
+
+            if "total charge-density along one line" in line:
+                wrapped_charge_list = []
+                directions = ["x", "y", "z"]
+                contained = True
+                for direct in directions:
+                    too_far = False
+                    k = i
+                    wrapped_charge = None
+                    while not too_far:
+                        if direct in f[k].split():
+                            wrapped_charge = float(f[k].split()[-2])
+                        elif "pseudopotential strength for first" in f[k]:
+                            too_far = True
+                        k += 1
+                    wrapped_charge_list.append(wrapped_charge)
+                VASP_data["total wrapped charge"] = wrapped_charge_list
+
+            if "total drift" in line:
+                VASP_data["Drift force"] = np.linalg.norm([float(w) for w in
+                                                           line.split()[2:]])
+
+            if "TOTAL-FORCE" in line:
+                forces = f[i-3].split()
+                iforces = []
+                for j in range(0,10,3):
+                    iforces.append(np.linalg.norm([float(f) for f in forces[j:j+3]]))
+                VASP_data["Electron-ion force"] = iforces[0]
+                VASP_data["Ewald force"] = iforces[1]
+                VASP_data["Non-local force"] = iforces[2]
+                VASP_data["Convergence-correction force"] = iforces[3]
+
+            if "General timing and accounting informations for this job:" in line:
+                job_finished = True
                 
         VASP_data["number of plane waves"] = nplane_waves
         VASP_data["symmetry operators"] = sym_group
-    return VASP_data
+        
+    if job_finished == True:
+        return VASP_data
+    else:
+        return None
 
 
 # def read_VASP(location):
@@ -1616,7 +1658,6 @@ def setup_encut_tests(location, system_name, encut_list):
     # These are relevant for building the INCAR.
     vasp_data = read_vasp_input(data_location)
 
-    # new_NBANDS = 2*np.sum(vasp_data["ZVAL list"])
     enmax = max(vasp_data["ENMAX list"])
     new_enmax = 2*enmax
 
@@ -1650,7 +1691,9 @@ def setup_encut_tests(location, system_name, encut_list):
                 if not os.path.isdir(encut_dir):
                     os.mkdir(encut_dir)
                 os.chdir(encut_dir)
-            
+
+                # Copy the required VASP input files into the energy cutoff directory.
+                # Also copy the batch job and python script.
                 subprocess.call("cp " + data_location + "/* .", shell=True)
                 subprocess.call("cp " + location + "/run.py .", shell=True)
                 subprocess.call("cp " + location + "/run.sh .", shell=True)
@@ -1659,7 +1702,7 @@ def setup_encut_tests(location, system_name, encut_list):
                 incar_dir = os.path.join(encut_dir, "INCAR")
                 run_dir = os.path.join(encut_dir, "run.sh")
 
-                # Correctly label this job and adjust runtime if necessary.
+                # Correctly label this job, and adjust runtime and memory if necessary.
                 with open(run_dir, 'r') as file:
                     filedata = file.read()
                     
@@ -1671,9 +1714,10 @@ def setup_encut_tests(location, system_name, encut_list):
 
                 with open(run_dir, 'w') as file:
                     file.write(filedata)
-
-                # Replace the number of bands and change the initial charge density.
-                # The manual says that 1E-6 accuracy should be obtained within 10-15 iterations.
+                    
+                # Change the energy cutoff, and decrease the precision since it affects
+                # the energy cutoff, and it isn't clear whether the energy cutoff prescribed
+                # by PREC will overwrite that of ENCUT. Also turn off or leave on symmetry.
                 with open(incar_dir, "r") as file:
                     filedata = file.read()
 
@@ -1686,4 +1730,207 @@ def setup_encut_tests(location, system_name, encut_list):
                 
                 # Submit the job.
                 subprocess.call('sbatch run.sh', shell=True)
+
+
+def gen_encut_plots(system_dir):
+    """Generate plots that help identify the appropriate value for the energy encut.
+
+    Args:
+        system_name (str): the file path to the system being simulated. This folder
+            must contain subfolders that contain VASP simulations with varying energy
+            cutoffs.
+    """
+
+    # Initialize all quantities that'll be plotted.
+    cutoff_plot_list = []
+    cutoff_lists = []
+    encut_list = []
+    tot_wrapped_charge_list = [[],[],[]]
+    drift_force_list = []
+    cell_volume_list = []
+    lat_vec_norm_list = []
+    force_list = [[] for _ in range(5)]
+    directions = ["x", "y", "z"]
+    force_type_list = ["Electron-ion force", "Ewald force", "Non-local force",
+                       "Convergence-correction force", "Drift force"]
+    shift_list = [[0, 0, 0], [.5, .4, .3]]
+    symmetry_list = [0, 1]
+
+    system_name = system_dir.split(os.sep)[-1]
+    elem_dir = os.path.join(system_dir, system_name)
+    encut_test_dir = os.path.join(system_dir, "encut")
+    os.chdir(encut_test_dir)
+
+    # These tests don't depend on the different atomic shifts or turning off symmetry.
+    tests1_dir = os.path.join(encut_test_dir, str(symmetry_list[0]), str(shift_list[1]))
+    energy_cutoff_list = os.listdir(tests1_dir)
+    for encut in energy_cutoff_list:
+        cell_vol_bool = False
+        contained = False
+        encut_dir = os.path.join(tests1_dir, encut)
+        os.chdir(encut_dir)
+        outcar_dir = os.path.join(encut_dir, "OUTCAR")
+
+        vasp_data = read_vasp(encut_dir)
+        if vasp_data != None:
+            # Get the cutoff energy for this run, and add it to the list of energies.
+            cutoff_plot_list.append(float(encut))
+
+            # Find the wrapped charge density in each of the directions.
+            for i in range(3):
+                tot_wrapped_charge_list[i].append(vasp_data["total wrapped charge"][i])
+
+            # Find all the forces, and the change in cell volume and shape.
+            drift_force_list.append(vasp_data["Drift force"])
+            cell_volume_list.append(vasp_data["Final unit cell volume"])
+            lat_vec_norm_list.append(np.linalg.norm(vasp_data["Final lattice vectors"]))
+            for j in range(5):
+                force_list[j].append(vasp_data[force_type_list[j]])
+
+    # A dictionary that goes between the VASP parameter and it's meaning, useful
+    # for labeling plots and files.
+    sym_label_dict = {0: "no symmetry", 1: "symmetry"}
+
+    # Another dictionary useful for labeling plots and files.
+    shift_label_dict = {str([0,0,0]): "no shift", str([.5, .4, .3]): "shift"}
+
+    # A list of lists that contains all the energies for every run.
+    # The first nested loop contains the different energies (Ewald, Hartree, ...)
+    # The second nested list four elements for each combination of shift/no shift
+    # and symmmetry reduction/no symmetry reduction.
+    vasp_energies = [[] for _ in range(12)]
+    cutoff_energies = [[] for _ in range(12)]
+    vasp_energy_names  = ['alpha Z', 'Ewald energy', '-1/2 Hartree', '-exchange',
+                          '-V(xc)+E(xc)', 'PAW double counting', 'entropy T*S',
+                          'eigenvalues', 'atomic energy', 'free energy',
+                          'energy without entropy', 'energy(sigma->0)']
+
+    # A dictionary used for labels in plots.
+    vasp_energy_names_dict = {'alpha Z': "alpha",
+                              'Ewald energy': "Ewald",
+                              '-1/2 Hartree': "Hartree",
+                              '-exchange': "Hartree exchange",
+                              '-V(xc)+E(xc)': "total exchange",
+                              'PAW double counting': "PAW energy",
+                              'entropy T*S': "entropy",
+                              'eigenvalues': "band energy",
+                              'atomic energy': "atomic energy",
+                              'free energy': "free energy",
+                              'energy without entropy': "energy without entropy",
+                              'energy(sigma->0)': "extrapolated free energy"}
+
+    shift_sym_labels = []
+
+    # Collect data from symmetry and atom offset runs.
+    for symmetry in symmetry_list:
+        sym_dir = os.path.join(encut_test_dir, str(symmetry))
+        
+        for shift in shift_list:
+            shift_dir = os.path.join(sym_dir, str(shift))
+            slabel = sym_label_dict[symmetry] + ", " + shift_label_dict[str(shift)]
+            shift_sym_labels.append(slabel)
+            
+            for i in range(len(vasp_energy_names)):
+                vasp_energies[i].append([])
+                cutoff_energies[i].append([])
+
+            for encut in energy_cutoff_list:
+                finished = False
+                encut_dir = os.path.join(shift_dir, str(encut))
+                vasp_data = read_vasp(encut_dir)
+
+                if vasp_data != None:                    
+                    for i, en in enumerate(vasp_energy_names):
+                        cutoff_energies[i][-1].append(float(encut))
+                        vasp_energies[i][-1].append(float(vasp_data[en]))
+                else:
+                    continue
+
+    # Make a directory to store plots
+    plot_dir = os.path.join(encut_test_dir, "plots")
+    if not os.path.isdir(plot_dir):
+        os.mkdir(plot_dir)
+            
+    # Plot the individual energy convergences with/without symmetry and atomic shift.
+    for i, sym_energy in enumerate(vasp_energies):
+        fig1, ax1 = plt.subplots()
+        for j, energy in enumerate(sym_energy):
+            ax1.scatter(cutoff_energies[i][j], energy, label=shift_sym_labels[j])
+        
+        plot_label_i = vasp_energy_names_dict[vasp_energy_names[i]]
+        ax1.set_title("Comparing " + plot_label_i + " without symmetry "
+                      "and with shifted atoms")
+        ax1.set_xlabel("Energy cutoff (eV)")
+        ax1.set_ylabel("Energy (eV/Ang)")
+        ax1.set_xticks(ax1.get_xticks()[::4])
+        ax1.legend()
+        plot_name = os.path.join(plot_dir, plot_label_i + ".png")
+        fig1.savefig(plot_name)
+        plt.close(fig1)
+        
+    # Plot the total charge wrap-around vs. energy cutoff.
+    fig, ax = plt.subplots()
+
+    for i,direct in enumerate(directions):
+        ax.scatter(cutoff_plot_list, tot_wrapped_charge_list[i],
+                   label="%s-direction"%directions[i])
+
+    ax.set_title("Number of iterations required for 1E-10 accuracy")
+    ax.set_xlabel("Energy cutoff (eV)")
+    ax.set_xticks(ax.get_xticks()[::4])
+    ax.set_ylabel("Total charge density wrap-around")
+    ax.legend()
+    plot_name = os.path.join(plot_dir, "total_charge_wraparound.png")
+    fig.savefig(plot_name)
+    plt.close(fig)
+        
+    # Plot drift forces.
+    fig, ax = plt.subplots()
+    ax.scatter(cutoff_plot_list, drift_force_list, color="blue")
+    ax.set_title("Change in drift force")
+    ax.set_xlabel("Energy cutoff (eV)")
+    ax.set_ylabel("Drift force (eV/Ang)")
+    ax.set_xticks(ax.get_xticks()[::4])
+    plot_name = os.path.join(plot_dir, "drift_force.png")
+    fig.savefig(plot_name)
+    plt.close(fig)
+
+    # Plot cell volumes.
+    fig, ax = plt.subplots()
+    ax.scatter(cutoff_plot_list, cell_volume_list, color="blue")
+    ax.set_title("Change in cell volume")
+    ax.set_xlabel("Energy cutoff (eV)")
+    ax.set_ylabel("Cell volume ($\mathrm{Ang}^3$)")
+    ax.set_xticks(ax.get_xticks()[::4])
+    plot_name = os.path.join(plot_dir, "cell_volume.png")
+    fig.savefig(plot_name)
+    plt.close(fig)
+
+    # Plot cell norms.
+    fig, ax = plt.subplots()
+    ax.scatter(cutoff_plot_list, lat_vec_norm_list, color="blue")
+    ax.set_title("Change in basis vectors")
+    ax.set_xlabel("Energy cutoff (eV)")
+    ax.set_ylabel("Frobenius norm of basis")
+    ax.set_xticks(ax.get_xticks()[::4])
+    plot_name = os.path.join(plot_dir, "basis_norm.png")
+    fig.savefig(plot_name)
+    plt.close(fig)
+
+    # Plot all forces.
+    fig, ax = plt.subplots()
+    for i,force_type in enumerate(force_type_list):
+        ax.scatter(cutoff_plot_list, force_list[i], label=force_type)
+
+    ax.scatter(cutoff_plot_list, drift_force_list, label="drift")
+    ax.set_title("Forces acting on ions")
+    ax.set_xlabel("Energy cutoff (eV)")
+    ax.set_ylabel("Force (eV/Ang)")
+    ax.set_xticks(ax.get_xticks()[::4])
+    ax.legend()
+    plot_name = os.path.join(plot_dir, "all_forces.png")
+    fig.savefig(plot_name)
+    plt.close(fig)
     
+    return None
+                
