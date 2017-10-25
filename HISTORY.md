@@ -1,5 +1,10 @@
 # Revision History
 
+## Revision 0.2.10
+- Created a function that will plot the amount of wrap-around
+  soft charge in three directions agains the energy cutoff of
+  the augmentation charge.
+
 ## Revision 0.2.9
 - Created a function that will plot the convergence of various
   values as a function of the energy cutoff. This should help

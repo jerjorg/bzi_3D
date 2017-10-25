@@ -906,7 +906,7 @@ def read_vasp(location):
             if "total charge-density along one line" in line:
                 wrapped_charge_list = []
                 directions = ["x", "y", "z"]
-                contained = True
+                
                 for direct in directions:
                     too_far = False
                     k = i
@@ -920,6 +920,24 @@ def read_vasp(location):
                     wrapped_charge_list.append(wrapped_charge)
                 VASP_data["total wrapped charge"] = wrapped_charge_list
 
+            # Locate where the wrap-around charge density is listed.
+            if "soft charge-density along one line" in line:
+                wrapped_charge_list = []                
+                directions = ["x", "y", "z"]
+                
+                for j,direct in enumerate(directions):
+                    too_far = False                
+                    wrapped_charge = None
+                    k = i
+                    while not too_far:
+                        if direct in f[k].split():
+                            wrapped_charge = float(f[k].split()[-2])
+                        elif "total charge-density along" in f[k]:
+                            too_far = True
+                        k += 1
+                    wrapped_charge_list.append(wrapped_charge)
+                VASP_data["total wrapped soft charge"] = wrapped_charge_list
+                        
             if "total drift" in line:
                 VASP_data["Drift force"] = np.linalg.norm([float(w) for w in
                                                            line.split()[2:]])
@@ -1933,4 +1951,143 @@ def gen_encut_plots(system_dir):
     plt.close(fig)
     
     return None
-                
+
+def setup_enaug_tests(location, system_name, enaug_list):
+    """Create the file structure and submit jobs that will compare various
+    values of the energy cutoff for the augmentation chargens to find one that 
+    is adequate.
+
+    Args:
+        location (str): the root directory. It must have a folder named
+            system_name and this folder must contain a folder named initial_data,
+            where the VASP input files (POTCAR, POSCAR, and KPOINTS) are located.
+        system_name (str): the name of the system being simulated.
+        enaug_list (list): a list of energy cutoffs that are fractions of the 
+            default energy cutoff.
+    """
+
+    # The location is the file path of the element directory.
+    element = "Al"
+    location = os.getcwd()
+    system_dir = os.path.join(location, system_name)
+    data_dir = os.path.join(system_dir, "initial_data")
+
+    # Get the energy cutoff and number of bands from the POTCAR.
+    # These are relevant for building the INCAR.
+
+    vasp_data = read_vasp_input(data_dir)
+
+    NBANDS = int(np.sum(vasp_data["ZVAL list"]))
+    new_NBANDS = 2*NBANDS
+    EAUG = np.max(vasp_data["EAUG list"])
+    new_EAUG = 2*EAUG
+    ENMAX = np.max(vasp_data["ENMAX list"])
+    new_ENMAX = 2*ENMAX
+
+    # Make a directory where testing the augmentation energy cutoff will be performed.
+    enaug_test_dir = os.path.join(system_dir, "enaug")
+    if not os.path.isdir(enaug_test_dir):
+        os.mkdir(enaug_test_dir)
+    os.chdir(enaug_test_dir)
+
+    enaug_list = [i*EAUG for i in enaug_list]
+
+    for enaugcut in enaug_list:
+        enaugcut_dir = os.path.join(enaug_test_dir, str(enaugcut))
+        if not os.path.isdir(enaugcut_dir):
+            os.mkdir(enaugcut_dir)
+        
+        os.chdir(enaugcut_dir)
+
+        subprocess.call("cp " + data_dir + "/* .", shell=True)
+        subprocess.call("cp " + location + "/run.py .", shell=True)
+        subprocess.call("cp " + location + "/run.sh .", shell=True)
+
+        create_INCAR(enaugcut_dir)
+        incar_dir = os.path.join(enaugcut_dir, "INCAR")
+        run_dir = os.path.join(enaugcut_dir, "run.sh")
+
+        # Correctly label this job and adjust runtime if necessary.
+        with open(run_dir, 'r') as file:
+            filedata = file.read()
+
+        job_name = "enaug " + str(enaugcut)
+        filedata = filedata.replace("JOB NAME", job_name)
+        filedata = filedata.replace("12:00:00", "4:00:00")
+        filedata = filedata.replace("4096", "8192")
+
+        with open(run_dir, 'w') as file:
+            file.write(filedata)
+
+        # Replace the number of bands and change the initial charge density.
+        # The manual says that 1E-6 accuracy should be obtained within 10-15 iterations.
+        with open(incar_dir, "r") as file:
+            filedata = file.read()
+
+        filedata = filedata.replace("ENAUG = %f"%new_EAUG, "ENAUG = %f"%enaugcut)
+        filedata = filedata.replace("PREC = Accurate", "PREC = Normal")
+
+        with open(incar_dir, "w") as file:
+            file.write(filedata)
+        
+        # Submit the job.
+        subprocess.call('sbatch run.sh', shell=True)
+
+
+def gen_enaug_plots(system_dir):
+    """Generate plots that help identify the appropriate value for the energy cutoff
+    for the augmentation charges.
+
+    Args:
+        system_name (str): the file path to the system being simulated. This folder
+            must contain subfolders that contain VASP simulations with varying energy
+            cutoffs.
+    """
+
+    # Initialize all quantities that'll be plotted.
+    enaug_list = []
+    wrapped_charge_list = [[],[],[]]
+    directions = ["x", "y", "z"]
+
+    element = "Al"
+    location = os.getcwd()
+    elem_dir = os.path.join(location, element)
+    enaug_test_dir = os.path.join(elem_dir, "enaug")
+
+    enaug_cutoff_list = os.listdir(enaug_test_dir)
+
+    try:
+        enaug_cutoff_list.remove("plots")
+    except:
+        None
+
+    for enaug_cutoff in enaug_cutoff_list:
+        enaug_dir = os.path.join(enaug_test_dir, str(enaug_cutoff))
+        outcar_dir = os.path.join(enaug_dir, "OUTCAR")
+
+        vasp_data = read_vasp(enaug_dir)
+
+        if vasp_data != None:
+            enaug_list.append(float(enaug_cutoff))
+            for j in range(len(directions)):
+                wrapped_charge_list[j].append(vasp_data["total wrapped soft charge"][j])    
+
+    plot_dir = os.path.join(enaug_test_dir, "plots")
+    if not os.path.isdir(plot_dir):
+        os.mkdir(plot_dir)
+
+    # Plot the soft charge wrap-around vs. energy cutoff.
+    fig, ax = plt.subplots()
+
+    for i,direct in enumerate(directions):
+        ax.scatter(enaug_list, wrapped_charge_list[i],
+                   label="%s-direction"%directions[i])
+
+    ax.set_title("Number of iterations required for 1E-10 accuracy")
+    ax.set_xlabel("Energy cutoff (eV)")
+    ax.set_xticks(ax.get_xticks()[::4])
+    ax.set_ylabel("Soft charge density wrap-around")
+    ax.legend()
+    plot_name = os.path.join(plot_dir, "soft_charge_wraparound.png")
+    fig.savefig(plot_name)
+    plt.close(fig)
