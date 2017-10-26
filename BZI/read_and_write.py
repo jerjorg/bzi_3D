@@ -758,6 +758,13 @@ def read_vasp(location):
     outcar_file = os.path.join(location, "OUTCAR")
     eigenval_file = os.path.join(location, "EIGENVAL")
     oszicar_file = os.path.join(location, "OSZICAR")
+    doscar_file = os.path.join(location, "DOSCAR")
+
+    if not all([os.path.exists(oszicar_file),
+                os.path.exists(outcar_file),
+                os.path.exists(eigenval_file),
+                os.path.exists(eigenval_file)]):
+        return None
 
     # Right now it only counts the number of electronic self-consistency steps.
     with open(oszicar_file, "r") as file:
@@ -788,6 +795,22 @@ def read_vasp(location):
         VASP_data["k-point weights"] = weights
         VASP_data["reduced k-points"] = kpoints
         VASP_data["k-point degeneracy"] = degeneracy
+
+
+    energy_list = []
+    dos_list = []
+    idos_list = [] # integrated DOS
+    
+    with open(doscar_file, "r") as file:
+        f = file.readlines()
+        for i, line in enumerate(f):
+            if i > 5:
+                energy_list.append(float(line.split()[0]))
+                dos_list.append(float(line.split()[1]))
+                idos_list.append(float(line.split()[2]))
+        VASP_data["density of states data"] = dos_list
+        VASP_data["integrated density of states data"] = idos_list
+        VASP_data["density of states energies"] = energy_list
     
 
     with open(outcar_file, "r") as file:
@@ -811,6 +834,13 @@ def read_vasp(location):
                 
             if "plane waves" in line:
                 nplane_waves.append(int(line.split()[-1]))
+
+            # if "the Fermi energy is" in line:
+            #     VASP_data["Fermi level"] = line.split()[4] + " " + line.split()[5]
+            if "E-fermi" in line:
+                print(line.split())
+                VASP_data["Fermi level"] = float(line.split()[2])
+                print(float(line.split()[2]))
                 
             if " Free energy of the ion-electron system (eV)" in line:
                 alpha_line = f[i+2].split()
@@ -2091,3 +2121,82 @@ def gen_enaug_plots(system_dir):
     plot_name = os.path.join(plot_dir, "soft_charge_wraparound.png")
     fig.savefig(plot_name)
     plt.close(fig)
+
+
+def setup_ndos_tests(location, system_name, ndos_list):
+    """Create the file tree and submit jobs on the supercomputer for
+    testing the sampling of the density of states (NEDOS) in the INCAR.
+
+    Args:
+        location (str): the root directory. It must have a folder named
+            'system_name' and this folder must contain a folder named 'initial_data',
+            where the VASP input files (POTCAR, POSCAR, and KPOINTS) are located.
+        system_name (str): the name of the system being simulated.
+        ndos_list (list): a list of the number of density of states sampling points,
+            in fractions of the default value (NEDOS = 301).
+    """
+
+    ## Everything below will be creating runs for testing the sampling
+    ## for the density of states.
+
+    # The location is the file path of the element directory.
+    system_dir = os.path.join(location, system_name)
+    data_location = os.path.join(system_dir, "initial_data")
+
+    # Get the energy cutoff and number of bands from the POTCAR.
+    # These are relevant for building the INCAR.
+    vasp_data = read_vasp_input(data_location)
+    NBANDS = int(np.sum(vasp_data["ZVAL list"]))
+    new_NBANDS = 2*NBANDS
+    EAUG = np.max(vasp_data["EAUG list"])
+    ENMAX = np.max(vasp_data["ENMAX list"])
+    new_ENMAX = 2*ENMAX
+
+    # Make a directory where testing the DOS sampling will be performed.
+    ndos_test_dir = os.path.join(system_dir, "ndos")
+    if not os.path.isdir(ndos_test_dir):
+        os.mkdir(ndos_test_dir)
+    os.chdir(ndos_test_dir)
+
+    default_ndos = 301
+    ndos_list = [int(default_ndos*i) for i in ndos_list]
+
+    for ndos in ndos_list:
+        ndos_dir = os.path.join(ndos_test_dir, str(ndos))
+        if not os.path.isdir(ndos_dir):
+            os.mkdir(ndos_dir)
+        os.chdir(ndos_dir)
+        
+        subprocess.call("cp " + data_location + "/* .", shell=True)
+        subprocess.call("cp " + location + "/run.py .", shell=True)
+        subprocess.call("cp " + location + "/run.sh .", shell=True)
+            
+        create_INCAR(ndos_dir)
+        incar_dir = os.path.join(ndos_dir, "INCAR")
+        run_dir = os.path.join(ndos_dir, "run.sh")
+
+        # Correctly label this job and adjust runtime if necessary.
+        with open(run_dir, 'r') as file:
+            filedata = file.read()
+
+        job_name = "ndos " + str(ndos)
+        filedata = filedata.replace("JOB NAME", job_name)
+        filedata = filedata.replace("12:00:00", "4:00:00")
+        filedata = filedata.replace("4096", "8192")
+
+        with open(run_dir, 'w') as file:
+            file.write(filedata)
+
+        # Replace the number of bands and change the initial charge density.
+        # The manual says that 1E-6 accuracy should be obtained within 10-15 iterations.
+        with open(incar_dir, "r") as file:
+            filedata = file.read()
+
+        filedata = filedata.replace("NEDOS = 2000", "NEDOS = %i"%ndos)
+        
+        with open(incar_dir, "w") as file:
+            file.write(filedata)
+        
+        # Submit the job.
+        subprocess.call('sbatch run.sh', shell=True)
+    

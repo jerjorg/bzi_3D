@@ -1,5 +1,10 @@
 # Revision History
 
+## Revision 0.2.11
+- Added functions that will plot the density of states, integrated
+  density of states, and create convergence plots of the various
+  energies agains density of states sampling.
+
 ## Revision 0.2.10
 - Created a function that will plot the amount of wrap-around
   soft charge in three directions agains the energy cutoff of
