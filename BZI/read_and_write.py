@@ -5,6 +5,7 @@ import pandas as pd
 import pickle
 import itertools
 import matplotlib.pyplot as plt
+import xarray as xr
 
 
 #######
@@ -2396,14 +2397,21 @@ def pickle_QE_data(home_dir, system_name, parameters):
     # A list of quantities to include in the data frame.
     energy_list = ["total energy", "Fermi energy",
                      "one-electron contribution", "ewald contribution",
-                     "xc contribution", "hartree contribution"]                
-    smearing_value_names = str(smearing_value_list).strip("[]").replace(",","").split()
-    offset_names = [str(o) for o in offset_list]
+                     "xc contribution", "hartree contribution"]    
+
+    offset_names = [str(o) for o in parameters["offset list"]]
     kpoint_names = [str(k).strip("[]").replace(",","") for k in nkpoints_list]
-    coordinates = [grid_type_list, offset_names, occupation_list, smearing_list,
-                   smearing_value_names, nkpoints_list, energy_list]
+    coordinates = [parameters["grid type list"],
+                   offset_names,
+                   parameters["occupation list"],
+                   parameters["smearing list"],
+                   parameters["smearing value list"],
+                   nkpoints_list,
+                   energy_list]
+
     dimensions = ("grid", "offset", "occupation", "smearing", "smearing_value",
                   "kpoints", "energy")
+    
     coordinates = {i:j for i,j in zip(dimensions, coordinates)}
     data = xr.DataArray(data, coords=coordinates, dims=dimensions)
     data.name = system_name + " Quantum Espresso Data"
