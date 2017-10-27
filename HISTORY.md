@@ -1,5 +1,8 @@
 # Revision History
 
+## Revision 0.2.12
+- Added a function that pickles Quantum Espresso convergence data.
+
 ## Revision 0.2.11
 - Added functions that will plot the density of states, integrated
   density of states, and create convergence plots of the various

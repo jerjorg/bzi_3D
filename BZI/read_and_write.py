@@ -3,6 +3,7 @@ import subprocess
 import numpy as np
 import pandas as pd
 import pickle
+import itertools
 import matplotlib.pyplot as plt
 
 
@@ -12,7 +13,11 @@ import matplotlib.pyplot as plt
 ####### =========================================================================
 #######
 
-def run_QE(element, parameters):
+
+# Plotting marker
+marker = itertools.cycle(('1', '2', '3', '4'))
+
+def run_QE(home_dir, system_name, parameters):
     """A function that will take the values contained in parameters, create the
     file structure, and submit a series of Quantum Espresso jobs. The directory
     from which this command is run must contain run.py and run.sh files. It
@@ -26,19 +31,19 @@ def run_QE(element, parameters):
             'occupation list', 'smearing list', 'smearing value list',
             and 'k-points list'. Their corresponding values must be lists.
     """
-    
-    home_dir = os.getcwd()
+
+
     
     # Move into the element directory.
-    element_dir = home_dir + "/" + element
-    os.chdir(element_dir)
+    system_dir = home_dir + "/" + system_name
+    os.chdir(system_dir)
     
     # Locate the inital data.
-    idata_loc = element_dir + "/" + "initial_data"
+    idata_loc = system_dir + "/" + "initial_data"
     
     # Make and move into the grid type directory.
     for grid_type in parameters["grid type list"]:
-        grid_dir = element_dir + "/" + grid_type
+        grid_dir = system_dir + "/" + grid_type
         if not os.path.isdir(grid_dir):
             os.mkdir(grid_dir)
         os.chdir(grid_dir)
@@ -86,17 +91,16 @@ def run_QE(element, parameters):
                             subprocess.call("cp " + idata_loc + "/* ./", shell=True)
                             subprocess.call("cp " + home_dir + "/run.sh ./", shell=True)
                             subprocess.call("cp " + home_dir + "/run.py ./", shell=True)
+                            
                             subprocess.call('chmod +x run.py', shell=True)
 
 
                             # Replace a few values in run.py
                             with open('run.py', 'r') as file :
                                 filedata = file.read()
-
-                            filedata = filedata.replace("grid_type", grid_type)
-                            filedata = filedata.replace("element", element)
+                                
+                            filedata = filedata.replace("system_name", system_name)
                             
-                            # Write the file out again.
                             with open('run.py', 'w') as file:
                                 file.write(filedata)
                                                         
@@ -106,7 +110,7 @@ def run_QE(element, parameters):
                                 filedata = file.read()
 
                             # Replace the target string.
-                            filedata = filedata.replace('ELEMENT', str(element))
+                            filedata = filedata.replace('SYSTEM', str(system_name))
                             filedata = filedata.replace('GRIDTYPE', grid_type)
                             filedata = filedata.replace('OFFSET', str(offset))
                             filedata = filedata.replace('OCCUPATION', occupation)
@@ -120,8 +124,8 @@ def run_QE(element, parameters):
                             
                             # Replace values in the input file.
                             # Read in the file.
-                            with open(element + '.in', 'r') as file:
-                                filedata = file.read()
+                            with open(system_name + '.in', 'r') as file:
+                                filedata = file.read()                            
 
                             # Replace the target string.
                             filedata = filedata.replace("occupation type", occupation)
@@ -137,7 +141,7 @@ def run_QE(element, parameters):
                                 filedata = filedata.replace(off_name, str(off))
                             
                             # Write the file out again.
-                            with open(element + '.in', 'w') as file:
+                            with open(system_name + '.in', 'w') as file:
                                 file.write(filedata)
 
                             # If using a generalized Monkhorst-Pack grid, create a
@@ -148,11 +152,12 @@ def run_QE(element, parameters):
                                 file.write("BETA_MODE=TRUE\n")
                                 file.write("INCLUDEGAMMA=FALSE\n")
                                 file.write("MINDISTANCE=%i\n"%min_dist)
+                                file.write("OFFSET=AUTO\n")
 
                             # Adjust time to run and memory
                             with open("run.sh", "r") as file:
                                 filedata = file.read()
-                            
+                                
                             if nkpoints <= 8000:    
                                 filedata = filedata.replace("12:00:00", "4:00:00")
                                 filedata = filedata.replace("4096", "8192")
@@ -168,6 +173,12 @@ def run_QE(element, parameters):
                             elif nkpoints >= 64000:
                                 filedata = filedata.replace("12:00:00", "24:00:00")
                                 filedata = filedata.replace("4096", "65536")
+
+                            with open("run.sh", "w") as file:
+                                file.write(filedata)
+
+                            if grid_type == "Generalized Monkhorst-Pack":
+                                subprocess.call("getKPointsBeta -qe " + system_name + ".in", shell=True)
                                 
                             subprocess.call('sbatch run.sh', shell=True)
                             
@@ -176,23 +187,23 @@ def run_QE(element, parameters):
                     os.chdir(occupation_dir)
                 os.chdir(offset_dir)
             os.chdir(grid_dir)
-        os.chdir(element_dir)
+        os.chdir(system_dir)
     os.chdir(home_dir)
 
 
-def read_QE(location, file_prefix):
+def read_QE(location, system_name):
     """Create a dictionary of most of the data created during a
     single Quantum Espresso calculation.
 
     Args:
         location (str): the location of the Quantum Espresso calculation.
-        file_prefix (str): the prefix of the input and output files.
+        system_name (str): the prefix of the input and output files.
     """
     
     QE_data = {}
     QE_data["self-consistent calculation time"] = []
-    output_file = location + "/" + file_prefix + ".out"
-    input_file = location + "/" + file_prefix + ".in"
+    output_file = location + "/" + system_name + ".out"
+    input_file = location + "/" + system_name + ".in"
 
     with open(input_file, "r") as file:
         f = file.readlines()
@@ -402,7 +413,7 @@ def read_QE(location, file_prefix):
     return QE_data
 
 
-def remove_QE_save(element, parameters):
+def remove_QE_save(home_dir, system_name, parameters):
     """A function that will remove the save folder created during a Quantum Espresso
     run.
     
@@ -411,19 +422,19 @@ def remove_QE_save(element, parameters):
             key strings must be present: 'grid type list', 'offset list',
             'occupation list', 'smearing list', 'smearing value list',
             and 'k-points list'. Their corresponding values must be lists.
+        home_dir (str): the root directory that contains a filder 'system_name'.
+        system_name (str): the name of the system being considered.
     """
-
-    save_file_name = element + ".save"
     
-    home_dir = os.getcwd()
+    save_file_name = system_name + ".save"
     
-    # Make and move into the element directory.
-    element_dir = home_dir + "/" + element
-    os.chdir(element_dir)
+    # Make and move into the system directory.
+    system_dir = home_dir + "/" + system_name
+    os.chdir(system_dir)
         
     # Move into the grid type directory.
     for grid_type in parameters["grid type list"]:
-        grid_dir = element_dir + "/" + grid_type
+        grid_dir = system_dir + "/" + grid_type
         os.chdir(grid_dir)
         
         # Make and move into the offset directory
@@ -460,7 +471,7 @@ def remove_QE_save(element, parameters):
                     os.chdir(occupation_dir)
                 os.chdir(offset_dir)
             os.chdir(grid_dir)
-        os.chdir(element_dir)
+        os.chdir(system_dir)
     os.chdir(home_dir)
     
 
@@ -626,7 +637,7 @@ def read_vasp_input(location):
     Returns:
         VASP_data (dict): a dictionary of input parameters.
     """
-    
+
     VASP_data = {}
     kpoints_file = os.path.join(location, "KPOINTS")
     poscar_file = os.path.join(location, "POSCAR")
@@ -838,9 +849,7 @@ def read_vasp(location):
             # if "the Fermi energy is" in line:
             #     VASP_data["Fermi level"] = line.split()[4] + " " + line.split()[5]
             if "E-fermi" in line:
-                print(line.split())
                 VASP_data["Fermi level"] = float(line.split()[2])
-                print(float(line.split()[2]))
                 
             if " Free energy of the ion-electron system (eV)" in line:
                 alpha_line = f[i+2].split()
@@ -1326,7 +1335,7 @@ def create_INCAR(location):
         file.write("  EDIFFG = 1E-9 \n \n")
 
         file.write("The maximum number of ionic steps (default = 0) \n")
-        file.write("  NSW = 0 \n \n")
+        file.write("  NSW = 20 \n \n")
 
         file.write("Determines how the partial occupancies are set for each orbital "
                    "(default = 1) \n")  
@@ -1599,7 +1608,7 @@ def setup_nbands_tests(location, system_name, nbands_list):
         job_name = system_name + " nbands " + str(band_n)
         filedata = filedata.replace("JOB NAME", job_name)
         filedata = filedata.replace("12:00:00", "4:00:00")
-        filedata = filedata.replace("4096", "8192")    
+        filedata = filedata.replace("4096", "8192")
 
         with open(run_dir, 'w') as file:
             file.write(filedata)
@@ -1633,7 +1642,8 @@ def gen_nbands_plots(system_dir):
             must contain subfolders that contain VASP simulations with varying number of 
             bands.
     """
-    
+        
+    # Initialize quantities that will be plotted.
     nbands_list = []
     iterations_list = []
 
@@ -1674,7 +1684,7 @@ def gen_nbands_plots(system_dir):
         
     fig, ax = plt.subplots()
     ax.axhline(y=10 , color="black", linestyle="-")
-    ax.scatter(plotting_bands_list, iterations_list, color="blue")
+    ax.scatter(plotting_bands_list, iterations_list)
     ax.set_title("Number of iterations required for 1E-10 accuracy")
     ax.set_xlabel("Number of bands")
     ax.set_ylabel("Number of iterations")
@@ -1682,7 +1692,7 @@ def gen_nbands_plots(system_dir):
     if not os.path.isdir(plot_dir):
         os.mkdir(plot_dir)
     plot_name = os.path.join(plot_dir, "nbands_convergence.png")
-    fig.savefig(plot_name)
+    fig.savefig(plot_name, bbox_inches="tight")
     plt.close(fig)
 
     
@@ -1903,17 +1913,18 @@ def gen_encut_plots(system_dir):
     for i, sym_energy in enumerate(vasp_energies):
         fig1, ax1 = plt.subplots()
         for j, energy in enumerate(sym_energy):
-            ax1.scatter(cutoff_energies[i][j], energy, label=shift_sym_labels[j])
+            ax1.scatter(cutoff_energies[i][j], energy, label=shift_sym_labels[j],
+                        marker = next(marker))
         
         plot_label_i = vasp_energy_names_dict[vasp_energy_names[i]]
         ax1.set_title("Comparing " + plot_label_i + " without symmetry "
                       "and with shifted atoms")
         ax1.set_xlabel("Energy cutoff (eV)")
         ax1.set_ylabel("Energy (eV/Ang)")
-        ax1.set_xticks(ax1.get_xticks()[::4])
+        ax1.set_xticks(ax1.get_xticks()[::2])
         ax1.legend()
         plot_name = os.path.join(plot_dir, plot_label_i + ".png")
-        fig1.savefig(plot_name)
+        fig1.savefig(plot_name, bbox_inches="tight")
         plt.close(fig1)
         
     # Plot the total charge wrap-around vs. energy cutoff.
@@ -1921,63 +1932,64 @@ def gen_encut_plots(system_dir):
 
     for i,direct in enumerate(directions):
         ax.scatter(cutoff_plot_list, tot_wrapped_charge_list[i],
-                   label="%s-direction"%directions[i])
+                   label="%s-direction"%directions[i], marker = next(marker))
 
     ax.set_title("Number of iterations required for 1E-10 accuracy")
     ax.set_xlabel("Energy cutoff (eV)")
-    ax.set_xticks(ax.get_xticks()[::4])
+    ax.set_xticks(ax.get_xticks()[::2])
     ax.set_ylabel("Total charge density wrap-around")
     ax.legend()
     plot_name = os.path.join(plot_dir, "total_charge_wraparound.png")
-    fig.savefig(plot_name)
+    fig.savefig(plot_name, bbox_inches="tight")
     plt.close(fig)
         
     # Plot drift forces.
     fig, ax = plt.subplots()
-    ax.scatter(cutoff_plot_list, drift_force_list, color="blue")
+    ax.scatter(cutoff_plot_list, drift_force_list)
     ax.set_title("Change in drift force")
     ax.set_xlabel("Energy cutoff (eV)")
     ax.set_ylabel("Drift force (eV/Ang)")
-    ax.set_xticks(ax.get_xticks()[::4])
+    ax.set_xticks(ax.get_xticks()[::2])
     plot_name = os.path.join(plot_dir, "drift_force.png")
-    fig.savefig(plot_name)
+    fig.savefig(plot_name, bbox_inches="tight")
     plt.close(fig)
 
     # Plot cell volumes.
     fig, ax = plt.subplots()
-    ax.scatter(cutoff_plot_list, cell_volume_list, color="blue")
+    ax.scatter(cutoff_plot_list, cell_volume_list)
     ax.set_title("Change in cell volume")
     ax.set_xlabel("Energy cutoff (eV)")
     ax.set_ylabel("Cell volume ($\mathrm{Ang}^3$)")
-    ax.set_xticks(ax.get_xticks()[::4])
+    ax.set_xticks(ax.get_xticks()[::2])
     plot_name = os.path.join(plot_dir, "cell_volume.png")
-    fig.savefig(plot_name)
+    fig.savefig(plot_name, bbox_inches="tight")
     plt.close(fig)
 
     # Plot cell norms.
     fig, ax = plt.subplots()
-    ax.scatter(cutoff_plot_list, lat_vec_norm_list, color="blue")
+    ax.scatter(cutoff_plot_list, lat_vec_norm_list)
     ax.set_title("Change in basis vectors")
     ax.set_xlabel("Energy cutoff (eV)")
     ax.set_ylabel("Frobenius norm of basis")
-    ax.set_xticks(ax.get_xticks()[::4])
+    ax.set_xticks(ax.get_xticks()[::2])
     plot_name = os.path.join(plot_dir, "basis_norm.png")
-    fig.savefig(plot_name)
+    fig.savefig(plot_name, bbox_inches="tight")
     plt.close(fig)
 
     # Plot all forces.
     fig, ax = plt.subplots()
     for i,force_type in enumerate(force_type_list):
-        ax.scatter(cutoff_plot_list, force_list[i], label=force_type)
+        ax.scatter(cutoff_plot_list, force_list[i], label=force_type,
+                   marker = next(marker))
 
-    ax.scatter(cutoff_plot_list, drift_force_list, label="drift")
+    # ax.scatter(cutoff_plot_list, drift_force_list, label="drift")
     ax.set_title("Forces acting on ions")
     ax.set_xlabel("Energy cutoff (eV)")
     ax.set_ylabel("Force (eV/Ang)")
-    ax.set_xticks(ax.get_xticks()[::4])
+    ax.set_xticks(ax.get_xticks()[::2])
     ax.legend()
     plot_name = os.path.join(plot_dir, "all_forces.png")
-    fig.savefig(plot_name)
+    fig.savefig(plot_name, bbox_inches="tight")
     plt.close(fig)
     
     return None
@@ -1997,22 +2009,14 @@ def setup_enaug_tests(location, system_name, enaug_list):
     """
 
     # The location is the file path of the element directory.
-    element = "Al"
-    location = os.getcwd()
     system_dir = os.path.join(location, system_name)
     data_dir = os.path.join(system_dir, "initial_data")
 
     # Get the energy cutoff and number of bands from the POTCAR.
     # These are relevant for building the INCAR.
-
     vasp_data = read_vasp_input(data_dir)
-
-    NBANDS = int(np.sum(vasp_data["ZVAL list"]))
-    new_NBANDS = 2*NBANDS
-    EAUG = np.max(vasp_data["EAUG list"])
-    new_EAUG = 2*EAUG
-    ENMAX = np.max(vasp_data["ENMAX list"])
-    new_ENMAX = 2*ENMAX
+    eaug = np.max(vasp_data["EAUG list"])
+    new_eaug = 2*eaug
 
     # Make a directory where testing the augmentation energy cutoff will be performed.
     enaug_test_dir = os.path.join(system_dir, "enaug")
@@ -2020,7 +2024,7 @@ def setup_enaug_tests(location, system_name, enaug_list):
         os.mkdir(enaug_test_dir)
     os.chdir(enaug_test_dir)
 
-    enaug_list = [i*EAUG for i in enaug_list]
+    enaug_list = [i*eaug for i in enaug_list]
 
     for enaugcut in enaug_list:
         enaugcut_dir = os.path.join(enaug_test_dir, str(enaugcut))
@@ -2054,7 +2058,7 @@ def setup_enaug_tests(location, system_name, enaug_list):
         with open(incar_dir, "r") as file:
             filedata = file.read()
 
-        filedata = filedata.replace("ENAUG = %f"%new_EAUG, "ENAUG = %f"%enaugcut)
+        filedata = filedata.replace("ENAUG = %f"%new_eaug, "ENAUG = %f"%enaugcut)
         filedata = filedata.replace("PREC = Accurate", "PREC = Normal")
 
         with open(incar_dir, "w") as file:
@@ -2074,18 +2078,16 @@ def gen_enaug_plots(system_dir):
             cutoffs.
     """
 
+
+    system_name = system_dir.split(os.sep)[-1]    
+    enaug_test_dir = os.path.join(system_dir, "enaug")
+    
     # Initialize all quantities that'll be plotted.
     enaug_list = []
     wrapped_charge_list = [[],[],[]]
     directions = ["x", "y", "z"]
 
-    element = "Al"
-    location = os.getcwd()
-    elem_dir = os.path.join(location, element)
-    enaug_test_dir = os.path.join(elem_dir, "enaug")
-
     enaug_cutoff_list = os.listdir(enaug_test_dir)
-
     try:
         enaug_cutoff_list.remove("plots")
     except:
@@ -2111,7 +2113,8 @@ def gen_enaug_plots(system_dir):
 
     for i,direct in enumerate(directions):
         ax.scatter(enaug_list, wrapped_charge_list[i],
-                   label="%s-direction"%directions[i])
+                   label="%s-direction"%directions[i],
+                   marker = next(marker))
 
     ax.set_title("Number of iterations required for 1E-10 accuracy")
     ax.set_xlabel("Energy cutoff (eV)")
@@ -2142,15 +2145,6 @@ def setup_ndos_tests(location, system_name, ndos_list):
     # The location is the file path of the element directory.
     system_dir = os.path.join(location, system_name)
     data_location = os.path.join(system_dir, "initial_data")
-
-    # Get the energy cutoff and number of bands from the POTCAR.
-    # These are relevant for building the INCAR.
-    vasp_data = read_vasp_input(data_location)
-    NBANDS = int(np.sum(vasp_data["ZVAL list"]))
-    new_NBANDS = 2*NBANDS
-    EAUG = np.max(vasp_data["EAUG list"])
-    ENMAX = np.max(vasp_data["ENMAX list"])
-    new_ENMAX = 2*ENMAX
 
     # Make a directory where testing the DOS sampling will be performed.
     ndos_test_dir = os.path.join(system_dir, "ndos")
@@ -2199,4 +2193,221 @@ def setup_ndos_tests(location, system_name, ndos_list):
         
         # Submit the job.
         subprocess.call('sbatch run.sh', shell=True)
+
+
+def gen_ndos_plots(system_dir):
+    """Generate plots that help identify the appropriate value for the sampling
+    of the density of states.
+
+    Args:
+        system_dir (str): the file path to the system being simulated. This folder
+            must contain subfolders that contain VASP simulations with varying density
+            of states samplings.
+    """
+
+    system_name = system_dir.split(os.sep)[-1]    
+    ndos_test_dir = os.path.join(system_dir, "ndos")
     
+    # Initialize all quantities that'll be plotted.
+    cutoff_energies = []
+    vasp_energies = [[] for _ in range(12)]
+    ndos_values = [[] for _ in range(12)]
+    VASP_data = {}
+
+    vasp_energy_names  = ['alpha Z', 'Ewald energy', '-1/2 Hartree', '-exchange',
+                          '-V(xc)+E(xc)', 'PAW double counting', 'entropy T*S',
+                          'eigenvalues', 'atomic energy', 'free energy',
+                          'energy without entropy', 'energy(sigma->0)']
+
+    # A dictionary used for labels in plots.
+    vasp_energy_names_dict = {'alpha Z': "alpha",
+                              'Ewald energy': "Ewald",
+                              '-1/2 Hartree': "Hartree",
+                              '-exchange': "Hartree exchange",
+                              '-V(xc)+E(xc)': "total exchange",
+                              'PAW double counting': "PAW energy",
+                              'entropy T*S': "entropy",
+                              'eigenvalues': "band energy",
+                              'atomic energy': "atomic energy",
+                              'free energy': "free energy",
+                              'energy without entropy': "energy without entropy",
+                              'energy(sigma->0)': "extrapolated free energy"}
+    
+    ndos_list = os.listdir(ndos_test_dir)
+    try:
+        ndos_list.remove("plots")
+    except:
+        None
+
+    for ndos in ndos_list:
+        ndos_dir = os.path.join(ndos_test_dir, ndos)
+        vasp_data = read_vasp(ndos_dir)
+
+        if vasp_data != None:
+            for i, en in enumerate(vasp_energy_names):
+                ndos_values[i].append(int(ndos))
+                vasp_energies[i].append(float(vasp_data[en]))
+        else:
+            continue
+
+    # Make a directory to store plots.
+    plot_dir = os.path.join(ndos_test_dir, "plots")
+    if not os.path.isdir(plot_dir):
+        os.mkdir(plot_dir)
+
+    # Plot energy convergence against density of state sampling.
+    fig1, ax1 = plt.subplots()
+    for ndos_list, vasp_energy, energy_name in zip(ndos_values, vasp_energies, vasp_energy_names):
+        fig2,ax2 = plt.subplots()
+        ax1.scatter(ndos_list, vasp_energy, label=vasp_energy_names_dict[energy_name],
+                    marker = next(marker))
+        ax2.scatter(ndos_list, vasp_energy, label=vasp_energy_names_dict[energy_name])
+        ax2.set_title("Energy convergence with greater DOS accuracy")
+        ax2.set_xlabel("Number of grid points on which the DOS is evaluated")
+        ax2.set_ylabel("Energy (eV/Ang)")
+        ax2.set_xticks(ax2.get_xticks()[::2])
+        ax2.legend()
+        plot_name = os.path.join(plot_dir, vasp_energy_names_dict[energy_name] + "_dos.png")
+        fig2.savefig(plot_name, bbox_inches="tight")
+        plt.close(fig2)
+        
+    ax1.set_title("Energy convergence with greater DOS accuracy")
+    ax1.set_xlabel("Number of grid points on which the DOS is evaluated")
+    ax1.set_ylabel("Energy (eV/Ang)")
+    ax1.set_xticks(ax1.get_xticks()[::2])
+    lgd = ax1.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    plot_name = os.path.join(plot_dir, "dos_convergence.png")
+    fig1.savefig(plot_name, bbox_extra_artists=(lgd,), bbox_inches='tight')
+    plt.close(fig1)
+
+    # List the density of states sampling directories again.
+    ndos_list = os.listdir(ndos_test_dir)
+    try:
+        ndos_list.remove("plots")
+    except:
+        None
+
+    # Make a directory to save density of state and integrated density of state plots.
+    dos_plot_dir = os.path.join(plot_dir, "DOS")
+    if not os.path.isdir(dos_plot_dir):
+        os.mkdir(dos_plot_dir)
+
+    # Collect and plot density of states data.
+    for ndos in ndos_list:
+        ndos_dir = os.path.join(ndos_test_dir, ndos)
+        fermi_level = 0
+        vasp_data = read_vasp(ndos_dir)
+
+        if vasp_data != None:
+            energy_list = vasp_data["density of states energies"]
+            dos_list = vasp_data["density of states data"]
+            idos_list = vasp_data["integrated density of states data"]
+
+            fermi_level = vasp_data["Fermi level"]
+        else:
+            continue
+
+        plot_dir = os.path.join(dos_plot_dir, ndos)
+        if not os.path.isdir(plot_dir):
+            os.mkdir(plot_dir)
+            
+        fig1, ax1 = plt.subplots()
+        fig2, ax2 = plt.subplots()
+
+        ax1.plot(energy_list, dos_list)
+        ax1.set_title("Density of states with %s energy bins"%ndos)
+        ax1.set_xlim(min(energy_list), fermi_level + 2)
+        ax1.set_xlabel("Energy (eV)")
+        ax1.set_ylabel("Density of states")
+
+        plot_name = os.path.join(plot_dir, "dos.png")
+        fig1.savefig(plot_name, bbox_inches="tight")
+        plt.close(fig1)
+        
+        ax2.plot(energy_list, idos_list)
+        ax2.set_title("Integrated density of states with %s energy bins"%ndos)
+        ax2.set_xlabel("Energy (eV)")
+        ax2.set_ylabel("Integrated density of states")
+        ax2.set_xlim(min(energy_list), fermi_level + 1)
+        
+        plot_name = os.path.join(plot_dir, "idos.png")
+        fig2.savefig(plot_name, bbox_inches="tight")
+        plt.close(fig2)
+
+    return None
+
+
+def pickle_QE_data(home_dir, system_name, parameters):
+    """Write a pickle file of the data from the Quantum Espresso runs of a system.
+
+    Args:
+        home_dir (str): the root directory. It must have a folder named
+            'system_name' and this folder must contain a folder named 'initial_data',
+            where the VASP input files (POTCAR, POSCAR, and KPOINTS) are located.
+        system_name (str): the name of the system being simulated.
+        parameters (dict): a dictionary of adjustable parameters. The following
+            key strings must be present: 'grid type list', 'offset list',
+            'occupation list', 'smearing list', 'smearing value list',
+            and 'k-points list'. Their corresponding values must be lists.
+    """
+    
+    data = np.empty([len(parameters[i]) for i in parameters.keys()], dtype=float)
+
+    # Make and move into the system directory.
+    system_dir = home_dir + "/" + system_name
+
+    # Find the grid type directory.
+    for i, grid_type in enumerate(parameters["grid type list"]):
+        grid_dir = system_dir + "/" + grid_type
+
+        # Find the offset directory.
+        for j, shift in enumerate(parameters["offset list"]):
+            offset_name = str(shift).strip("[").strip("]")
+            offset_name = offset_name.replace(",", "")
+            offset_dir = grid_dir + "/" + offset_name
+
+            # Find the occupation type directory.
+            for k,occupation in enumerate(parameters["occupation list"]):
+                occupation_dir = offset_dir + "/" + occupation
+
+                # Find the smearing type directory.
+                for l,smearing in enumerate(parameters["smearing list"]):
+                    smearing_dir = occupation_dir + "/" + smearing
+
+                    # Find the smearing value directory.
+                    for m,smearing_value in enumerate(parameters["smearing value list"]):
+                        smearing_value_dir = smearing_dir + "/" + str(smearing_value)
+
+                        # Find the k-points directory.
+                        kpoint_list = os.listdir(smearing_value_dir)
+
+                        # Find the number of reduced and unreduced k-points.
+                        nkpoints_list = []
+                        for n,nkpoints in enumerate(kpoint_list):
+                        # for n,kpoints in enumerate(parameters["k-point list"]):
+                            # nkpoints = np.prod(kpoints)
+                            kpoint_dir = smearing_value_dir + "/" + str(nkpoints)
+                            qe_data = read_QE(kpoint_dir, system_name)
+
+                            nkpoints_list.append(str([int(qe_data["number of unreduced k-points"]), (
+                                int(qe_data["number of reduced k-points"]))]))
+                            for o,energy in enumerate(parameters["energy list"]):
+                                data[i,j,k,l,m,n,o] = float(qe_data[energy].split()[0])    
+                                
+                                
+    # A list of quantities to include in the data frame.
+    energy_list = ["total energy", "Fermi energy",
+                     "one-electron contribution", "ewald contribution",
+                     "xc contribution", "hartree contribution"]                
+    smearing_value_names = str(smearing_value_list).strip("[]").replace(",","").split()
+    offset_names = [str(o) for o in offset_list]
+    kpoint_names = [str(k).strip("[]").replace(",","") for k in nkpoints_list]
+    coordinates = [grid_type_list, offset_names, occupation_list, smearing_list,
+                   smearing_value_names, nkpoints_list, energy_list]
+    dimensions = ("grid", "offset", "occupation", "smearing", "smearing_value",
+                  "kpoints", "energy")
+    coordinates = {i:j for i,j in zip(dimensions, coordinates)}
+    data = xr.DataArray(data, coords=coordinates, dims=dimensions)
+    data.name = system_name + " Quantum Espresso Data"
+    
+    pickle.dump(data, open(system_name + ".p", "wb"))
