@@ -1,5 +1,27 @@
 # Revision History
 
+## Revision 0.2.12
+- Added a function that pickles Quantum Espresso convergence data.
+
+## Revision 0.2.11
+- Added functions that will plot the density of states, integrated
+  density of states, and create convergence plots of the various
+  energies agains density of states sampling.
+
+## Revision 0.2.10
+- Created a function that will plot the amount of wrap-around
+  soft charge in three directions agains the energy cutoff of
+  the augmentation charge.
+
+## Revision 0.2.9
+- Created a function that will plot the convergence of various
+  values as a function of the energy cutoff. This should help
+  determine the value of `ENCUT` in the VASP INCAR file.
+
+## Revision 0.2.8
+- Created functions that will test the `NBANDS` and `ENCUT` input
+  parameters in the VASP INCAR.
+
 ## Revision 0.2.7
 - Added `create_incar` and `read_potcar` to `read_and_write.py`.
 

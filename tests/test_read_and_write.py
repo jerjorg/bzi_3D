@@ -2,7 +2,7 @@
 
 import numpy as np
 import pytest
-from BZI.read_and_write import read_QE, read_VASP
+from BZI.read_and_write import read_QE, read_vasp
 from conftest import run
 import os
 
@@ -306,11 +306,11 @@ def test_read_QE():
     assert QE_data_Si["number of unreduced k-points"] == 216.0
     
 
-@pytest.mark.skipif("test_read_VASP" not in tests, reason="different tests")
-def test_read_VASP():
+@pytest.mark.skipif("test_read_vasp" not in tests, reason="different tests")
+def test_read_vasp():
 
     location = os.path.join(os.getcwd(), "tests", "Al_VASP")
-    vasp_data = read_VASP(location)
+    vasp_data = read_vasp(location)
 
 
     assert vasp_data['number of unreduced k-points'] == 512
