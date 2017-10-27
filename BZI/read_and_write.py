@@ -86,8 +86,8 @@ def run_QE(element, parameters):
                             subprocess.call("cp " + idata_loc + "/* ./", shell=True)
                             subprocess.call("cp " + home_dir + "/run.sh ./", shell=True)
                             subprocess.call("cp " + home_dir + "/run.py ./", shell=True)
-                            subprocess.call('chmod +x run.py', shell=True)                            
-                                                        
+                            subprocess.call('chmod +x run.py', shell=True)
+                                                                                        
                             # Correctly label this job.
                             # Read in the file.
                             with open('run.sh', 'r') as file :
@@ -656,7 +656,7 @@ def read_VASP(location):
 
         # If negative, the scaling factor should be interpreted as the total volume
         # of the cell.
-        VASP_data["scaling factor"] = float(f[1])
+        VASP_data["scaling factor"] = float(f[1].split()[0])
 
         a1 = [float(v) for v in f[2].strip().split()]
         a2 = [float(v) for v in f[3].strip().split()]            
@@ -822,6 +822,11 @@ def create_INCAR(location):
     Args:
         location (str): the location of the VASP input files
     """
+
+    potcar_data = read_potcar(location)
+
+    NBANDS = int(np.sum(potcar_data["ZVAL list"]))
+    EAUG = np.max(potcar_data["EAUG list"])
 
     incar_file = os.path.join(location, "INCAR")
     system = "Cu"
