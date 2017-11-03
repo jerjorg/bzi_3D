@@ -179,7 +179,11 @@ def run_QE(home_dir, system_name, parameters):
 
                             if grid_type == "Generalized Monkhorst-Pack":
                                 subprocess.call("getKPointsBeta -qe " + system_name + ".in", shell=True)
-                                
+
+                            # Setting a larger stack size should keep some jobs from segfaulting.
+                            subprocess.call("ulimit -s unlimited", shell=True)
+
+                            # Submit the job.
                             subprocess.call('sbatch run.sh', shell=True)
                             
                             os.chdir(smearing_value_dir)
@@ -209,11 +213,18 @@ def read_QE(location, system_name):
         f = file.readlines()
         for i, line in enumerate(f):
             if "K_POINTS" in line:
-                kpt_index = i + 1
-                kpt_line = f[kpt_index].split()
-                total_kpoints = (float(kpt_line[0])*float(kpt_line[1])*
-                                 float(kpt_line[2]))
-                QE_data["number of unreduced k-points"] = total_kpoints
+                try:
+                    kpt_index = i + 1
+                    print(f[kpt_index])
+                    kpt_line = f[kpt_index].split()
+                    total_kpoints = (float(kpt_line[0])*float(kpt_line[1])*
+                                     float(kpt_line[2]))
+                    QE_data["number of unreduced k-points"] = total_kpoints
+                except:
+                    continue
+            if "Server version" in line:
+                kpt_line = line.split()
+                QE_data["number of unreduced k-points"] = int(kpt_line[kpt_line.index("total") - 1])
     
     with open(output_file, "r") as file:
         f = file.readlines()
@@ -516,7 +527,7 @@ def plot_QE_data(home, grid_type_list, occupation_list, energy_list):
             
             for i, kpoint in enumerate(kpoint_list):
                 kpt_dir = occ_dir + "/" + kpoint
-                
+
                 # Extract data from Quantum Espresso output file.
                 qe_data = read_QE(kpt_dir, "Al")
                 total_kpoints = qe_data["number of unreduced k-points"]
@@ -532,9 +543,9 @@ def plot_QE_data(home, grid_type_list, occupation_list, energy_list):
                     for energy in energy_list:
                         df_dict[energy].set_value(total_kpoints, np.nan)
 
-            df = pd.DataFrame(df_dict)        
+            df = pd.DataFrame(df_dict)
             for energy in energy_list:
-                df[energy + " error"] = abs(df[energy] - df[energy][max_kpts])                
+                df[energy + " error"] = abs(df[energy] - df[energy][max_kpts])
                 df[energy + " error"] = df[energy + " error"].drop(max_kpts)
             df["number of unreduced k-points"] = total_kpoint_series
             df["number of reduced k-points"] = reduced_kpoint_series
@@ -613,7 +624,7 @@ def plot_QE_data(home, grid_type_list, occupation_list, energy_list):
                         entry = grid_type + " " + occupation
                         legend_names.append(entry)
                         if err_or_not == "":
-                            grid_integral_panel[entry].plot(x=xaxis, y=err_name, 
+                            grid_integral_panel[entry].plot(x=xaxis, y=err_name,
                                                             kind = "scatter", ax=ax,
                                                             color=colors[j])
                         else:
@@ -1373,6 +1384,120 @@ def create_INCAR(location):
                    "(default = 0.001) \n")
         file.write("  WEIMIN = 1E-6 \n \n")
 
+
+def make_QE_input(location, pseudo_dir, system_params):
+    """Make a Quantum espresso input file based on reasonable input parameters.
+
+    Args:
+        location (str): the file path to the directory where the input file will be saved.
+        pseudo_file (str): the file path to the pseudopotential files.
+        system_params (dict): a dictionary of system parameters. In particular, it
+            should contain information about the atomic basis and crystal lattice.
+    """
+
+    input_file = os.path.join(location, system_params["system name"] + ".in")
+    pseudo_files = []
+
+    for file in os.listdir(pseudo_dir):
+        if ".UPF" in file:
+            pseudo_files.append(os.path.join(pseudo_dir, file))
+
+    # Get the energy cutoffs and number of bands from the pseudopotential.
+    QE_data = [read_QE_pseudopot(pf) for pf in pseudo_files]
+
+    wfc_cutoff = max([qe["wavefunction cutoff"] for qe in QE_data])
+    rho_cutoff = max([qe["charge density cutoff"] for qe in QE_data])
+    nbands = np.sum([qe["valency"] for qe in QE_data])
+
+
+    natoms = 0
+    for atom in system_params["atomic species"]:
+        for pos in system_params[atom]["positions"]:
+            natoms += 1
+
+    if np.isclose(wfc_cutoff, 0):
+        wfc_cutoff = 100
+
+    if np.isclose(rho_cutoff, 0):
+        rho_cutoff = 12*wfc_cutoff
+
+    with open(input_file, "w") as file:
+        file.write("&CONTROL \n")
+        file.write("  calculation = 'relax' \n")
+        file.write("  verbosity = 'low' \n")
+        file.write("  wf_collect = .false. \n") # don't write the wavefunctions to file
+        file.write("  nstep = 100 \n")
+        file.write("  tstress = .true. \n")
+        file.write("  tprnfor = .true. \n")
+        file.write("  prefix = '" + system_params["system name"] + "' \n")
+        file.write("  etot_conv_thr = 1.0d-9 \n")
+        file.write("  forc_conv_thr = 1.0d-8 \n")
+        file.write("  disk_io = 'low' \n")
+        file.write("  pseudo_dir = '" + system_params["pseudopotential directory"] + "' \n")
+        file.write("/ \n \n")
+
+        file.write("&SYSTEM \n")
+        file.write("  ibrav = 0 \n")
+        file.write("  nat = " + str(natoms)  + "\n")
+        file.write("  ntyp = 1 \n")
+        file.write("  nbnd = 20 \n")
+        file.write("  ecutwfc = " + str(wfc_cutoff) + " \n")
+        file.write("  ecutrho = " + str(rho_cutoff) + " \n")
+        file.write("  ecutfock = " + str(rho_cutoff) + " \n")
+        file.write("  nosym = .false. \n")
+        file.write("  occupations = '" + system_params["occupations"] + "' \n")
+        file.write("  degauss = " + system_params["smearing value"] + " \n")
+        file.write("  smearing = '" + system_params["smearing method"] + "' \n")
+        file.write("/ \n \n")
+
+        file.write("&ELECTRONS \n")
+        file.write("  electron_maxstep = 200 \n")
+        file.write("  conv_thr = 1.0d-8 \n")
+        file.write("  mixing_beta = 0.7 \n")
+        file.write("/ \n \n")
+
+        # The dictionary parameters contains a key 'atomic species' which contains a list
+        # of all the elements in the system.
+        
+        # The dictionary parameters contains a key for each atomic species. The value
+        # for each atomic species is another dictionary that contains the atomic mass,
+        # positions, and the name of the pseudopotential file.
+        file.write("ATOMIC_SPECIES \n")
+        for atom in system_params["atomic species"]:
+            file.write(" " + atom + " " + str(system_params[atom]["atomic mass"]) + " "
+                       + system_params[atom]["pseudopotential file"] + " \n")
+        file.write("\n")
+        
+        # file.write("Al 26.982 Al.pbe-high.UPF \n \n")
+        
+        file.write("ATOMIC_POSITIONS angstrom \n")
+        for atom in system_params["atomic species"]:
+            for pos in system_params[atom]["positions"]:
+                atp = (" " + atom + " " + str(pos[0]) +
+                       " " + str(pos[1]) + " " + str(pos[2]) + "\n")
+                file.write(atp)
+        file.write("\n")
+        # file.write("Al 0.00000000 0.00000000 0.00000000 \n \n")
+        file.write("K_POINTS automatic \n")
+        file.write(" 20 20 20 1 1 1 \n \n")
+
+        v11 = str(system_params["lattice vectors"][0,0])
+        v12 = str(system_params["lattice vectors"][1,0])
+        v13 = str(system_params["lattice vectors"][2,0])
+
+        v21 = str(system_params["lattice vectors"][0,1])
+        v22 = str(system_params["lattice vectors"][1,1])
+        v23 = str(system_params["lattice vectors"][2,1])
+
+        v31 = str(system_params["lattice vectors"][0,2])
+        v32 = str(system_params["lattice vectors"][1,2])
+        v33 = str(system_params["lattice vectors"][2,2])
+
+        file.write("CELL_PARAMETERS angstrom \n")
+        file.write(" " + v11 + " " + v12 + " " + v13 + "\n")
+        file.write(" " + v21 + " " + v22 + " " + v23 + "\n")
+        file.write(" " + v31 + " " + v32 + " " + v33 + "\n\n")
+
         
 def read_potcar(location):
     """Read values from the POTCAR
@@ -1550,6 +1675,10 @@ def run_VASP(element, parameters):
                             filedata = filedata.replace("12:00:00", "24:00:00")
                             filedata = filedata.replace("4096", "65536")
 
+                        # Setting a larger stack size should keep some jobs from segfaulting.
+                        subprocess.call("ulimit -s unlimited", shell=True)
+
+                        # Submit the job.
                         subprocess.call('sbatch run.sh', shell=True)
 
                         os.chdir(smearing_value_dir)
@@ -1621,10 +1750,18 @@ def setup_nbands_tests(location, system_name, nbands_list):
         filedata = filedata.replace("NBANDS = %i"%new_zval, "NBANDS = " + str(band_n))
         filedata = filedata.replace("ICHARG = 2", "ICHARG = 12")
 
+        # When I kept the convergence tolerance very small (1e-10, 1e-9) the energy convergence        
+        filedata = filedata.replace("EDIFF = 1E-10", "EDIFF = 1E-6")
+        filedata = filedata.replace("EDIFFG = 1E-9", "EDIFF = 1E-5")
+        filedata = filedata.replace("PREC = Accurate", "PREC = Normal")
+
         with open(incar_dir, "w") as file:
             file.write(filedata)
         
-        # Submit the job.
+        # Setting a larger stack size should keep some jobs from segfaulting.
+        subprocess.call("ulimit -s unlimited", shell=True)
+
+        # Submit the job.        
         subprocess.call('sbatch run.sh', shell=True)
 
 
@@ -1684,7 +1821,7 @@ def gen_nbands_plots(system_dir):
     fig, ax = plt.subplots()
     ax.axhline(y=10 , color="black", linestyle="-")
     ax.scatter(plotting_bands_list, iterations_list)
-    ax.set_title("Number of iterations required for 1E-10 accuracy")
+    ax.set_title("Number of iterations required for 1E-6 accuracy")
     ax.set_xlabel("Number of bands")
     ax.set_ylabel("Number of iterations")
     plot_dir = os.path.join(nbands_test_dir, "plots")
@@ -1784,7 +1921,11 @@ def setup_encut_tests(location, system_name, encut_list):
 
                 with open(incar_dir, "w") as file:
                     file.write(filedata)
-                
+
+
+                # Setting a larger stack size should keep some jobs from segfaulting.
+                subprocess.call("ulimit -s unlimited", shell=True)
+                    
                 # Submit the job.
                 subprocess.call('sbatch run.sh', shell=True)
 
@@ -1880,9 +2021,11 @@ def gen_encut_plots(system_dir):
 
     # Collect data from symmetry and atom offset runs.
     for symmetry in symmetry_list:
+        print("symmetry: ", symmetry)
         sym_dir = os.path.join(encut_test_dir, str(symmetry))
         
         for shift in shift_list:
+            print("shift: ", shift)
             shift_dir = os.path.join(sym_dir, str(shift))
             slabel = sym_label_dict[symmetry] + ", " + shift_label_dict[str(shift)]
             shift_sym_labels.append(slabel)
@@ -1892,29 +2035,52 @@ def gen_encut_plots(system_dir):
                 cutoff_energies[i].append([])
 
             for encut in energy_cutoff_list:
+                print("encut: ", encut)
                 finished = False
                 encut_dir = os.path.join(shift_dir, str(encut))
                 vasp_data = read_vasp(encut_dir)
 
-                if vasp_data != None:                    
+                if vasp_data != None:
                     for i, en in enumerate(vasp_energy_names):
                         cutoff_energies[i][-1].append(float(encut))
                         vasp_energies[i][-1].append(float(vasp_data[en]))
                 else:
                     continue
+            print(cutoff_energies)
 
     # Make a directory to store plots
     plot_dir = os.path.join(encut_test_dir, "plots")
     if not os.path.isdir(plot_dir):
         os.mkdir(plot_dir)
-            
+
+    for e in cutoff_energies:
+        print(e)
+    xlims = [min(min(min(cutoff_energies))) - 10,  max(max(max(cutoff_energies))) + 10]
+    print(xlims)
+    
     # Plot the individual energy convergences with/without symmetry and atomic shift.
     for i, sym_energy in enumerate(vasp_energies):
         fig1, ax1 = plt.subplots()
+        fig2, ax2 = plt.subplots()
+        ylims = [0,0]
+        
         for j, energy in enumerate(sym_energy):
             ax1.scatter(cutoff_energies[i][j], energy, label=shift_sym_labels[j],
                         marker = next(marker))
+            
+            ind = np.argsort(cutoff_energies)
+            error = abs(np.array(energy) - energy[-1])
+            ylims = [min(error)/2, max(error)*2]            
+            ax2.scatter(cutoff_energies[i][j][:-1], error[:-1], label=shift_sym_labels[j],
+                        marker = next(marker))
+        print(ylims)
+        if np.isclose(ylims[0], 0):
+            ylims[0] = 1e-10
+
+        if np.isclose(ylims[1], 0):
+            ylims[1] = 1
         
+        # Plot the energy convergences.
         plot_label_i = vasp_energy_names_dict[vasp_energy_names[i]]
         ax1.set_title("Comparing " + plot_label_i + " without symmetry "
                       "and with shifted atoms")
@@ -1925,7 +2091,22 @@ def gen_encut_plots(system_dir):
         plot_name = os.path.join(plot_dir, plot_label_i + ".png")
         fig1.savefig(plot_name, bbox_inches="tight")
         plt.close(fig1)
-        
+
+        # Plot the error relative to the highest energy cutoff.
+        plot_label_i = vasp_energy_names_dict[vasp_energy_names[i]] + " error"
+        ax2.set_title("Comparing " + plot_label_i + " without symmetry "
+                      "and with shifted atoms")
+        ax2.set_xlabel("Energy cutoff (eV)")
+        ax2.set_ylabel("Energy error (eV)")
+        ax2.set_xticks(ax2.get_xticks()[::2])
+        ax2.set_yscale("log")
+        ax2.set_ylim(ylims[0], ylims[1])
+        ax2.set_xlim(xlims[0], xlims[1])
+        ax2.legend()
+        plot_name = os.path.join(plot_dir, plot_label_i + ".png")
+        fig2.savefig(plot_name, bbox_inches="tight")
+        plt.close(fig2)
+
     # Plot the total charge wrap-around vs. energy cutoff.
     fig, ax = plt.subplots()
 
@@ -1941,7 +2122,7 @@ def gen_encut_plots(system_dir):
     plot_name = os.path.join(plot_dir, "total_charge_wraparound.png")
     fig.savefig(plot_name, bbox_inches="tight")
     plt.close(fig)
-        
+
     # Plot drift forces.
     fig, ax = plt.subplots()
     ax.scatter(cutoff_plot_list, drift_force_list)
@@ -2062,7 +2243,10 @@ def setup_enaug_tests(location, system_name, enaug_list):
 
         with open(incar_dir, "w") as file:
             file.write(filedata)
-        
+
+        # Setting a larger stack size should keep some jobs from segfaulting.
+        subprocess.call("ulimit -s unlimited", shell=True)
+            
         # Submit the job.
         subprocess.call('sbatch run.sh', shell=True)
 
@@ -2189,7 +2373,11 @@ def setup_ndos_tests(location, system_name, ndos_list):
         
         with open(incar_dir, "w") as file:
             file.write(filedata)
-        
+
+
+        # Setting a larger stack size should keep some jobs from segfaulting.
+        subprocess.call("ulimit -s unlimited", shell=True)
+            
         # Submit the job.
         subprocess.call('sbatch run.sh', shell=True)
 
@@ -2417,3 +2605,270 @@ def pickle_QE_data(home_dir, system_name, parameters):
     data.name = system_name + " Quantum Espresso Data"
     
     pickle.dump(data, open(system_name + ".p", "wb"))
+
+def read_QE_pseudopot(pseudo_file):
+    """Read relevant parameters from the pseudopotential file.
+
+    Args:
+        location (str): the file path to the pseudopotential.
+
+    Returns:
+        parameters (dict): a dictionary of pseudopotential parameters.
+    """
+    
+    parameters = {}
+    
+    with open(pseudo_file, 'r') as file :
+        for i,line in enumerate(file.readlines()):
+            if "Z valence" in line:
+                parameters["valency"] = int(line.split()[0])
+                
+            if "z_valence" in line:
+                parameters["valency"] = int(float(line.split()[0].strip("z_valence=").replace('"', '')))
+
+            if "wfc_cutoff" in line:
+                parameters["wavefunction cutoff"] = float(
+                    line.split()[0].strip("wfc_cutoff=").replace('"', ''))
+
+            if "rho_cutoff" in line:
+                parameters["charge density cutoff"] = float(
+                    line.split()[0].strip("rho_cutoff=").replace('"', ''))
+
+            if "Suggested cutoff for wfc and rho" in line:
+                parameters["wavefunction cutoff"] = float(line.split()[0])
+                parameters["charge density cutoff"] = float(line.split()[0])                
+
+    return parameters
+
+def test_QE_inputs(location, system_name, system_parameters,
+                   ecutwfc_list, ecutrho_list, nbands_list):
+    """Create the file structure and submit jobs that will compare various
+    values of the wavefunction cutoff in order to find one that is adequate.
+
+    Args:
+        location (str): the root directory. It must have a folder named
+            'system_name' and this folder must contain a folder named 'initial_data',
+            where the VASP input files (POTCAR, POSCAR, and KPOINTS) are located.
+        system_name (str): the name of the system being simulated.
+        system_parameters (dict): a dictionary that contains the geometric properties of
+            the system, including the atomic types and positions, as well as the lattice
+            basis.
+        ecutwfc_list (list): a list of wavefunction cutoffs that are in fractions of the
+            default cutoff.
+        ecutrho_list (list): a list of charge density cutoffs that are in fractions of the
+            default cutoff.
+        nbands_list (list): a list of the number of bands included in the calculation in
+            multiples of the default cutoff.
+    """
+    
+    system_dir = os.path.join(location, system_name)
+    data_location = os.path.join(system_dir, "initial_data")
+
+    pseudo_files = []
+    for file in os.listdir(data_location):
+        if ".UPF" in file:
+            pseudo_files.append(os.path.join(data_location, file))
+    
+    # Get the energy cutoffs and number of bands from the pseudopotential.
+    # These are relevant for building the QE input file.
+    QE_data = [read_QE_pseudopot(pf) for pf in pseudo_files]
+
+    wfc_cutoff = max([qe["wavefunction cutoff"] for qe in QE_data])
+    rho_cutoff = max([qe["charge density cutoff"] for qe in QE_data])
+    nbands = np.sum([qe["valency"] for qe in QE_data])
+
+    if np.isclose(wfc_cutoff, 0):
+        wfc_cutoff = 100
+
+    if np.isclose(rho_cutoff, 0):
+        rho_cutoff = 4*wfc_cutoff
+
+    # Make a directory where testing the wavefunction cutoff will be performed.
+    wfc_dir = os.path.join(system_dir, "ecutwfc")
+    if not os.path.isdir(wfc_dir):
+        os.mkdir(wfc_dir)
+    os.chdir(wfc_dir)
+
+    ecutwfc_list = [i*wfc_cutoff for i in ecutwfc_list]
+
+    # One of the tests will compare the total energy of two QE calculations
+    # with the atoms of one run shifted with respect to the other.
+    shift_list = [[0, 0, 0], [.2, .4, .3]]
+    symmetry_list = [0, 1]
+
+    for symmetry in symmetry_list:
+        sym_dir = os.path.join(encut_test_dir, str(symmetry))
+        if not os.path.isdir(sym_dir):
+            os.mkdir(sym_dir)
+        os.chdir(sym_dir)
+        
+        for shift in shift_list:
+            shift_dir = os.path.join(sym_dir, str(shift))
+            if not os.path.isdir(shift_dir):
+                os.mkdir(shift_dir)
+            os.chdir(shift_dir)
+            
+            for ecutwfc in ecutwfc_list:
+                ecutwfc_dir = os.path.join(shift_dir, str(ecutwfc))
+                if not os.path.isdir(ecutwfc_dir):
+                    os.mkdir(ecutwfc_dir)
+                os.chdir(ecutwfc_dir)
+
+                # Copy the required VASP input files into the energy cutoff directory.
+                # Also copy the batch job and python script.
+                subprocess.call("cp " + data_location + "/* .", shell=True)
+                subprocess.call("cp " + location + "/run.py .", shell=True)
+                subprocess.call("cp " + location + "/run.sh .", shell=True)
+                    
+                # create_input(ecutwfc_dir)
+                input_dir = os.path.join(ecutwfc_dir, system_name + ".in")
+                run_dir = os.path.join(ecutwfc_dir, "run.sh")
+
+                # Correctly label this job, and adjust runtime and memory if necessary.
+                with open(run_dir, 'r') as file:
+                    filedata = file.read()
+                    
+                filedata = filedata.replace("ELEMENT", system_name)
+                filedata = filedata.replace("GRIDTYPE", str(shift[0]))
+                filedata = filedata.replace("SMEAR KPOINT", "ecutwfc " + str(ecutwfc))
+                filedata = filedata.replace("12:00:00", "4:00:00")
+                filedata = filedata.replace("4096", "8192")
+
+                with open(run_dir, 'w') as file:
+                    file.write(filedata)
+                    
+                # Change the energy cutoff, and decrease the precision since it affects
+                # the energy cutoff, and it isn't clear whether the energy cutoff prescribed
+                # by PREC will overwrite that of ENCUT. Also turn off or leave on symmetry.
+                with open(input_dir, "r") as file:
+                    filedata = file.read()
+
+                if symmetry == 0:
+                    filedata = filedata.replace("nosym = .false.", "nosym = .true.")
+
+                filedata = filedata.replace("20 20 20 1 1 1", "20 20 20 " +
+                                            str(shift[0]) + " " +
+                                            str(shift[1]) + " " +
+                                            str(shift[2]))
+
+                filedata = filedata.replace("ecutwfc = " + wfc_cutoff, "ecutwfc = " + str(ecutwfc))
+
+                with open(input_dir, "w") as file:
+                    file.write(filedata)
+
+                # Setting a larger stack size should keep some jobs from segfaulting.
+                subprocess.call("ulimit -s unlimited", shell=True)
+
+                # Submit the job.
+                subprocess.call('sbatch run.sh', shell=True)
+
+    # Make a directory where testing the charge density cutoff will be performed.
+    rho_dir = os.path.join(system_dir, "ecutrho")
+    if not os.path.isdir(rho_dir):
+        os.mkdir(rho_dir)
+    os.chdir(rho_dir)
+
+    ecutrho_list = [i*rho_cutoff for i in ecutrho_list]
+
+    ## Charge density cutoff tests
+    for ecutrho in ecutrho_list:
+        ecutrho_dir = os.path.join(shift_dir, str(ecutrho))
+        if not os.path.isdir(ecutrho_dir):
+            os.mkdir(ecutrho_dir)
+        os.chdir(ecutrho_dir)
+
+        # Copy the required VASP input files into the energy cutoff directory.
+        # Also copy the batch job and python script.
+        subprocess.call("cp " + data_location + "/* .", shell=True)
+        subprocess.call("cp " + location + "/run.py .", shell=True)
+        subprocess.call("cp " + location + "/run.sh .", shell=True)
+            
+        # create_input(ecutwfc_dir)
+        input_dir = os.path.join(ecutrho_dir, system_name + ".in")
+        run_dir = os.path.join(ecutrho_dir, "run.sh")
+
+        # Correctly label this job, and adjust runtime and memory if necessary.
+        with open(run_dir, 'r') as file:
+            filedata = file.read()
+
+        filedata = filedata.replace("ELEMENT", system_name)
+        filedata = filedata.replace("GRIDTYPE", str(shift[0]))
+        filedata = filedata.replace("SMEAR KPOINT", "ecutrho " + str(ecutrho))
+        filedata = filedata.replace("12:00:00", "4:00:00")
+        filedata = filedata.replace("4096", "8192")
+
+        with open(run_dir, 'w') as file:
+            file.write(filedata)
+
+        # Change the energy cutoff, and decrease the precision since it affects
+        # the energy cutoff, and it isn't clear whether the energy cutoff prescribed
+        # by PREC will overwrite that of ENCUT. Also turn off or leave on symmetry.
+        with open(input_dir, "r") as file:
+            filedata = file.read()
+
+        filedata = filedata.replace("ecutrho = " + rho_cutoff, "ecutrho = " + str(ecutrho))
+
+        with open(input_dir, "w") as file:
+            file.write(filedata)
+
+        # Setting a larger stack size should keep some jobs from segfaulting.
+        subprocess.call("ulimit -s unlimited", shell=True)
+
+        # Submit the job.
+        subprocess.call('sbatch run.sh', shell=True)
+
+
+    # Make a directory where testing the number of bands will be performed.
+    nbands_dir = os.path.join(system_dir, "nbnd")
+    if not os.path.isdir(nbands_dir):
+        os.mkdir(nbands_dir)
+    os.chdir(nbands_dir)
+                
+    nbands_list = [i*nbands for i in range(20)]
+
+    ## Number of bands tests 
+    for nbands in nbands_list:
+        nbands_dir = os.path.join(shift_dir, str(nbands))
+        if not os.path.isdir(nbands_dir):
+            os.mkdir(nbands_dir)
+        os.chdir(nbands_dir)
+
+        # Copy the required VASP input files into the energy cutoff directory.
+        # Also copy the batch job and python script.
+        subprocess.call("cp " + data_location + "/* .", shell=True)
+        subprocess.call("cp " + location + "/run.py .", shell=True)
+        subprocess.call("cp " + location + "/run.sh .", shell=True)
+            
+        # create_input(ecutwfc_dir)
+        input_dir = os.path.join(nbands_dir, system_name + ".in")
+        run_dir = os.path.join(nbands_dir, "run.sh")
+
+        # Correctly label this job, and adjust runtime and memory if necessary.
+        with open(run_dir, 'r') as file:
+            filedata = file.read()
+
+        filedata = filedata.replace("ELEMENT", system_name)
+        filedata = filedata.replace("GRIDTYPE", str(shift[0]))
+        filedata = filedata.replace("SMEAR KPOINT", "nbands " + str(nbands))
+        filedata = filedata.replace("12:00:00", "4:00:00")
+        filedata = filedata.replace("4096", "8192")
+
+        with open(run_dir, 'w') as file:
+            file.write(filedata)
+
+        # Change the energy cutoff, and decrease the precision since it affects
+        # the energy cutoff, and it isn't clear whether the energy cutoff prescribed
+        # by PREC will overwrite that of ENCUT. Also turn off or leave on symmetry.
+        with open(input_dir, "r") as file:
+            filedata = file.read()
+
+        filedata = filedata.replace("nbnd = 20", "nbnd = " + nbands)
+
+        with open(input_dir, "w") as file:
+            file.write(filedata)
+
+        # Setting a larger stack size should keep some jobs from segfaulting.
+        subprocess.call("ulimit -s unlimited", shell=True)
+
+        # Submit the job.
+        subprocess.call('sbatch run.sh', shell=True)
