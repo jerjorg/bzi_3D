@@ -1,5 +1,9 @@
 # Revision History
 
+## Revision 0.2.14
+- Added a function that will plot the data gathered while testing
+  the energy cutoffs and number bands for QE runs.
+
 ## Revision 0.2.13
 - Added functions that test the input parameters for Quantum 
   Espresso runs. 
