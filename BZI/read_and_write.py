@@ -5,7 +5,7 @@ import pandas as pd
 import pickle
 import itertools
 import matplotlib
-matplotlib.use("Agg")
+# matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import xarray as xd
 
@@ -35,15 +35,15 @@ def run_QE(home_dir, system_name, parameters):
     """
    
     # Move into the element directory.
-    system_dir = home_dir + "/" + system_name
+    system_dir = os.path.join(home_dir, system_name)
     os.chdir(system_dir)
     
     # Locate the inital data.
-    idata_loc = system_dir + "/" + "initial_data"
+    idata_loc = os.path.join(system_dir, "initial_data")
     
     # Make and move into the grid type directory.
     for grid_type in parameters["grid type list"]:
-        grid_dir = system_dir + "/" + grid_type
+        grid_dir = os.path.join(system_dir, grid_type)
         if not os.path.isdir(grid_dir):
             os.mkdir(grid_dir)
         os.chdir(grid_dir)
@@ -51,30 +51,29 @@ def run_QE(home_dir, system_name, parameters):
         # Make and move into the offset directory
         for offset in parameters["offset list"]:
             offset_name = str(offset).strip("[").strip("]")
-            offset_name = offset_name.replace(",", "")
-            
-            offset_dir = grid_dir + "/" + offset_name
+            offset_name = offset_name.replace(",", "")            
+            offset_dir = os.path.join(grid_dir, offset_name)
             if not os.path.isdir(offset_dir):
                 os.mkdir(offset_dir)
             os.chdir(offset_dir)
             
             # Make and move into the occupation directory.
             for occupation in parameters["occupation list"]:
-                occupation_dir = offset_dir + "/" + occupation
+                occupation_dir = os.path.join(offset_dir, occupation)
                 if not os.path.isdir(occupation_dir):
                     os.mkdir(occupation_dir)
                 os.chdir(occupation_dir)
                 
                 # Make and move into the smearing type directory.
                 for smearing in parameters["smearing list"]:
-                    smearing_dir = occupation_dir + "/" + smearing
+                    smearing_dir = os.path.join(occupation_dir, smearing)
                     if not os.path.isdir(smearing_dir):
                         os.mkdir(smearing_dir)
                     os.chdir(smearing_dir)
                     
                     # Make and move into the smearing value directory.
                     for smearing_value in parameters["smearing value list"]:
-                        smearing_value_dir = smearing_dir + "/" + str(smearing_value)
+                        smearing_value_dir = os.path.join(smearing_dir, str(smearing_value))
                         if not os.path.isdir(smearing_value_dir):
                             os.mkdir(smearing_value_dir)
                         os.chdir(smearing_value_dir)
@@ -82,15 +81,18 @@ def run_QE(home_dir, system_name, parameters):
                         # Make and move into the number of k-points directory.
                         for kpoints in parameters["k-point list"]:
                             nkpoints = np.prod(kpoints)
-                            kpoints_dir = smearing_value_dir + "/" + str(nkpoints)
+                            kpoints_dir = os.path.join(smearing_value_dir, str(nkpoints))
                             if not os.path.isdir(kpoints_dir):
                                 os.mkdir(kpoints_dir)
                             os.chdir(kpoints_dir)
 
                             # Copy initial_data, run.sh and run.py to current directory.
-                            subprocess.call("cp " + idata_loc + "/* ./", shell=True)
-                            subprocess.call("cp " + home_dir + "/run.sh ./", shell=True)
-                            subprocess.call("cp " + home_dir + "/run.py ./", shell=True)
+                            data_loc = os.path.join(idata_loc, "*")
+                            run_file = os.path.join(home_dir, "run.sh")
+                            runpy_file = os.path.join(home_dir, "run.py")
+                            subprocess.call("cp " + data_loc + " .", shell=True)
+                            subprocess.call("cp " + run_file + " .", shell=True)
+                            subprocess.call("cp " + runpy_file + " ./", shell=True)
                             
                             subprocess.call('chmod +x run.py', shell=True)
 
@@ -108,15 +110,11 @@ def run_QE(home_dir, system_name, parameters):
                             with open('run.sh', 'r') as file :
                                 filedata = file.read()
 
-                            # Replace the target string.
-                            filedata = filedata.replace('SYSTEM', str(system_name))
-                            filedata = filedata.replace('GRIDTYPE', grid_type)
-                            filedata = filedata.replace('OFFSET', str(offset))
-                            filedata = filedata.replace('OCCUPATION', occupation)
-                            filedata = filedata.replace('SMEAR', smearing)
-                            filedata = filedata.replace('SMRVALUE', str(smearing_value))
-                            filedata = filedata.replace('KPOINT', str(nkpoints))
-                            
+                            file_str = (str(system_name) + grid_type + str(offset) +
+                                        occupation + smearing + str(smearing_value) +
+                                        str(nkpoints))
+                            filedata = filedata.replace('JOB NAME', file_str)
+
                             # Write the file out again.
                             with open('run.sh', 'w') as file:
                                 file.write(filedata)
@@ -158,30 +156,31 @@ def run_QE(home_dir, system_name, parameters):
                                 filedata = file.read()
                                 
                             if nkpoints <= 8000:    
-                                filedata = filedata.replace("12:00:00", "4:00:00")
+                                filedata = filedata.replace("12:00:00", "12:00:00")
                                 filedata = filedata.replace("4096", "8192")
                                 
                             elif nkpoints > 8000 and nkpoints < 27000:                                    
-                                filedata = filedata.replace("12:00:00", "6:00:00")
+                                filedata = filedata.replace("12:00:00", "48:00:00")
                                 filedata = filedata.replace("4096", "16384")                                
                                 
                             elif nkpoints >= 27000 and nkpoints < 64000:
-                                filedata = filedata.replace("12:00:00", "12:00:00")
+                                filedata = filedata.replace("12:00:00", "48:00:00")
                                 filedata = filedata.replace("4096", "32768")
                                 
                             elif nkpoints >= 64000:
-                                filedata = filedata.replace("12:00:00", "24:00:00")
+                                filedata = filedata.replace("12:00:00", "96:00:00")
                                 filedata = filedata.replace("4096", "65536")
 
                             with open("run.sh", "w") as file:
                                 file.write(filedata)
 
                             if grid_type == "Generalized Monkhorst-Pack":
-                                subprocess.call("getKPointsBeta -qe " + system_name + ".in", shell=True)
-
+                                subprocess.call("getKPointsBeta -qe " + system_name +
+                                                    ".in", shell=True)
+                            
                             # Setting a larger stack size should keep some jobs from segfaulting.
                             subprocess.call("ulimit -s unlimited", shell=True)
-
+                            
                             # Submit the job.
                             subprocess.call('sbatch run.sh', shell=True)
                             
@@ -197,7 +196,7 @@ def run_QE(home_dir, system_name, parameters):
 def read_QE(location, system_name):
     """Create a dictionary of most of the data created during a
     single Quantum Espresso calculation.
-
+    
     Args:
         location (str): the location of the Quantum Espresso calculation.
         system_name (str): the prefix of the input and output files.
@@ -205,9 +204,9 @@ def read_QE(location, system_name):
     
     QE_data = {}
     QE_data["self-consistent calculation time"] = []
-    output_file = location + "/" + system_name + ".out"
-    input_file = location + "/" + system_name + ".in"
-
+    output_file = os.path.join(location, system_name + ".out")
+    input_file = os.path.join(location, system_name + ".in")
+    
     with open(input_file, "r") as file:
         f = file.readlines()
         for i, line in enumerate(f):
@@ -438,40 +437,40 @@ def remove_QE_save(home_dir, system_name, parameters):
     save_file_name = system_name + ".save"
     
     # Make and move into the system directory.
-    system_dir = home_dir + "/" + system_name
+    system_dir = os.path.join(home_dir, system_name)
     os.chdir(system_dir)
         
     # Move into the grid type directory.
     for grid_type in parameters["grid type list"]:
-        grid_dir = system_dir + "/" + grid_type
+        grid_dir = os.path.join(system_dir, grid_type)
         os.chdir(grid_dir)
         
         # Make and move into the offset directory
         for offset in parameters["offset list"]:
             offset_name = str(offset).strip("[").strip("]")
             offset_name = offset_name.replace(",", "")
-            offset_dir = grid_dir + "/" + offset_name
+            offset_dir = os.path.join(grid_dir, offset_name)
             os.chdir(offset_dir)
             
             # Make and move into the occupation directory.
             for occupation in parameters["occupation list"]:
-                occupation_dir = offset_dir + "/" + occupation
+                occupation_dir = os.path.join(offset_dir, occupation)
                 os.chdir(occupation_dir)
                 
                 # Make and move into the smearing type directory.
                 for smearing in parameters["smearing list"]:
-                    smearing_dir = occupation_dir + "/" + smearing
+                    smearing_dir = os.path.join(occupation_dir, smearing)
                     os.chdir(smearing_dir)
                     
                     # Make and move into the smearing value directory.
                     for smearing_value in parameters["smearing value list"]:
-                        smearing_value_dir = smearing_dir + "/" + str(smearing_value)
+                        smearing_value_dir = os.path.join(smearing_dir, str(smearing_value))
                         os.chdir(smearing_value_dir)
                             
                         # Make and move into the number of k-points directory.
                         for kpoints in parameters["k-point list"]:
                             nkpoints = np.prod(kpoints)
-                            kpoints_dir = smearing_value_dir + "/" + str(nkpoints)
+                            kpoints_dir = os.path.join(smearing_value_dir, str(nkpoints))
                             os.chdir(kpoints_dir)
                             
                             subprocess.call('rm -r ' + save_file_name, shell=True)
@@ -506,9 +505,9 @@ def plot_QE_data(home, grid_type_list, occupation_list, energy_list):
     grid_integral_dict = {}
     
     for grid_type in grid_type_list:
-        grid_dir = home + "/" + grid_type
+        grid_dir = os.path.join(home, grid_type)
         for occupation in occupation_list:
-            occ_dir = grid_dir + "/" + occupation
+            occ_dir = os.path.join(grid_dir, occupation)
             # Find all the k-point directories.
             kpoint_list = os.listdir(occ_dir)
             
@@ -524,19 +523,21 @@ def plot_QE_data(home, grid_type_list, occupation_list, energy_list):
             reduced_kpoint_series = pd.Series()
             
             for i, kpoint in enumerate(kpoint_list):
-                kpt_dir = occ_dir + "/" + kpoint
+                kpt_dir = os.path.join(occ_dir, kpoint)
 
                 # Extract data from Quantum Espresso output file.
                 qe_data = read_QE(kpt_dir, "Al")
                 total_kpoints = qe_data["number of unreduced k-points"]
-                total_kpoint_series.set_value(total_kpoints, qe_data["number of unreduced k-points"])
-                reduced_kpoint_series.set_value(total_kpoints, qe_data["number of reduced k-points"])
+                total_kpoint_series.set_value(total_kpoints,
+                                              qe_data["number of unreduced k-points"])
+                reduced_kpoint_series.set_value(total_kpoints,
+                                                qe_data["number of reduced k-points"])
                 
                 try:
                     for energy in energy_list:
                         energy_entry = float(qe_data[energy].split()[0])
                         energy_units_dict[energy] = qe_data[energy].split()[1]
-                        df_dict[energy].set_value(total_kpoints, energy_entry)                    
+                        df_dict[energy].set_value(total_kpoints, energy_entry)
                 except:
                     for energy in energy_list:
                         df_dict[energy].set_value(total_kpoints, np.nan)
@@ -556,11 +557,11 @@ def plot_QE_data(home, grid_type_list, occupation_list, energy_list):
     grid_integral_panel = pd.Panel(grid_integral_dict)
 
     # Save the pandas panel.
-    panel_file = open(home + "/panel.p", "wb")
+    panel_file = open(os.path.join(home, "panel.p"), "wb")
     pickle.dump(grid_integral_panel, panel_file)
     panel_file.close()
 
-    plots_dir = home + "/plots"
+    plots_dir = os.path.join(home, "plots")
     if not os.path.isdir(plots_dir):
         os.mkdir(plots_dir)
         
@@ -568,11 +569,11 @@ def plot_QE_data(home, grid_type_list, occupation_list, energy_list):
 
     # First plot the errors.
     for grid in grid_type_list:
-        grid_dir = plots_dir + "/" + grid_type
+        grid_dir = os.path.join(plots_dir, grid_type)
         if not os.path.isdir(grid_dir):
             os.mkdir(grid_dir)
         for occupation in occupation_list:
-            occ_dir = grid_dir + "/" + occupation
+            occ_dir = os.path.join(grid_dir, occupation)
             if not os.path.isdir(occ_dir):
                 os.mkdir(occ_dir)
             entry = grid + " " + occupation
@@ -595,7 +596,7 @@ def plot_QE_data(home, grid_type_list, occupation_list, energy_list):
                         ax.set_ylabel(err_name)
                         lgd = ax.legend(entry, loc='center left', bbox_to_anchor=(1, 0.5))
 
-                        file_name = occ_dir + "/" + xaxis + " " + err_name + ".pdf"
+                        file_name = os.path.join(occ_dir, xaxis + " " + err_name + ".pdf")
                         fig = ax.get_figure()
                         fig.savefig(file_name, bbox_extra_artists=(lgd,), bbox_inches="tight")
     
@@ -632,7 +633,7 @@ def plot_QE_data(home, grid_type_list, occupation_list, energy_list):
                 ax.set_ylabel(err_name)
                 lgd = ax.legend(legend_names, loc='center left', bbox_to_anchor=(1, 0.5))
 
-                file_name = compare_dir + "/" + xaxis + " " + err_name + ".pdf"
+                file_name = os.path.join(compare_dir, xaxis + " " + err_name + ".pdf")
                 fig = ax.get_figure()
                 fig.savefig(file_name, bbox_extra_artists=(lgd,), bbox_inches="tight")
 
@@ -665,15 +666,19 @@ def read_vasp_input(location):
             if "Gamma" in line:
                 kpt_index = i + 1
                 kpt_line = f[kpt_index].split()
-                total_kpoints = np.prod([int(k) for k in kpt_line])
+                try:
+                    total_kpoints = np.prod([int(k) for k in kpt_line])
+                except:
+                    total_kpoints = None
                 
                 VASP_data["number of unreduced k-points"] = total_kpoints
-                
-                offset_index = i + 2
-                offset_line = f[offset_index].split()
 
-                VASP_data["offset"] = [float(off) for off in offset_line]
-
+                try:
+                    offset_index = i + 2
+                    offset_line = f[offset_index].split()
+                    VASP_data["offset"] = [float(off) for off in offset_line]
+                except:
+                    VASP_data["offset"] = None
 
     """
     The POSCAR should have the following format:
@@ -700,9 +705,9 @@ def read_vasp_input(location):
         # If negative, the scaling factor should be interpreted as the total volume
         # of the cell.
         VASP_data["scaling factor"] = float(f[1].split()[0])
-
+        
         a1 = [float(v) for v in f[2].strip().split()[:3]]
-        a2 = [float(v) for v in f[3].strip().split()[:3]]            
+        a2 = [float(v) for v in f[3].strip().split()[:3]]
         a3 = [float(v) for v in f[4].strip().split()[:3]]
         VASP_data["lattice vectors"] = np.transpose([a1,a2,a3])
 
@@ -713,7 +718,7 @@ def read_vasp_input(location):
                 elem = int(elem)
                 atomic_species.append(elem)
             except:
-                continue            
+                continue
         natoms = int(np.sum(atomic_species))
         atomic_basis["number of atoms per atomic species"] = atomic_species
         atomic_basis["number of atoms"] = natoms
@@ -784,6 +789,8 @@ def read_vasp(location):
                 os.path.exists(outcar_file),
                 os.path.exists(eigenval_file),
                 os.path.exists(eigenval_file)]):
+        print("This job failed:")
+        print(location, "\n")
         return None
 
     # Right now it only counts the number of electronic self-consistency steps.
@@ -820,14 +827,19 @@ def read_vasp(location):
     energy_list = []
     dos_list = []
     idos_list = [] # integrated DOS
-    
+
     with open(doscar_file, "r") as file:
         f = file.readlines()
         for i, line in enumerate(f):
             if i > 5:
-                energy_list.append(float(line.split()[0]))
-                dos_list.append(float(line.split()[1]))
-                idos_list.append(float(line.split()[2]))
+                try:
+                    energy_list.append(float(line.split()[0]))
+                    dos_list.append(float(line.split()[1]))
+                    idos_list.append(float(line.split()[2]))
+                except:
+                    print("Something is wrong with this DOSCAR")
+                    print(doscar_file, "\n")
+                    return None
         VASP_data["density of states data"] = dos_list
         VASP_data["integrated density of states data"] = idos_list
         VASP_data["density of states energies"] = energy_list
@@ -895,6 +907,8 @@ def read_vasp(location):
                 try:                    
                     VASP_data[eigval_line[0]] = float(eigval_line[-1])
                 except:
+                    print("Band energy isn't convergerging for this job:")
+                    print(location, "\n")
                     return None
                 
                 atomic_line = f[i+10].split()
@@ -978,10 +992,17 @@ def read_vasp(location):
                     wrapped_charge = None
                     k = i
                     while not too_far:
-                        if direct in f[k].split():
-                            wrapped_charge = float(f[k].split()[-2])
-                        elif "total charge-density along" in f[k]:
-                            too_far = True
+                        # If the run dies before reaching the break condition,
+                        # return none.
+                        try: 
+                            if direct in f[k].split():
+                                wrapped_charge = float(f[k].split()[-2])
+                            elif "total charge-density along" in f[k]:
+                                too_far = True
+                        except:
+                            print("This job died before finishing:")
+                            print(location, "\n")
+                            return None
                         k += 1
                     wrapped_charge_list.append(wrapped_charge)
                 VASP_data["total wrapped soft charge"] = wrapped_charge_list
@@ -1009,6 +1030,8 @@ def read_vasp(location):
     if job_finished == True:
         return VASP_data
     else:
+        print("This job didn't finish:")
+        print(location, "\n")
         return None
 
 
@@ -1240,9 +1263,11 @@ def create_INCAR(location):
     """
 
     vasp_data = read_vasp_input(location)
-
     zval = np.sum(vasp_data["ZVAL list"])
-    new_zval = 2*zval
+    natoms = vasp_data["atomic basis"]["number of atoms"]
+
+    # This is larger than the default number of electrons.
+    new_zval = 2*zval*natoms
     eaug = max(vasp_data["EAUG list"])
     new_eaug = 2*eaug
 
@@ -1384,7 +1409,7 @@ def create_INCAR(location):
 
 
 def make_QE_input(location, pseudo_dir, system_params):
-    """Make a Quantum espresso input file based on reasonable input parameters.
+    """Make a template Quantum espresso input file.
 
     Args:
         location (str): the file path to the directory where the input file will be saved.
@@ -1407,11 +1432,12 @@ def make_QE_input(location, pseudo_dir, system_params):
     rho_cutoff = max([qe["charge density cutoff"] for qe in QE_data])
     nbands = np.sum([qe["valency"] for qe in QE_data])
 
-
     natoms = 0
     for atom in system_params["atomic species"]:
         for pos in system_params[atom]["positions"]:
             natoms += 1
+    
+    ntypes = len(system_params["atomic species"])
 
     if np.isclose(wfc_cutoff, 0):
         wfc_cutoff = 100
@@ -1430,22 +1456,23 @@ def make_QE_input(location, pseudo_dir, system_params):
         file.write("  prefix = '" + system_params["system name"] + "' \n")
         file.write("  etot_conv_thr = 1.0d-9 \n")
         file.write("  forc_conv_thr = 1.0d-8 \n")
-        file.write("  disk_io = 'low' \n")
+        file.write("  disk_io = 'none' \n") # don't write anything to disk
         file.write("  pseudo_dir = '" + system_params["pseudopotential directory"] + "' \n")
         file.write("/ \n \n")
 
         file.write("&SYSTEM \n")
         file.write("  ibrav = 0 \n")
         file.write("  nat = " + str(natoms)  + "\n")
-        file.write("  ntyp = 1 \n")
+        file.write("  ntyp = " + str(ntypes) + "\n")
         file.write("  nbnd = 20 \n")
         file.write("  ecutwfc = " + str(wfc_cutoff) + " \n")
         file.write("  ecutrho = " + str(rho_cutoff) + " \n")
         file.write("  ecutfock = " + str(rho_cutoff) + " \n")
         file.write("  nosym = .false. \n")
-        file.write("  occupations = '" + system_params["occupations"] + "' \n")
-        file.write("  degauss = " + system_params["smearing value"] + " \n")
-        file.write("  smearing = '" + system_params["smearing method"] + "' \n")
+        
+        file.write("  occupations = 'occupation type' \n")
+        file.write("  degauss = smearing value \n")
+        file.write("  smearing = 'smearing method' \n")
         file.write("/ \n \n")
 
         file.write("&ELECTRONS \n")
@@ -1469,21 +1496,21 @@ def make_QE_input(location, pseudo_dir, system_params):
         file.write("ATOMIC_SPECIES \n")
         for atom in system_params["atomic species"]:
             file.write(" " + atom + " " + str(system_params[atom]["atomic mass"]) + " "
-                       + system_params[atom]["pseudopotential file"] + " \n")
+                       + system_params[atom]["pseudopotential file"] + "\n")
         file.write("\n")
         
         # file.write("Al 26.982 Al.pbe-high.UPF \n \n")
         
-        file.write("ATOMIC_POSITIONS angstrom \n")
+        file.write("ATOMIC_POSITIONS crystal \n")
         for atom in system_params["atomic species"]:
             for pos in system_params[atom]["positions"]:
                 atp = (" " + atom + " " + str(pos[0]) +
-                       " " + str(pos[1]) + " " + str(pos[2]) + "\n")
+                       " " + str(pos[1]) + " " + str(pos[2]) + " \n")
                 file.write(atp)
         file.write("\n")
-        # file.write("Al 0.00000000 0.00000000 0.00000000 \n \n")
+
         file.write("K_POINTS automatic \n")
-        file.write(" 20 20 20 1 1 1 \n \n")
+        file.write(" kpoint1 kpoint2 kpoint3 offset1 offset2 offset3 \n \n")
 
         v11 = str(system_params["lattice vectors"][0,0])
         v12 = str(system_params["lattice vectors"][1,0])
@@ -1534,7 +1561,7 @@ def read_potcar(location):
     return data
 
 
-def run_VASP(element, parameters):
+def run_VASP(home_dir, element, parameters):
     """A function that will take the values contained in parameters, create the
     file structure, and submit a series of VASP jobs. The directory from which 
     this command is run must contain run.py and run.sh files. It must contain a 
@@ -1543,24 +1570,24 @@ def run_VASP(element, parameters):
     file runs the run.py script.
     
     Args:
+        home_dir (str): a the home directory.
+        element (str): the name of the system being simulated.
         parameters (dict): a dictionary of adjustable parameters. The following
             key strings must be present: 'grid type list', 'offset list',
             'smearing list', 'smearing value list', and 'k-points list'. 
             Their corresponding values must be lists.
     """
 
-    # A dictionary to give the folders more meaningful names
+    # a dictionary to give the folders more meaningful names
     smearing_dict = {"-1": "Fermi-Dirac smearing", 
                      "0": "Gaussian smearing", 
-                     "1": "1st order Methfessel-Paxton smearing", 
-                     "2": "2nd order Methfessel-Paxton smearing", 
-                     "3": "3rd order Methfessel-Paxton smearing", 
-                     "4": "4th order Methfessel-Paxton smearing", 
-                     "5": "5th order Methfessel-Paxton smearing", 
+                     "1": "1st order Methfessel-Paxton smearing",
+                     "2": "2nd order Methfessel-Paxton smearing",
+                     "3": "3rd order Methfessel-Paxton smearing",
+                     "4": "4th order Methfessel-Paxton smearing",
+                     "5": "5th order Methfessel-Paxton smearing",
                      "-4": "Tetrahedron method without Blochl corrections",
                      "-5": "Tetrahedron method with Blochl corrections"}
-
-    home_dir = os.getcwd()
     
     # Move into the element directory.
     element_dir = os.path.join(home_dir, element)
@@ -1609,56 +1636,77 @@ def run_VASP(element, parameters):
                         os.chdir(kpoints_dir)
 
                         # Copy initial_data, run.sh and run.py to current directory.
-                        subprocess.call("cp " + idata_loc + "/* ./", shell=True)
-                        subprocess.call("cp " + home_dir + "/run.sh ./", shell=True)
-                        subprocess.call("cp " + home_dir + "/run.py ./", shell=True)
+                        dat_loc = os.path.join(idata_loc, "*")
+                        run_file = os.path.join(home_dir, "run.sh")
+                        runpy_file = os.path.join(home_dir, "run.py")
+                        subprocess.call("cp " + dat_loc + " .", shell=True)
+                        subprocess.call("cp " + run_file + " .", shell=True)
+                        subprocess.call("cp " + runpy_file + " .", shell=True)
                         subprocess.call('chmod +x run.py', shell=True)
 
+                        # Create an INCAR
+                        create_INCAR(kpoints_dir)
+                        
                         # Correctly label this job.
                         # Read in the file.
                         with open('run.sh', 'r') as file:
                             filedata = file.read()
 
                         # Replace the target string.
-                        filedata = filedata.replace('ELEMENT', str(element))
-                        filedata = filedata.replace('GRIDTYPE', grid_type)
-                        filedata = filedata.replace('OFFSET', str(offset))
-                        filedata = filedata.replace('SMEAR', smearing_dict[smearing])
-                        filedata = filedata.replace('SMRVALUE', str(smearing_value))
-                        filedata = filedata.replace('KPOINT', str(nkpoints))
-
+                        job_name = os.path.join(str(element), " ",
+                                                grid_type, " ",
+                                                str(offset), " ",
+                                                smearing_dict[smearing], " ",
+                                                str(smearing_value), " ",
+                                                str(nkpoints))
+                        filedata = filedata.replace('JOB NAME', job_name)
+                        
                         # Write the file out again.
                         with open('run.sh', 'w') as file:
                             file.write(filedata)
-
+                        
                         incar_dir = os.path.join(kpoints_dir, "INCAR")
                         # Replace values in the INCAR.
                         with open(incar_dir, "r") as file:
                             filedata = file.read()
-
+                        
                         filedata = filedata.replace("smearing method", smearing)
                         filedata = filedata.replace("smearing value",
                                                     str(smearing_value))
-
+                        
                         with open(incar_dir, "w") as file:
                             file.write(filedata)
-
+                        
                         # Replace values in the KPOINTS file.
                         vkpts_dir = os.path.join(kpoints_dir, "KPOINTS")
                         with open(vkpts_dir, "r") as file:
                             filedata = file.read()
-
+                        
                         for i,kp in enumerate(kpoints):
                             kp_name = "kpoint" + str(i + 1)
                             filedata = filedata.replace(kp_name, str(kp))
-
+                        
                         for j,off in enumerate(offset):
                             off_name = "offset" + str(j + 1)
                             filedata = filedata.replace(off_name, str(off))
-
+                        
                         with open(vkpts_dir, "w") as file:
                             file.write(filedata)
+                        
+                        if grid_type == "Generalized Monkhorst-Pack":
+                            precalc_dir = os.path.join(kpoints_dir, "PRECALC")
+                            with open(precalc_dir, "r") as file:
+                                filedata = file.read()
 
+                            kpoint = np.sum(kpoints)/3
+                            rn = int(2.8074*kpoint - 3.4008)
+                            filedata = filedata.replace("rn", str(rn))
+
+                            with open(precalc_dir, "w") as file:
+                                file.write(filedata)
+
+                            subprocess.call('./getKPOINTS', shell=True)
+                        
                         # Adjust time to run and memory
                         with open("run.sh", "r") as file:
                             filedata = file.read()
@@ -1713,8 +1761,14 @@ def setup_nbands_tests(location, system_name, nbands_list):
     eaug = max(vasp_data["EAUG list"])
     new_eaug = 2*eaug
 
+    # Make a directory where input testing data will be stored
+    input_test_dir = os.path.join(system_dir, "test_inputs")
+    if not os.path.isdir(input_test_dir):
+        os.mkdir(input_test_dir)
+    os.chdir(input_test_dir)    
+
     # Make a directory where testing the number of bands will be performed.
-    nbands_dir = os.path.join(system_dir, "nbands")
+    nbands_dir = os.path.join(input_test_dir, "nbands")
     if not os.path.isdir(nbands_dir):
         os.mkdir(nbands_dir)
     os.chdir(nbands_dir)
@@ -1724,9 +1778,13 @@ def setup_nbands_tests(location, system_name, nbands_list):
         if not os.path.isdir(band_dir):
             os.mkdir(band_dir)
         os.chdir(band_dir)
-        subprocess.call("cp " + data_dir + "/* .", shell=True)
-        subprocess.call("cp " + location + "/run.py .", shell=True)
-        subprocess.call("cp " + location + "/run.sh .", shell=True)
+        
+        data_files = os.path.join(data_dir, "*")
+        run_file = os.path.join(location, "run.py")
+        runpy_file = os.path.join(location, "run.sh")
+        subprocess.call("cp " + data_files + " .", shell=True)
+        subprocess.call("cp " + run_file + " .", shell=True)
+        subprocess.call("cp " + runpy_file + " .", shell=True)
             
         create_INCAR(band_dir)
         
@@ -1739,8 +1797,8 @@ def setup_nbands_tests(location, system_name, nbands_list):
         
         job_name = system_name + " nbands " + str(band_n)
         filedata = filedata.replace("JOB NAME", job_name)
-        filedata = filedata.replace("12:00:00", "4:00:00")
-        filedata = filedata.replace("4096", "8192")
+        filedata = filedata.replace("12:00:00", "48:00:00")
+        filedata = filedata.replace("4096", "16384")
 
         with open(run_dir, 'w') as file:
             file.write(filedata)
@@ -1788,7 +1846,7 @@ def gen_nbands_plots(system_dir):
     iterations_list = []
 
     system_name = system_dir.split(os.sep)[-1]
-    nbands_test_dir = os.path.join(system_dir, "nbands")
+    nbands_test_dir = os.path.join(system_dir, "test_inputs", "nbands")
     bands_list = os.listdir(nbands_test_dir)
     count = 0
     
@@ -1796,7 +1854,7 @@ def gen_nbands_plots(system_dir):
         bands_list.remove("plots")
     except:
         None
-    bands_list = [int(b) for b in bands_list]
+    bands_list = [float(b) for b in bands_list]
 
     # It's possible some of the runs failed. This list will contain the
     # number of bands for those that didn't.
@@ -1845,7 +1903,7 @@ def setup_encut_tests(location, system_name, encut_list):
             'system_name' and this folder must contain a folder named 'initial_data',
             where the VASP input files (POTCAR, POSCAR, and KPOINTS) are located.
         system_name (str): the name of the system being simulated.
-        encut_list (list): a list of energy cutoffs that are fractions of the 
+        encut_list (list): a list of energy cutoffs that are fractions of the
             default energy cutoff.
     """
     
@@ -1859,8 +1917,14 @@ def setup_encut_tests(location, system_name, encut_list):
     enmax = max(vasp_data["ENMAX list"])
     new_enmax = 2*enmax
 
+    # Make a directory where input testing data will be stored
+    input_test_dir = os.path.join(system_dir, "test_inputs")
+    if not os.path.isdir(input_test_dir):
+        os.mkdir(input_test_dir)
+    os.chdir(input_test_dir)
+
     # Make a directory where testing the energy cutoff will be performed.
-    encut_test_dir = os.path.join(system_dir, "encut")
+    encut_test_dir = os.path.join(input_test_dir, "encut")
     if not os.path.isdir(encut_test_dir):
         os.mkdir(encut_test_dir)
     os.chdir(encut_test_dir)
@@ -1892,30 +1956,30 @@ def setup_encut_tests(location, system_name, encut_list):
 
                 # Copy the required VASP input files into the energy cutoff directory.
                 # Also copy the batch job and python script.
-                subprocess.call("cp " + data_location + "/* .", shell=True)
-                subprocess.call("cp " + location + "/run.py .", shell=True)
-                subprocess.call("cp " + location + "/run.sh .", shell=True)
-                    
+                data_files = os.path.join(data_location, "*")
+                run_file = os.path.join(location, "run.py")
+                runpy_file = os.path.join(location, "run.sh")
+                subprocess.call("cp " + data_files + " .", shell=True)
+                subprocess.call("cp " + run_file + " .", shell=True)
+                subprocess.call("cp " + runpy_file + " .", shell=True)                
                 create_INCAR(encut_dir)
-                incar_dir = os.path.join(encut_dir, "INCAR")
+                
                 run_dir = os.path.join(encut_dir, "run.sh")
-
                 # Correctly label this job, and adjust runtime and memory if necessary.
                 with open(run_dir, 'r') as file:
                     filedata = file.read()
-                    
-                filedata = filedata.replace("ELEMENT", system_name)
-                filedata = filedata.replace("GRIDTYPE", str(shift[0]))
-                filedata = filedata.replace("SMEAR KPOINT", "encut " + str(encut))
-                filedata = filedata.replace("12:00:00", "4:00:00")
-                filedata = filedata.replace("4096", "8192")
-
+                
+                filedata = filedata.replace("JOB NAME", "encut " + str(encut))
+                filedata = filedata.replace("12:00:00", "48:00:00")
+                filedata = filedata.replace("4096", "16384")
+                
                 with open(run_dir, 'w') as file:
                     file.write(filedata)
-                    
+                
                 # Change the energy cutoff, and decrease the precision since it affects
                 # the energy cutoff, and it isn't clear whether the energy cutoff prescribed
                 # by PREC will overwrite that of ENCUT. Also turn off or leave on symmetry.
+                incar_dir = os.path.join(encut_dir, "INCAR")
                 with open(incar_dir, "r") as file:
                     filedata = file.read()
 
@@ -1926,9 +1990,8 @@ def setup_encut_tests(location, system_name, encut_list):
                 with open(incar_dir, "w") as file:
                     file.write(filedata)
 
-
                 # Setting a larger stack size should keep some jobs from segfaulting.
-                # subprocess.call("ulimit -s unlimited", shell=True)
+                subprocess.call("ulimit -s unlimited", shell=True)
                     
                 # Submit the job.
                 subprocess.call('sbatch run.sh', shell=True)
@@ -1959,7 +2022,7 @@ def gen_encut_plots(system_dir):
 
     system_name = system_dir.split(os.sep)[-1]
     elem_dir = os.path.join(system_dir, system_name)
-    encut_test_dir = os.path.join(system_dir, "encut")
+    encut_test_dir = os.path.join(system_dir, "test_inputs", "encut")
     os.chdir(encut_test_dir)
 
     # These tests don't depend on the different atomic shifts or turning off symmetry.
@@ -1971,7 +2034,6 @@ def gen_encut_plots(system_dir):
         encut_dir = os.path.join(tests1_dir, encut)
         os.chdir(encut_dir)
         outcar_dir = os.path.join(encut_dir, "OUTCAR")
-
         vasp_data = read_vasp(encut_dir)
         if vasp_data != None:
             # Get the cutoff energy for this run, and add it to the list of energies.
@@ -2051,9 +2113,10 @@ def gen_encut_plots(system_dir):
     plot_dir = os.path.join(encut_test_dir, "plots")
     if not os.path.isdir(plot_dir):
         os.mkdir(plot_dir)
-            
-    xlims = [min(min(min(cutoff_energies))) - 10,  max(max(max(cutoff_energies))) + 10]
     
+    # If all the cutoff energies are empty lists, skip this plot.
+    xlims = [min(min(min(cutoff_energies))) - 10,  max(max(max(cutoff_energies))) + 10]
+
     # Plot the individual energy convergences with/without symmetry and atomic shift.
     for i, sym_energy in enumerate(vasp_energies):
         fig1, ax1 = plt.subplots()
@@ -2118,56 +2181,56 @@ def gen_encut_plots(system_dir):
     fig.savefig(plot_name, bbox_inches="tight")
     plt.close(fig)
 
-    # Plot drift forces.
-    fig, ax = plt.subplots()
-    ax.scatter(cutoff_plot_list, drift_force_list)
-    ax.set_title("Change in drift force")
-    ax.set_xlabel("Energy cutoff (eV)")
-    ax.set_ylabel("Drift force (eV/Ang)")
-    ax.set_xticks(ax.get_xticks()[::2])
-    plot_name = os.path.join(plot_dir, "drift_force.png")
-    fig.savefig(plot_name, bbox_inches="tight")
-    plt.close(fig)
+    # # Plot drift forces.
+    # fig, ax = plt.subplots()
+    # ax.scatter(cutoff_plot_list, drift_force_list)
+    # ax.set_title("Change in drift force")
+    # ax.set_xlabel("Energy cutoff (eV)")
+    # ax.set_ylabel("Drift force (eV/Ang)")
+    # ax.set_xticks(ax.get_xticks()[::2])
+    # plot_name = os.path.join(plot_dir, "drift_force.png")
+    # fig.savefig(plot_name, bbox_inches="tight")
+    # plt.close(fig)
 
-    # Plot cell volumes.
-    fig, ax = plt.subplots()
-    ax.scatter(cutoff_plot_list, cell_volume_list)
-    ax.set_title("Change in cell volume")
-    ax.set_xlabel("Energy cutoff (eV)")
-    ax.set_ylabel("Cell volume ($\mathrm{Ang}^3$)")
-    ax.set_xticks(ax.get_xticks()[::2])
-    plot_name = os.path.join(plot_dir, "cell_volume.png")
-    fig.savefig(plot_name, bbox_inches="tight")
-    plt.close(fig)
+    # # Plot cell volumes.
+    # fig, ax = plt.subplots()
+    # ax.scatter(cutoff_plot_list, cell_volume_list)
+    # ax.set_title("Change in cell volume")
+    # ax.set_xlabel("Energy cutoff (eV)")
+    # ax.set_ylabel("Cell volume ($\mathrm{Ang}^3$)")
+    # ax.set_xticks(ax.get_xticks()[::2])
+    # plot_name = os.path.join(plot_dir, "cell_volume.png")
+    # fig.savefig(plot_name, bbox_inches="tight")
+    # plt.close(fig)
 
-    # Plot cell norms.
-    fig, ax = plt.subplots()
-    ax.scatter(cutoff_plot_list, lat_vec_norm_list)
-    ax.set_title("Change in basis vectors")
-    ax.set_xlabel("Energy cutoff (eV)")
-    ax.set_ylabel("Frobenius norm of basis")
-    ax.set_xticks(ax.get_xticks()[::2])
-    plot_name = os.path.join(plot_dir, "basis_norm.png")
-    fig.savefig(plot_name, bbox_inches="tight")
-    plt.close(fig)
+    # # Plot cell norms.
+    # fig, ax = plt.subplots()
+    # ax.scatter(cutoff_plot_list, lat_vec_norm_list)
+    # ax.set_title("Change in basis vectors")
+    # ax.set_xlabel("Energy cutoff (eV)")
+    # ax.set_ylabel("Frobenius norm of basis")
+    # ax.set_xticks(ax.get_xticks()[::2])
+    # plot_name = os.path.join(plot_dir, "basis_norm.png")
+    # fig.savefig(plot_name, bbox_inches="tight")
+    # plt.close(fig)
 
-    # Plot all forces.
-    fig, ax = plt.subplots()
-    for i,force_type in enumerate(force_type_list):
-        ax.scatter(cutoff_plot_list, force_list[i], label=force_type,
-                   marker = next(marker))
+    # # Plot all forces.
+    # fig, ax = plt.subplots()
+    # for i,force_type in enumerate(force_type_list):
+    #     ax.scatter(cutoff_plot_list, force_list[i], label=force_type,
+    #                marker = next(marker))
 
-    # ax.scatter(cutoff_plot_list, drift_force_list, label="drift")
-    ax.set_title("Forces acting on ions")
-    ax.set_xlabel("Energy cutoff (eV)")
-    ax.set_ylabel("Force (eV/Ang)")
-    ax.set_xticks(ax.get_xticks()[::2])
-    ax.legend()
-    plot_name = os.path.join(plot_dir, "all_forces.png")
-    fig.savefig(plot_name, bbox_inches="tight")
-    plt.close(fig)
+    # # ax.scatter(cutoff_plot_list, drift_force_list, label="drift")
+    # ax.set_title("Forces acting on ions")
+    # ax.set_xlabel("Energy cutoff (eV)")
+    # ax.set_ylabel("Force (eV/Ang)")
+    # ax.set_xticks(ax.get_xticks()[::2])
+    # ax.legend()
+    # plot_name = os.path.join(plot_dir, "all_forces.png")
+    # fig.savefig(plot_name, bbox_inches="tight")
+    # plt.close(fig)
     
-    return None
+    # return None
 
 def setup_enaug_tests(location, system_name, enaug_list):
     """Create the file structure and submit jobs that will compare various
@@ -2193,8 +2256,14 @@ def setup_enaug_tests(location, system_name, enaug_list):
     eaug = np.max(vasp_data["EAUG list"])
     new_eaug = 2*eaug
 
+    # Make a directory where input testing data will be stored
+    input_test_dir = os.path.join(system_dir, "test_inputs")
+    if not os.path.isdir(input_test_dir):
+        os.mkdir(input_test_dir)
+    os.chdir(input_test_dir)    
+    
     # Make a directory where testing the augmentation energy cutoff will be performed.
-    enaug_test_dir = os.path.join(system_dir, "enaug")
+    enaug_test_dir = os.path.join(input_test_dir, "enaug")
     if not os.path.isdir(enaug_test_dir):
         os.mkdir(enaug_test_dir)
     os.chdir(enaug_test_dir)
@@ -2208,9 +2277,12 @@ def setup_enaug_tests(location, system_name, enaug_list):
         
         os.chdir(enaugcut_dir)
 
-        subprocess.call("cp " + data_dir + "/* .", shell=True)
-        subprocess.call("cp " + location + "/run.py .", shell=True)
-        subprocess.call("cp " + location + "/run.sh .", shell=True)
+        data_files = os.path.join(data_dir, "*")
+        run_file = os.path.join(location, "run.py")
+        runpy_file = os.path.join(location, "run.sh")
+        subprocess.call("cp " + data_files + " .", shell=True)
+        subprocess.call("cp " + run_file + " .", shell=True)
+        subprocess.call("cp " + runpy_file + " .", shell=True)
 
         create_INCAR(enaugcut_dir)
         incar_dir = os.path.join(enaugcut_dir, "INCAR")
@@ -2222,8 +2294,8 @@ def setup_enaug_tests(location, system_name, enaug_list):
 
         job_name = "enaug " + str(enaugcut)
         filedata = filedata.replace("JOB NAME", job_name)
-        filedata = filedata.replace("12:00:00", "4:00:00")
-        filedata = filedata.replace("4096", "8192")
+        filedata = filedata.replace("12:00:00", "48:00:00")
+        filedata = filedata.replace("4096", "16384")
 
         with open(run_dir, 'w') as file:
             file.write(filedata)
@@ -2238,7 +2310,7 @@ def setup_enaug_tests(location, system_name, enaug_list):
 
         with open(incar_dir, "w") as file:
             file.write(filedata)
-
+        
         # Setting a larger stack size should keep some jobs from segfaulting.
         subprocess.call("ulimit -s unlimited", shell=True)
             
@@ -2258,13 +2330,14 @@ def gen_enaug_plots(system_dir):
 
 
     system_name = system_dir.split(os.sep)[-1]    
-    enaug_test_dir = os.path.join(system_dir, "enaug")
+    enaug_test_dir = os.path.join(system_dir, "test_inputs", "enaug")
     
     # Initialize all quantities that'll be plotted.
     enaug_list = []
+    total_energy_list = []
     wrapped_charge_list = [[],[],[]]
     directions = ["x", "y", "z"]
-
+    
     enaug_cutoff_list = os.listdir(enaug_test_dir)
     try:
         enaug_cutoff_list.remove("plots")
@@ -2276,11 +2349,16 @@ def gen_enaug_plots(system_dir):
         outcar_dir = os.path.join(enaug_dir, "OUTCAR")
 
         vasp_data = read_vasp(enaug_dir)
-
+        try:
+            total_energy_list.append(vasp_data["free energy"])
+        except:
+            continue
+        
         if vasp_data != None:
             enaug_list.append(float(enaug_cutoff))
             for j in range(len(directions)):
-                wrapped_charge_list[j].append(vasp_data["total wrapped soft charge"][j])    
+                wrapped_charge_list[j].append(vasp_data["total wrapped soft charge"][j])
+                
 
     plot_dir = os.path.join(enaug_test_dir, "plots")
     if not os.path.isdir(plot_dir):
@@ -2304,6 +2382,39 @@ def gen_enaug_plots(system_dir):
     plt.close(fig)
 
 
+    # Plot total energy convergence with varying energy cutoffs for the
+    # augmentation charges.
+    fig, ax = plt.subplots()
+    ax.scatter(enaug_list, total_energy_list)
+    ax.set_title("Total energy convergence")
+    ax.set_xlabel("Augmentation charge energy cutoff (eV)")
+    ax.set_xticks(ax.get_xticks()[::4])
+    ax.set_ylabel("Total energy (eV)")
+    ax.legend()
+    plot_name = os.path.join(plot_dir, "soft_charge_convergence.png")
+    fig.savefig(plot_name)
+    plt.close(fig)
+    
+    fig, ax = plt.subplots()
+    # Just in case all of the runs failed.
+    try:
+        total_energy_error = abs(np.array(total_energy_list) - total_energy_list[-1])
+        total_energy_error[np.isclose(total_energy_error,0)] = np.nan
+        
+        ax.scatter(enaug_list[:-1], total_energy_error[:-1])
+        ax.set_title("Total energy convergence")
+        ax.set_xlabel("Augmentation charge energy cutoff (eV)")
+        ax.set_xticks(ax.get_xticks()[::4])
+        ax.set_ylabel("Total energy error (eV)")
+        ax.set_yscale("log")
+        ax.legend()
+        plot_name = os.path.join(plot_dir, "soft_charge_convergence_error.png")
+        fig.savefig(plot_name)
+        plt.close(fig)
+    except:
+        pass
+
+
 def setup_ndos_tests(location, system_name, ndos_list):
     """Create the file tree and submit jobs on the supercomputer for
     testing the sampling of the density of states (NEDOS) in the INCAR.
@@ -2324,8 +2435,14 @@ def setup_ndos_tests(location, system_name, ndos_list):
     system_dir = os.path.join(location, system_name)
     data_location = os.path.join(system_dir, "initial_data")
 
+    # Make a directory where input testing data will be stored
+    input_test_dir = os.path.join(system_dir, "test_inputs")
+    if not os.path.isdir(input_test_dir):
+        os.mkdir(input_test_dir)
+    os.chdir(input_test_dir)
+    
     # Make a directory where testing the DOS sampling will be performed.
-    ndos_test_dir = os.path.join(system_dir, "ndos")
+    ndos_test_dir = os.path.join(input_test_dir, "ndos")
     if not os.path.isdir(ndos_test_dir):
         os.mkdir(ndos_test_dir)
     os.chdir(ndos_test_dir)
@@ -2338,11 +2455,14 @@ def setup_ndos_tests(location, system_name, ndos_list):
         if not os.path.isdir(ndos_dir):
             os.mkdir(ndos_dir)
         os.chdir(ndos_dir)
-        
-        subprocess.call("cp " + data_location + "/* .", shell=True)
-        subprocess.call("cp " + location + "/run.py .", shell=True)
-        subprocess.call("cp " + location + "/run.sh .", shell=True)
-            
+
+        data_files = os.path.join(data_dir, "*")
+        run_file = os.path.join(location, "run.py")
+        runpy_file = os.path.join(location, "run.sh")
+        subprocess.call("cp " + data_files + " .", shell=True)
+        subprocess.call("cp " + run_file + " .", shell=True)
+        subprocess.call("cp " + runpy_file + " .", shell=True)
+
         create_INCAR(ndos_dir)
         incar_dir = os.path.join(ndos_dir, "INCAR")
         run_dir = os.path.join(ndos_dir, "run.sh")
@@ -2388,7 +2508,7 @@ def gen_ndos_plots(system_dir):
     """
 
     system_name = system_dir.split(os.sep)[-1]    
-    ndos_test_dir = os.path.join(system_dir, "ndos")
+    ndos_test_dir = os.path.join(system_dir, "test_inputs", "ndos")
     
     # Initialize all quantities that'll be plotted.
     cutoff_energies = []
@@ -2536,29 +2656,30 @@ def pickle_QE_data(home_dir, system_name, parameters):
     data = np.empty([len(parameters[i]) for i in parameters.keys()], dtype=float)
 
     # Make and move into the system directory.
-    system_dir = home_dir + "/" + system_name
+    system_dir = os.path.join(home_dir, system_name)
+    data_file = os.path.join(home_dir, "data")
 
     # Find the grid type directory.
     for i, grid_type in enumerate(parameters["grid type list"]):
-        grid_dir = system_dir + "/" + grid_type
+        grid_dir = os.path.join(system_dir, grid_type)
 
         # Find the offset directory.
         for j, shift in enumerate(parameters["offset list"]):
             offset_name = str(shift).strip("[").strip("]")
             offset_name = offset_name.replace(",", "")
-            offset_dir = grid_dir + "/" + offset_name
+            offset_dir = os.path.join(grid_dir, offset_name)
 
             # Find the occupation type directory.
             for k,occupation in enumerate(parameters["occupation list"]):
-                occupation_dir = offset_dir + "/" + occupation
+                occupation_dir = os.path.join(offset_dir, occupation)
 
                 # Find the smearing type directory.
                 for l,smearing in enumerate(parameters["smearing list"]):
-                    smearing_dir = occupation_dir + "/" + smearing
+                    smearing_dir = os.path.join(occupation_dir, smearing)
 
                     # Find the smearing value directory.
                     for m,smearing_value in enumerate(parameters["smearing value list"]):
-                        smearing_value_dir = smearing_dir + "/" + str(smearing_value)
+                        smearing_value_dir = os.path.join(smearing_dir, str(smearing_value))
 
                         # Find the k-points directory.
                         kpoint_list = os.listdir(smearing_value_dir)
@@ -2568,15 +2689,22 @@ def pickle_QE_data(home_dir, system_name, parameters):
                         for n,nkpoints in enumerate(kpoint_list):
                         # for n,kpoints in enumerate(parameters["k-point list"]):
                             # nkpoints = np.prod(kpoints)
-                            kpoint_dir = smearing_value_dir + "/" + str(nkpoints)
+                            kpoint_dir = os.path.join(smearing_value_dir, str(nkpoints))
                             qe_data = read_QE(kpoint_dir, system_name)
 
-                            nkpoints_list.append(str([int(qe_data["number of unreduced k-points"]), (
-                                int(qe_data["number of reduced k-points"]))]))
+                            try:
+                                nkpoints_list.append(str([int(qe_data["number of unreduced k-points"]), (
+                                    int(qe_data["number of reduced k-points"]))]))
+                            except:
+                                nkpoints_list.append([np.nan, np.nan])
                             for o,energy in enumerate(parameters["energy list"]):
-                                data[i,j,k,l,m,n,o] = float(qe_data[energy].split()[0])    
-                                
-                                
+                                try:
+                                    data[i,j,k,l,m,n,o] = float(qe_data[energy].split()[0])
+                                except:
+                                    # If the run fails
+                                    data[i,j,k,l,m,n,o] = np.nan
+
+
     # A list of quantities to include in the data frame.
     energy_list = ["total energy", "Fermi energy",
                      "one-electron contribution", "ewald contribution",
@@ -2598,8 +2726,8 @@ def pickle_QE_data(home_dir, system_name, parameters):
     coordinates = {i:j for i,j in zip(dimensions, coordinates)}
     data = xd.DataArray(data, coords=coordinates, dims=dimensions)
     data.name = system_name + " Quantum Espresso Data"
-    
-    pickle.dump(data, open(system_name + ".p", "wb"))
+    output_file = os.path.join(data_file, system_name + ".p")
+    pickle.dump(data, open(output_file, "wb"))
 
 def read_QE_pseudopot(pseudo_file):
     """Read relevant parameters from the pseudopotential file.
@@ -2616,7 +2744,7 @@ def read_QE_pseudopot(pseudo_file):
     with open(pseudo_file, 'r') as file :
         for i,line in enumerate(file.readlines()):
             if "Z valence" in line:
-                parameters["valency"] = int(line.split()[0])
+                parameters["valency"] = int(float(line.split()[0]))
                 
             if "z_valence" in line:
                 parameters["valency"] = int(float(line.split()[0].strip("z_valence=").replace('"', '')))
@@ -2643,7 +2771,7 @@ def test_QE_inputs(location, system_name, system_parameters,
     Args:
         location (str): the root directory. It must have a folder named
             'system_name' and this folder must contain a folder named 
-            'initial_data', where the VASP input files (POTCAR, POSCAR, and 
+            'initial_data', where the VASP input files (POTCAR, POSCAR, and
             KPOINTS) are located.
         system_name (str): the name of the system being simulated.
         system_parameters (dict): a dictionary that contains the geometric 
@@ -2651,7 +2779,7 @@ def test_QE_inputs(location, system_name, system_parameters,
             as well as the lattice basis.
         ecutwfc_list (list): a list of wavefunction cutoffs that are in 
             fractions of the default cutoff.
-        ecutrho_list (list): a list of charge density cutoffs that are in 
+        ecutrho_list (list): a list of charge density cutoffs that are in
             fractions of the default cutoff.
         nbands_list (list): a list of the number of bands included in the 
             calculation in multiples of the default cutoff.
@@ -2723,13 +2851,12 @@ def test_QE_inputs(location, system_name, system_parameters,
                     os.mkdir(ecutwfc_dir)
                 os.chdir(ecutwfc_dir)
 
-                # Copy the required VASP input files into the energy cutoff directory.
+                # Copy the required input files into the energy cutoff directory.
                 # Also copy the batch job and python script.
                 subprocess.call("cp " + input_file +  " .", shell=True)
                 subprocess.call("cp " + location + "/run.py .", shell=True)
                 subprocess.call("cp " + location + "/run.sh .", shell=True)
-                    
-                # create_input(ecutwfc_dir)
+                
                 input_dir = os.path.join(ecutwfc_dir, system_name + ".in")
                 run_dir = os.path.join(ecutwfc_dir, "run.sh")
                 runpy_dir = os.path.join(ecutwfc_dir, "run.py")
@@ -2737,13 +2864,22 @@ def test_QE_inputs(location, system_name, system_parameters,
                 # Correctly label this job, and adjust runtime and memory if necessary.
                 with open(run_dir, 'r') as file:
                     filedata = file.read()
-                    
-                filedata = filedata.replace("ELEMENT", system_name)
-                filedata = filedata.replace("GRIDTYPE", str(shift[0]))
-                filedata = filedata.replace("SMEAR KPOINT", "ecutwfc " + str(ecutwfc))
-                filedata = filedata.replace("12:00:00", "4:00:00")
-                filedata = filedata.replace("4096", "8192")
+                
+                job_name = (system_name + " " + str(shift[0]) + " " +
+                            str(symmetry)  + " " + str(ecutwfc))
+                filedata = filedata.replace("JOB NAME", job_name)
 
+                if ecutwfc < 200:
+                    filedata = filedata.replace("12:00:00", "24:00:00")
+                    filedata = filedata.replace("4096", "16384")
+                elif 200 <= ecutwfc < 400:
+                    filedata = filedata.replace("12:00:00", "36:00:00")
+                    filedata = filedata.replace("4096", "32768")
+                elif 400 <= ecutwfc:
+                    filedata = filedata.replace("12:00:00", "48:00:00")
+                    filedata = filedata.replace("4096", "65536")
+
+                
                 with open(run_dir, 'w') as file:
                     file.write(filedata)
 
@@ -2766,19 +2902,42 @@ def test_QE_inputs(location, system_name, system_parameters,
                 if symmetry == 0:
                     filedata = filedata.replace("nosym = .false.", "nosym = .true.")
 
-                filedata = filedata.replace("20 20 20 1 1 1", "20 20 20 " +
-                                            str(shift[0]) + " " +
-                                            str(shift[1]) + " " +
-                                            str(shift[2]))
 
-                filedata = filedata.replace("ecutwfc = " + str(wfc_cutoff), "ecutwfc = " + str(ecutwfc))
+                for atom in system_parameters["atomic species"]:
+                    for loc in system_parameters[atom]["positions"]:
+                        filedata = filedata.replace(atom
+                                                    + " " + str(loc[0])
+                                                    + " " + str(loc[1])
+                                                    + " " + str(loc[2]),
+                                                    atom
+                                                    + " " + str(loc[0] + shift[0])
+                                                    + " " + str(loc[0] + shift[1])
+                                                    + " " + str(loc[0] + shift[2]))
 
+                filedata = filedata.replace("ecutwfc = " + str(wfc_cutoff),
+                                            "ecutwfc = " + str(ecutwfc))
+
+                # Set the default number of k-points to 20**3 for testing.
+                for i,kp in enumerate([20]*3):
+                    kp_name = "kpoint" + str(i + 1)
+                    filedata = filedata.replace(kp_name, str(kp))
+
+                # Have 1 1 1 be the default offset for testing.
+                for j,off in enumerate([1]*3):
+                    off_name = "offset" + str(j + 1)
+                    filedata = filedata.replace(off_name, str(off))
+
+                # Use Gaussian smearing with a very small smearing parameter for testing.    
+                filedata = filedata.replace("occupation type", "smearing")
+                filedata = filedata.replace("smearing method", "gaussian")
+                filedata = filedata.replace("smearing value", str(1e-06))
+                
                 with open(input_dir, "w") as file:
                     file.write(filedata)
 
                 # Setting a larger stack size should keep some jobs from segfaulting.
                 subprocess.call("ulimit -s unlimited", shell=True)
-
+                
                 # Submit the job.
                 subprocess.call('sbatch run.sh', shell=True)
 
@@ -2803,25 +2962,33 @@ def test_QE_inputs(location, system_name, system_parameters,
         subprocess.call("cp " + input_file + " .", shell=True)
         subprocess.call("cp " + location + "/run.py .", shell=True)
         subprocess.call("cp " + location + "/run.sh .", shell=True)
-            
-        # create_input(ecutwfc_dir)
+        
         input_dir = os.path.join(ecutrho_dir, system_name + ".in")
         run_dir = os.path.join(ecutrho_dir, "run.sh")
         runpy_dir = os.path.join(ecutrho_dir, "run.py")
-
+        
         # Correctly label this job, and adjust runtime and memory if necessary.
         with open(run_dir, 'r') as file:
             filedata = file.read()
 
-        filedata = filedata.replace("ELEMENT", system_name)
-        filedata = filedata.replace("GRIDTYPE", str(shift[0]))
-        filedata = filedata.replace("SMEAR KPOINT", "ecutrho " + str(ecutrho))
-        filedata = filedata.replace("12:00:00", "4:00:00")
-        filedata = filedata.replace("4096", "8192")
-        
+        job_name = system_name + " " + str(shift[0]) + " " + str(ecutrho)
+        filedata = filedata.replace("JOB NAME", job_name)
+        # filedata = filedata.replace("12:00:00", "48:00:00")
+        # filedata = filedata.replace("4096", "65536")
+
+        if ecutrho < 200:
+            filedata = filedata.replace("12:00:00", "24:00:00")
+            filedata = filedata.replace("4096", "16384")
+        elif 200 <= ecutrho < 400:
+            filedata = filedata.replace("12:00:00", "36:00:00")
+            filedata = filedata.replace("4096", "32768")
+        elif 400 <= ecutrho:
+            filedata = filedata.replace("12:00:00", "48:00:00")
+            filedata = filedata.replace("4096", "65536")
+              
         with open(run_dir, 'w') as file:
             file.write(filedata)
-
+        
         # Feed the correct file to pw.x
         with open(runpy_dir, 'r') as file:
             filedata = file.read()
@@ -2839,6 +3006,23 @@ def test_QE_inputs(location, system_name, system_parameters,
             filedata = file.read()
 
         filedata = filedata.replace("ecutrho = " + str(rho_cutoff), "ecutrho = " + str(ecutrho))
+        # Having ecutfock = ecutrho is the default.
+        filedata = filedata.replace("ecutfock = " + str(rho_cutoff), "ecutfock = " + str(ecutrho))
+
+        # Set the default number of k-points to 20**3 for testing.
+        for i,kp in enumerate([20]*3):
+            kp_name = "kpoint" + str(i + 1)
+            filedata = filedata.replace(kp_name, str(kp))
+
+        # Have 1 1 1 be the default offset for testing.
+        for j,off in enumerate([1]*3):
+            off_name = "offset" + str(j + 1)
+            filedata = filedata.replace(off_name, str(off))
+
+        # Use Gaussian smearing with a very small smearing parameter for testing.
+        filedata = filedata.replace("occupation type", "smearing")
+        filedata = filedata.replace("smearing method", "gaussian")
+        filedata = filedata.replace("smearing value", str(1e-06))
 
         with open(input_dir, "w") as file:
             file.write(filedata)
@@ -2856,9 +3040,9 @@ def test_QE_inputs(location, system_name, system_parameters,
         os.mkdir(nbands_dir)
     os.chdir(nbands_dir)
                 
-    nbands_list = [i*nbands for i in range(1,20)]
+    nbands_list = [i*nbands for i in nbands_list]
 
-    ## Number of bands tests 
+    ## Number of bands tests
     for nbnd in nbands_list:
         nbnd = np.round(nbnd, 10)
         bnd_dir = os.path.join(nbands_dir, str(nbnd))
@@ -2871,8 +3055,7 @@ def test_QE_inputs(location, system_name, system_parameters,
         subprocess.call("cp " + input_file + " .", shell=True)
         subprocess.call("cp " + location + "/run.py .", shell=True)
         subprocess.call("cp " + location + "/run.sh .", shell=True)
-            
-        # create_input(ecutwfc_dir)
+
         input_dir = os.path.join(bnd_dir, system_name + ".in")
         run_dir = os.path.join(bnd_dir, "run.sh")
         runpy_dir = os.path.join(bnd_dir, "run.py")
@@ -2881,11 +3064,10 @@ def test_QE_inputs(location, system_name, system_parameters,
         with open(run_dir, 'r') as file:
             filedata = file.read()
 
-        filedata = filedata.replace("ELEMENT", system_name)
-        filedata = filedata.replace("GRIDTYPE", str(shift[0]))
-        filedata = filedata.replace("SMEAR KPOINT", "nbands " + str(nbnd))
-        filedata = filedata.replace("12:00:00", "4:00:00")
-        filedata = filedata.replace("4096", "8192")
+        job_name = system_name + " " + str(shift[0]) + " " + str(nbnd)
+        filedata = filedata.replace("JOB NAME", job_name)        
+        filedata = filedata.replace("12:00:00", "48:00:00")
+        filedata = filedata.replace("4096", "65536")
 
         with open(run_dir, 'w') as file:
             file.write(filedata)
@@ -2905,6 +3087,21 @@ def test_QE_inputs(location, system_name, system_parameters,
         # by PREC will overwrite that of ENCUT. Also turn off or leave on symmetry.
         with open(input_dir, "r") as file:
             filedata = file.read()
+
+        # Set the default number of k-points to 20**3 for testing.
+        for i,kp in enumerate([20]*3):
+            kp_name = "kpoint" + str(i + 1)
+            filedata = filedata.replace(kp_name, str(kp))
+
+        # Have 1 1 1 be the default offset for testing.
+        for j,off in enumerate([1]*3):
+            off_name = "offset" + str(j + 1)
+            filedata = filedata.replace(off_name, str(off))
+
+        # Use Gaussian smearing with a very small smearing parameter for testing.    
+        filedata = filedata.replace("occupation type", "smearing")
+        filedata = filedata.replace("smearing method", "gaussian")
+        filedata = filedata.replace("smearing value", str(1e-06))            
 
         filedata = filedata.replace("nbnd = 20", "nbnd = " + str(nbnd))
 
@@ -2950,13 +3147,10 @@ def qe_test_input_plots(location, system_name, parameters):
 
     # Collect data from wavefunction energy cutoff runs and store it in
     # an xarray.
-    sym_dir_list = os.listdir(wfc_dir)
     for i,sym in enumerate(parameters["symmetry"]):
         sym_dir = os.path.join(wfc_dir, str(sym))
-        shift_dir_list = os.listdir(sym_dir)
         for j,shift in enumerate(parameters["shifts"]):
             shift_dir = os.path.join(sym_dir, str(shift))
-            ecutwfc_list = os.listdir(shift_dir)
             for k,ecutwfc in enumerate(parameters["wavefunction energy cutoffs"]):
                 ecut_dir = os.path.join(shift_dir, ecutwfc)
                 qe_data = read_QE(ecut_dir, system_name)
@@ -3111,11 +3305,11 @@ def qe_test_input_plots(location, system_name, parameters):
         lgd = ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         ax.set_yscale("log")
         ax.set_ylim(1e-10,1e-1)
-        ax.set_xlabel("Charge density energy cutoff (Ry)")
-        ax.set_ylabel("Energy (Ry)")
+        ax.set_xlabel("Wavefunction energy cutoff (Ry)")
+        ax.set_ylabel("Total energy error (Ry)")
         ax.set_title(energy_names[i])
         
-        wfc_plot_file = os.path.join(plot_dir, en_name + "_rho.pdf")
+        wfc_plot_file = os.path.join(plot_dir, en_name + "_wfc.pdf")
         fig.savefig(wfc_plot_file, bbox_extra_artists=(lgd,), bbox_inches='tight')
         plt.close(fig)
         

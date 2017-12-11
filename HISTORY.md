@@ -1,5 +1,9 @@
 # Revision History
 
+## Revision 0.2.15
+- Small changes to setup and run of VASP and QE jobs. Now able to
+  get input parameters and run convergence tests.
+
 ## Revision 0.2.14
 - Added a function that will plot the data gathered while testing
   the energy cutoffs and number bands for QE runs.
