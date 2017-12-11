@@ -69,11 +69,18 @@ def run(tests):
                  "test_reduce_monoclinic",
                  "test_reduce_base_centered_monoclinic",
                  "test_reduce_tetragonal",
-                 "test_reduce_body_centered_tetragonal"]
+                 "test_reduce_body_centered_tetragonal",
+                 "test_get_point_group"]
 
     # Read and write tests
     elif tests == "all read_and_write":
         tests = ["test_read_QE", "test_read_VASP"]
+    elif tests == "all make_IBZ":
+        tests = ["test_get_bragg_planes",
+                 "test_trim_small",
+                 "test_three_planes_intersect",
+                 "test_find_bragg_shells",
+                 "test_find_bz"]
     else:
         tests = []
     

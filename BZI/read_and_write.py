@@ -1797,7 +1797,7 @@ def gen_encut_plots(system_dir):
             must contain subfolders that contain VASP simulations with varying energy
             cutoffs.
     """
-
+    
     # Initialize all quantities that'll be plotted.
     cutoff_plot_list = []
     cutoff_lists = []
@@ -1925,6 +1925,25 @@ def gen_encut_plots(system_dir):
         plot_name = os.path.join(plot_dir, plot_label_i + ".png")
         fig1.savefig(plot_name, bbox_inches="tight")
         plt.close(fig1)
+        
+        fig2, ax2 = plt.subplots()
+        for j, energy in enumerate(sym_energy):
+            energy_error = abs(energy - energy[-1])
+            ax2.scatter(cutoff_energies[i][j][:-1], energy_error[:-1], label=shift_sym_labels[j],
+                        marker = next(marker), loglog=True)
+
+        # Plot the error relative the highest energy cutoff.
+        plot_label_i = vasp_energy_names_dict[vasp_energy_names[i]] + "_error"
+        ax2.set_title("Comparing " + plot_label_i + " without symmetry "
+                      "and with shifted atoms")
+        ax2.set_xlabel("Energy cutoff (eV)")
+        ax2.set_ylabel("Energy error (eV)")
+        ax2.set_xticks(ax2.get_xticks()[::2])
+        ax2.legend()
+        plot_name = os.path.join(plot_dir, plot_label_i + ".png")
+        fig2.savefig(plot_name, bbox_inches="tight")
+        plt.close(fig2)
+        
         
     # Plot the total charge wrap-around vs. energy cutoff.
     fig, ax = plt.subplots()

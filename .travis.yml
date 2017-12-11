@@ -11,5 +11,5 @@ install:
   - pip install --upgrade .
   - pip install --upgrade tox-travis
 # command to run tests
-script: tox
+script: travis_wait tox
 after_success: coveralls

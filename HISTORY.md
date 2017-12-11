@@ -1,5 +1,22 @@
 # Revision History
 
+## Revision 0.3.0
+- Added new modules and notebooks:
+  - `make_ibz.py` is a module that creates the first Brillouin zone
+	and the irreducible wedge of the Brillouin zone. New method for
+	plotting these are found in `plots.py` and a notebook that plots
+	each of these is `Brillouin zone plots.ipynb`.
+  - `quaternions.py` has methods for rotating and reflecting vectors
+	using a quaternion derivation.
+  - `utilities.py` has various usefull functions such determining if a
+	vector is contained in a list of vectors.
+  - `Blochl Plots.ipynb` reproduces the plots found in Blochl's paper.
+  - `Free Electron Tetrahedron Convergence.ipynb` tests the
+	convergence of Blochl's tetrahedron method with and without weight
+	corrections to rectangular integration on a free electron model.
+  - `indexing tetrahedron grid.ipynb` is a notebook that works out how
+	the grid and tetrahedra are indexed in Blochl's method.
+
 ## Revision 0.2.12
 - Added a function that pickles Quantum Espresso convergence data.
 

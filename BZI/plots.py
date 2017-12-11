@@ -4,8 +4,11 @@
 import numpy as np
 from numpy.linalg import norm, inv
 from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.patches import FancyArrowPatch
+from mpl_toolkits.mplot3d import proj3d
 import matplotlib.pyplot as plt
 from itertools import product, chain
+from copy import deepcopy
 import time
 import pickle
 import os
@@ -13,13 +16,22 @@ import os
 from BZI.pseudopots import free_PP
 from BZI.symmetry import (bcc_sympts, fcc_sympts, sc_sympts, make_ptvecs,
                           make_rptvecs, sym_path)
-from BZI.sampling import make_grid
+# from BZI.sampling import make_grid #
+from BZI.sampling import make_cell_points
+from BZI.sampling import make_cell_points
 from BZI.integration import (rectangular_fermi_level, rectangular_method,
                              rec_dos_nos)
 from BZI.tetrahedron import (grid_and_tetrahedra, calc_fermi_level,
                              calc_total_energy, get_extended_tetrahedra,
                              get_corrected_total_energy, density_of_states,
                              number_of_states, tet_dos_nos)
+from BZI.make_IBZ import find_bz
+
+from BZI.utilities import remove_points, find_point_indices, check_contained
+
+# Move these to make_IBZ
+from BZI.makeIBZ import orderAngle, planar3dTo2d
+
 
 def ScatterPlotMultiple(func, states, ndivisions, cutoff=None):
     """Plot the energy states of a multivalued toy pseudo-potential using 
@@ -197,7 +209,7 @@ def plot_mesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
         mesh_points (list or numpy.ndarray): a list of mesh points in Cartesian
             coordinates.
         cell_vecs (list or numpy.ndarray): a list vectors that define a cell.
-        offset (list or numpy.ndarray): the offset of the unit cell, which is 
+        offset (list or numpy.ndarray): the offset of the unit cell, which is
            also plotted, in Cartesian coordinates.
         indices (list or numpy.ndarray): the indices of the points. If
             provided, they will be plotted with the mesh points.
@@ -252,6 +264,33 @@ def plot_mesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
         else:
             plt.savefig("mesh.pdf")
     return None
+
+def plot_bz_mesh(mesh_points, lat_vecs):
+    """Plot the irreducible k-points inside the Wigner-Seitz construction of the first
+    Brillouin zone.
+
+    Args:
+        mesh_points (numpy.ndarray): an 2D array of mesh points.
+        lat_vecs (numpy.ndarray): an array of lattice vectors as columns of a 3x3 array.
+    """
+
+    ngpts = len(mesh_points)
+    kxlist = [mesh_points[i][0] for i in range(ngpts)]
+    kylist = [mesh_points[i][1] for i in range(ngpts)]
+    kzlist = [mesh_points[i][2] for i in range(ngpts)]
+
+    ax = plt.subplot(1,1,1,projection="3d")
+    ax.scatter(kxlist, kylist, kzlist, c="red")
+
+    BZ = find_bz(lat_vecs)
+    for simplex in BZ.simplices:
+        # We're going to plot lines between the vertices of the simplex.
+        # To make sure we make it all the way around, append the first element
+        # to the end of the simplex.
+        simplex = np.append(simplex, simplex[0])
+        simplex_pts = [BZ.points[i] for i in simplex]
+        plot_simplex_edges(simplex_pts, ax)
+
 
 def PlotMeshes(mesh_points_list, cell_vecs, atoms, offset = np.asarray([0.,0.,0.])):
     """Create a 3D scatter plot of a set of mesh points inside a cell.
@@ -786,7 +825,8 @@ def create_convergence_plot(PP, ndivisions, degree, exact_fl, improved, symmetry
                                                  [0.5]*3)
         # Calculate the Fermi level, if applicable, and total energy for the rectangular method.
         # Calculate percent error for each.
-        grid = make_grid(PP.lattice.reciprocal_vectors, rgrid_vecs, offset)
+        # This did call make_grid instead of make_cell_points and could cause problems.
+        grid = make_cell_points(PP.lattice.reciprocal_vectors, rgrid_vecs, offset)
         weights = np.ones(len(grid), dtype=int)
         
         # Calculate errors using rectangle method with symmetry.
@@ -860,7 +900,6 @@ def create_convergence_plot(PP, ndivisions, degree, exact_fl, improved, symmetry
         fermi_axes.legend(loc="best")    
         
         fermi_fig.savefig(loc + "degree_" + "%i"%degree + "/" + file_names[0]+".pdf")
-
         
     energy_axes.loglog(np.array(ndivisions)**3, rec_te_err,label="Rectangles")
     energy_axes.loglog(np.array(ndivisions)**3, tet_te_err,label="Tetrahedra")
@@ -1219,3 +1258,136 @@ def plot_states_data(EPM, file_location, file_number, file_name, quantity, metho
     plt.ylim(ylimits[0], ylimits[1])
     plt.legend(loc="best")
     plt.savefig(file_prefix + "/" + file_name + ".pdf")
+
+
+def plot_simplex_edges(vertices, axes):
+    """Plot the edges of a 3-simplex.
+
+    Args:
+        vertices (numpy.ndarray): a list of simplex vertices.
+        axes (matplotlib.axes)
+    """
+
+    if len(vertices) == 3:
+        vertices = np.append(vertices, [vertices[0]], axis=0)
+    
+    for i in range(len(vertices)-1):
+        xstart = vertices[i][0]
+        xfinish = vertices[i+1][0]
+        xs = np.linspace(xstart, xfinish, 100)
+        ystart = vertices[i][1]
+        yfinish = vertices[i+1][1]
+        ys = np.linspace(ystart, yfinish, 100)
+        zstart = vertices[i][2]
+        zfinish = vertices[i+1][2]
+        zs = np.linspace(zstart, zfinish, 100)
+        axes.plot(xs, ys, zs, c="blue")
+
+
+def plot_bz(bz, symmetry_points=None, remove=True):
+    """Plot a Brillouin zone
+    
+    Args:
+        BZ (scipy.spatial.ConvexHull): a convex hull object.
+        symmetry_points (dict): a dictionary of symmetry points in Cartesian coordinates.
+        remove (bool): if True, plot the facets instead of the simplices that make up the
+            boundary of the Brillouin zone or irreducible Brilloun zone.
+    """
+
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    ax.set_aspect('equal')
+    
+    if symmetry_points != None:
+        eps = np.average(list(symmetry_points.values()))*0.05
+        for spt in symmetry_points.keys():
+            coords = symmetry_points[spt]
+            ax.scatter(coords[0], coords[1], coords[2], c="black")
+            ax.text(coords[0] + eps, coords[1] + eps, coords[2] + eps, spt,
+                   size = 14)
+
+    if remove:
+        facet_list = []
+        equations = list(deepcopy(bz.equations))
+        simplices = list(deepcopy(bz.points[bz.simplices]))
+        while len(equations) != 0:
+            equation, equations = equations[-1], equations[:-1]            
+            facet, simplices = simplices[-1], simplices[:-1]
+            indices = find_point_indices(equation, equations)
+            
+            if len(indices) > 0:
+                # Remove duplicate equations from the list of equations
+                equations_to_remove = [equations[i] for i in indices]
+                for eq in equations_to_remove:
+                    equations = remove_points(equation, equations)
+                
+                # Find all simplices that lie on the same plane to get the facet.
+                simplices_to_remove = []
+                for index in indices:
+                    facet = np.append(facet, simplices[index], axis=0)                    
+                    simplices_to_remove.append(simplices[index])
+                
+                for s in simplices_to_remove:
+                    simplices = remove_points(s, simplices)
+                
+                # Remove duplicate points on facet.
+                unique_facet = []
+                for pt in facet:
+                    if not check_contained(pt, unique_facet):
+                        unique_facet.append(pt)
+                facet_list.append(orderAngle(unique_facet))
+            else:
+                facet_list.append(orderAngle(facet))
+
+        
+        for facet in facet_list:
+            # We want to plot all the edges, so we append the last vertex to the
+            # beginning of the facet.
+            facet = np.append(facet, [facet[0]], axis=0)
+            plot_simplex_edges(facet, ax)
+    else:
+        for simplex in bz.simplices:
+            # We're going to plot lines between the vertices of the simplex.
+            # To make sure we make it all the way around, append the first element
+            # to the end of the simplex.
+            simplex = np.append(simplex, simplex[0])
+            simplex_pts = [bz.points[i] for i in simplex]
+            plot_simplex_edges(simplex_pts, ax)
+
+
+class Arrow3D(FancyArrowPatch):
+    def __init__(self, xs, ys, zs, *args, **kwargs):
+        FancyArrowPatch.__init__(self, (0,0), (0,0), *args, **kwargs)
+        self._verts3d = xs, ys, zs
+
+    def draw(self, renderer):
+        xs3d, ys3d, zs3d = self._verts3d
+        xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, renderer.M)
+        self.set_positions((xs[0],ys[0]),(xs[1],ys[1]))
+        FancyArrowPatch.draw(self, renderer)            
+
+            
+def plot_vecs(vecs, colors, labels):
+    """Plot a list of vectors."""
+
+    xmin = min([vecs[i][0] for i in range(len(vecs))])
+    xmax = max([vecs[i][0] for i in range(len(vecs))])
+    ymin = min([vecs[i][1] for i in range(len(vecs))])
+    ymax = max([vecs[i][1] for i in range(len(vecs))])
+    zmin = min([vecs[i][2] for i in range(len(vecs))])
+    zmax = max([vecs[i][2] for i in range(len(vecs))])
+    
+    fig = plt.figure(figsize=(15,15))
+    ax = fig.add_subplot(111, projection='3d')
+    for i,v in enumerate(vecs):
+        arrow = Arrow3D([0,v[0]], [0,v[1]], [0,v[2]],
+                        mutation_scale=20, lw=3,
+                        arrowstyle="-|>", color=colors[i])
+
+        ax.text(v[0], v[1], v[2], labels[i])
+        ax.add_artist(arrow)
+    ax.set_xlim(xmin,xmax)
+    ax.set_ylim(ymin,ymax)
+    ax.set_zlim(zmin,zmax)
+    plt.legend()
+    plt.show()            

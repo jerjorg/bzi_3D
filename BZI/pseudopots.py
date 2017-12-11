@@ -70,8 +70,8 @@ class EmpiricalPP(object):
         self.form_factors = form_factors
         self.energy_cutoff = energy_cutoff
         if np.shape(atomic_positions) == (3,):
-            msg = ("Please provide a list of atomic positions instead of an "
-                   "individual atomic position.")
+            msg = ("Please provide a list of atomic positions instead of a "
+                   "single atomic position.")
             raise ValueError(msg.format(atomic_positions))
         else:
             self.atomic_positions = atomic_positions
@@ -82,8 +82,9 @@ class EmpiricalPP(object):
         self.energy_shift = energy_shift or 0.
         self.fermi_level = fermi_level or 0.
         self.total_energy = total_energy or 0.
-        self.init_hamiltonian = self.hamiltonian([0.]*3) - np.diag(
-            np.diag(self.hamiltonian([0.]*3)))
+
+        # self.init_hamiltonian = self.hamiltonian([0.]*3) - np.diag(
+        #     np.diag(self.hamiltonian([0.]*3)))
 
     def find_energy_shells(self):
         """Find the spherical shells of constant energy on which the points in
@@ -99,7 +100,7 @@ class EmpiricalPP(object):
                 
         self.energy_shells = np.sort(shells)
 
-                
+    
     def eval(self, kpoint, neigvals, adjust=False):
         """Evaluate the empirical pseudopotential eigenvalues at the provided
         k-point. Only return the lowest 'neigvals' eigenvalues.
@@ -157,16 +158,17 @@ class EmpiricalPP(object):
                 # H = self.init_hamiltonian*np.exp(-1j*phase_mat) + diag*Ry_to_eV
                 H = self.init_hamiltonian + diag*Ry_to_eV
             return np.sort(np.linalg.eigvalsh(H))[:neigvals]
-    
+        
     def hamiltonian(self, kpoint):
         """Evaluate the empirical pseudopotential Hamiltonian at the provided
         k-point. This function is typically used to verify the Hamiltonian is 
         Hermitian.
         """
-        
+        print("hello")
         # Calculate the diagonal elements of the Hamiltonian.
         diag = np.eye(len(self.rlat_pts))*np.apply_along_axis(norm, 1,
                                                               self.rlat_pts + kpoint)**2
+
         # For some reason the lattice points need to be double nested for
         # numpy.tile to work.
         nested_rlatpts = np.array([[rlp] for rlp in self.rlat_pts])
@@ -877,20 +879,20 @@ free_nvalence_electrons = 1
 free_degree = 2
 free_PP = FreeElectronModel(free_lattice, free_degree)
 
-# #### Single Free electron Pseudopotential #
-# single_free_lat_centering = "prim"
-# single_free_lat_const = 1.
-# single_free_lat_consts = [single_free_lat_const]*3
-# single_free_lat_angles = [np.pi/2]*3
-# single_free_lattice = Lattice(single_free_lat_centering,
-#                               single_free_lat_consts, single_free_lat_angles)
+#### Single Free electron Pseudopotential #
+single_free_lat_centering = "prim"
+single_free_lat_const = 1.
+single_free_lat_consts = [single_free_lat_const]*3
+single_free_lat_angles = [np.pi/2]*3
+single_free_lattice = Lattice(single_free_lat_centering,
+                              single_free_lat_consts, single_free_lat_angles)
 
-# single_free_pff = [0.0]
-# single_free_energy_cutoff = 2*(2*np.pi/single_free_lat_const)**2
-# single_free_atomic_positions = [[0.]*3]
-# single_free_nvalence_electrons = 1
-# single_free_degree = 2
-# single_free_PP = SingleFreeElectronModel(single_free_lattice, single_free_degree)
+single_free_pff = [0.0]
+single_free_energy_cutoff = 2*(2*np.pi/single_free_lat_const)**2
+single_free_atomic_positions = [[0.]*3]
+single_free_nvalence_electrons = 1
+single_free_degree = 2
+single_free_PP = SingleFreeElectronModel(single_free_lattice, single_free_degree)
 
 #### Multiple Free electron Pseudopotential ####
 multiple_free_lat_centering = "prim"
@@ -910,10 +912,10 @@ multiple_free_PP = MultipleFreeElectronModel(multiple_free_lattice,
                                              multiple_free_nvalence_electrons)
 
 
-# The following pseudopotentials come from: 
-# Marvin L. Cohen and Volker Heine. "The fitting of pseudopotentials to
-# experimental data and their subsequent application." Solid state physics 24
-# (1970): 37-248. APA
+# # The following pseudopotentials come from: 
+# # Marvin L. Cohen and Volker Heine. "The fitting of pseudopotentials to
+# # experimental data and their subsequent application." Solid state physics 24
+# # (1970): 37-248. APA
 
 #### Pseudopotential of Al ####
 Al_centering_type = "face"
@@ -925,7 +927,7 @@ Al_lattice = Lattice(Al_centering_type, Al_lat_consts, Al_lat_angles)
 Al_pff = [0.0, 0.0179, 0.0562]
 Al_energy_cutoff = (4+1)*(2*np.pi/Al_lat_const)**2
 Al_energy_cutoff = norm(2*Al_lattice.reciprocal_vectors[:,0])**2 + (
-                            (2*np.pi/Al_lat_const)**2) + 20
+                            (2*np.pi/Al_lat_const)**2)
 
 Al_atomic_positions = [[0.,0.,0.]]
 Al_nvalence_electrons = 3
