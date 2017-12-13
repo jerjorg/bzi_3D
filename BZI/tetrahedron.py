@@ -6,7 +6,7 @@ from itertools import product
 from copy import deepcopy
 import math
 
-from BZI.symmetry import find_orbitals, bring_into_cell
+from BZI.symmetry import get_orbits, bring_into_cell
 
 def find_tetrahedra(vertices):
     """Determine how a parallelepiped should be split into tetrahedra by
@@ -676,9 +676,9 @@ def find_irreducible_tetrahedra(PP, tetrahedra, grid, duplicates=True):
     """
     
     if duplicates:
-        orbitals = find_orbitals(grid, PP.lattice.reciprocal_vectors, duplicates=True)
+        orbits = get_orbits(grid, PP.lattice.reciprocal_vectors, duplicates=True)
     else:
-        orbitals = find_orbitals(grid, PP.lattice.reciprocal_vectors)
+        orbits = get_orbits(grid, PP.lattice.reciprocal_vectors)
 
     # Move all grid points into the first unit cell
 
@@ -692,11 +692,11 @@ def find_irreducible_tetrahedra(PP, tetrahedra, grid, duplicates=True):
     for i,pt in enumerate(grid):
         # pt = bring_into_cell(pt, PP.lattice.reciprocal_vectors)
         new_dict[i] = None
-        for k in orbitals.keys():
+        for k in orbits.keys():
             # Represntative k-point
-            rpt = orbitals[k][0]
+            rpt = orbits[k][0]
             index = np.where([np.allclose(p,rpt) for p in grid])[0][0]
-            for v in orbitals[k]:
+            for v in orbits[k]:
                 if np.allclose(v,pt):
                     # index = np.where([np.allclose(p,v) for p in grid])[0][0]
                     new_dict[i] = index

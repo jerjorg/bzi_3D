@@ -6,8 +6,7 @@ Materials Science 49.2 (2010): 299-312.
 
 import numpy as np
 from numpy.linalg import norm, inv, det
-import math
-import itertools
+import math, itertools
 from copy import deepcopy
 import itertools as it
 from itertools import islice, product
@@ -31,6 +30,9 @@ class Lattice(object):
             the angles between lattice vectors in the conventional unit cell
             ordered as [alpha, beta, gamma] where alpha is the angle between bc,
             beta is the angle between ac, and gamma is the angle between ab.
+        convention (str): gives the convention of for finding the reciprocal lattice
+            vectors. Options include 'ordinary' and 'angular'. Angular include a 
+            factor of 2pi.
 
     Attributes:
         centering (str): the type of lattice point centering in the 
@@ -58,23 +60,24 @@ class Lattice(object):
             lattice vectors
         reciprocal_volume (float): the volume of the parallelepiped given by the three
             reciprocal lattice vectors
-
     """
     
-    def __init__(self, centering_type, lattice_constants, lattice_angles):
+    def __init__(self, centering_type, lattice_constants, lattice_angles,
+                 convention="ordinary"):
         self.centering = centering_type
         self.constants = lattice_constants
         self.angles = lattice_angles
         self.type = find_lattice_type(centering_type, lattice_constants,
-                                      lattice_angles)        
+                                      lattice_angles)
         self.vectors = make_lattice_vectors(self.type, lattice_constants,
                                             lattice_angles)
-        self.reciprocal_vectors = make_rptvecs(self.vectors)
+        self.reciprocal_vectors = make_rptvecs(self.vectors, convention)
         self.symmetry_group = get_point_group(self.vectors)
         self.symmetry_points = get_sympts(centering_type, lattice_constants,
-                                          lattice_angles)
+                                          lattice_angles, convention=convention)
+                                          
         self.symmetry_paths = get_sympaths(centering_type, lattice_constants,
-                                           lattice_angles)
+                                           lattice_angles, convention=convention)
         self.volume = det(self.vectors)
         self.reciprocal_volume = det(self.reciprocal_vectors)
 
@@ -476,7 +479,8 @@ tr1b2b_sympts = {"G": [0., 0., 0.],
                  "Y": [1./2, 0., 0.],
                  "Z": [-1./2, 0., 1./2]}
 
-def get_sympts(centering_type, lattice_constants, lattice_angles):
+def get_sympts(centering_type, lattice_constants, lattice_angles,
+               convention="ordinary"):
     """Find the symmetry points for the provided lattice.
 
     Args:
@@ -484,6 +488,8 @@ def get_sympts(centering_type, lattice_constants, lattice_angles):
             options include 'prim', 'base', 'body', and 'face'.
         lattice_constants (list): a list of lattice constants [a, b, c].
         lattice_angles (list): a list of lattice angles [alpha, beta, gamma].
+        convention (str): indicates the convention used in defining the reciprocal
+            lattice vectors. Options include 'ordinary' and 'angular'.
 
     Returns:
         (dict): a dictionary with a string of letters as the keys and lattice 
@@ -505,7 +511,7 @@ def get_sympts(centering_type, lattice_constants, lattice_angles):
     
     lattice_vectors = make_ptvecs(centering_type, lattice_constants,
                                   lattice_angles)
-    reciprocal_lattice_vectors = make_rptvecs(lattice_vectors)
+    reciprocal_lattice_vectors = make_rptvecs(lattice_vectors, convention=convention)
     
     rlat_veca = reciprocal_lattice_vectors[:,0] # individual reciprocal lattice vectors
     rlat_vecb = reciprocal_lattice_vectors[:,1]
@@ -630,7 +636,8 @@ def get_sympts(centering_type, lattice_constants, lattice_angles):
                "3D Bravais lattice.")
         raise ValueError(msg.format())
     
-def get_sympaths(centering_type, lattice_constants, lattice_angles):
+def get_sympaths(centering_type, lattice_constants, lattice_angles,
+                 convention="ordinary"):
     """Find the symmetry paths for the provided lattice.
 
     Args:
@@ -638,17 +645,19 @@ def get_sympaths(centering_type, lattice_constants, lattice_angles):
             options include 'prim', 'base', 'body', and 'face'.
         lattice_constants (list): a list of lattice constants [a, b, c].
         lattice_angles (list): a list of lattice angles [alpha, beta, gamma].
+        convention (str): indicates the convention used in defining the reciprocal
+            lattice vectors. Options include 'ordinary' and 'angular'.
 
     Returns:
         (dict): a dictionary with a string of letters as the keys and lattice 
-            coordinates of the symmetry points ase values.
+            coordinates of the symmetry points as values.
 
     Example:
         >>> lattice_constants = [4.05]*3
         >>> lattice_angles = [numpy.pi/2]*3
         >>> symmetry_points = get_sympts(lattice_constants, lattice_angles)
     """
-    
+        
     a = float(lattice_constants[0])
     b = float(lattice_constants[1])
     c = float(lattice_constants[2])
@@ -659,7 +668,7 @@ def get_sympaths(centering_type, lattice_constants, lattice_angles):
     
     lattice_vectors = make_ptvecs(centering_type, lattice_constants,
                                   lattice_angles)
-    reciprocal_lattice_vectors = make_rptvecs(lattice_vectors)
+    reciprocal_lattice_vectors = make_rptvecs(lattice_vectors, convention=convention)
     
     rlat_veca = reciprocal_lattice_vectors[:,0] # individual reciprocal lattice vectors
     rlat_vecb = reciprocal_lattice_vectors[:,1]
@@ -1336,7 +1345,7 @@ def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
         msg = "Please provide a valid lattice type."
         raise ValueError(msg.format(lattice_type))
 
-def sym_path(lattice, npts):
+def sym_path(lattice, npts, cart=False):
     """Create an array of lattice coordinates along the symmetry paths of 
     the lattice.
 
@@ -1344,6 +1353,8 @@ def sym_path(lattice, npts):
         lattice (:py:obj:`BZI.symmetry.Lattice`): an instance of the Lattice
             class.
         npts (int): the number of points on each symmetry path.
+        cart (bool): if true, return the k-points in Cartesian coordinates. The 
+            reciprocal lattice vectors will be used in the conversion.
     Return:
         (numpy.array): an array of lattice coordinates along the symmetry
             paths.
@@ -1369,7 +1380,11 @@ def sym_path(lattice, npts):
         else:
             del ipath[-1]
             paths += ipath
-    return paths    
+    
+    if cart:
+        return [np.dot(lattice.reciprocal_vectors, k) for k in paths]
+    else:
+        return paths    
 
 def get_point_group1(lat_vecs):
     """Return the point group of a lattice.
@@ -1431,10 +1446,11 @@ def shells_list(vectors, lat_vecs):
     nested_shells = [shells(i, lat_vecs) for i in vectors]
     return np.array(list(itertools.chain(*nested_shells)))
             
-def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False,
+def get_orbits(grid_car, lat_vecs, coord = "cart", duplicates=False,
                   eps=10):
     """ Find the partial orbitals of the points in a grid, including only the
-    points that are in the grid.
+    points that are in the grid. This symmetry reduction routine doesn't scale
+    linearly. It is highly recommended that you use find_orbits instead.
 
     Args:
         grid_car (numpy.ndarray): a list of grid point positions in Cartesian 
@@ -2287,7 +2303,12 @@ def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
                 iWt[cOrbit] += 1
 
     hashtable = dict((k, v) for k, v in hashtable.items() if v)
-    return hashtable, iFirst
+
+    kpoint_list = np.array(kpoint_list)
+    reduced_kpoints = kpoint_list[list(iFirst.values())]
+    return reduced_kpoints, iWt.values()
+    # return hashtable, iFirst
+    
 
 def minkowski_reduce_basis(basis, eps):
     """Find the Minkowski representation of a basis.

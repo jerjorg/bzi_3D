@@ -16,7 +16,7 @@ def run(tests):
                  "test_convert_tet_index",
                  "test_get_grid_tetrahedra",
                  "test_find_adjacent_tetrahedra"]
-        
+
     elif tests == "improved tetrahedra":
         tests = ["test_corrections",
                  "test_adjacent_tetrahedra",
@@ -58,7 +58,7 @@ def run(tests):
         tests = ["test_make_ptvecs",
                  "test_make_lattice_vectors",
                  "test_sympts_sympaths",
-                 "test_find_orbitals",
+                 "test_get_orbitals",
                  "test_reduce_simple_cubic",
                  "test_reduce_body_centered_cubic",
                  "test_reduce_face_centered_cubic",

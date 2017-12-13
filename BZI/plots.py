@@ -2,22 +2,18 @@
 """
 
 import numpy as np
-from numpy.linalg import norm, inv
+from numpy.linalg import norm, inv, det
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 import matplotlib.pyplot as plt
 from itertools import product, chain
+from scipy.spatial import ConvexHull
 from copy import deepcopy
-import time
-import pickle
-import os
+import time, pickle, os
 
-from BZI.pseudopots import free_PP
 from BZI.symmetry import (bcc_sympts, fcc_sympts, sc_sympts, make_ptvecs,
-                          make_rptvecs, sym_path)
-# from BZI.sampling import make_grid #
-from BZI.sampling import make_cell_points
+                          make_rptvecs, sym_path, number_of_point_operators)
 from BZI.sampling import make_cell_points
 from BZI.integration import (rectangular_fermi_level, rectangular_method,
                              rec_dos_nos)
@@ -25,13 +21,8 @@ from BZI.tetrahedron import (grid_and_tetrahedra, calc_fermi_level,
                              calc_total_energy, get_extended_tetrahedra,
                              get_corrected_total_energy, density_of_states,
                              number_of_states, tet_dos_nos)
-from BZI.make_IBZ import find_bz
-
+from BZI.make_IBZ import find_bz, orderAngle, planar3dTo2d
 from BZI.utilities import remove_points, find_point_indices, check_contained
-
-# Move these to make_IBZ
-from BZI.makeIBZ import orderAngle, planar3dTo2d
-
 
 def ScatterPlotMultiple(func, states, ndivisions, cutoff=None):
     """Plot the energy states of a multivalued toy pseudo-potential using 
@@ -200,6 +191,24 @@ def ScatterPlotSingle(func, ndivisions, cutoff=None):
         ax = plt.subplot(1,1,1,projection="3d")
         ax.scatter(kxlist, kylist, estates,s=.5);
     plt.show()
+
+def plot_just_points(mesh_points, ax=None):
+    """Plot just the points in a mesh.
+
+    Args:
+        mesh_points (numpy.ndarray or list): a list of points
+    """
+
+    ngpts = len(mesh_points)
+    kxlist = [mesh_points[i][0] for i in range(ngpts)]
+    kylist = [mesh_points[i][1] for i in range(ngpts)]
+    kzlist = [mesh_points[i][2] for i in range(ngpts)]
+
+    if ax:
+        ax.scatter(kxlist, kylist, kzlist, c="black", s=1)
+    else:
+        ax = plt.subplot(1,1,1,projection="3d")
+        ax.scatter(kxlist, kylist, kzlist, c="black", s=1)
     
 def plot_mesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
               indices=None, show=True, save=False, file_name=None):
@@ -421,12 +430,9 @@ def plot_band_structure(materials_list, PPlist, PPargs_list, lattice, npts,
         Display or save the band structure.
     """
     
-    # k-points between symmetry point pairs in lattice coordinates.
-    lat_kpoints = sym_path(lattice, npts)
-
     # k-points between symmetry point pairs in Cartesian coordinates.
-    car_kpoints = [np.dot(lattice.reciprocal_vectors, k) for k in lat_kpoints]
-
+    car_kpoints = sym_path(lattice, npts, cart=True)
+    
     # Find the distance of each symmetry path by putting the symmetry point pairs 
     # that make up a path in lattice coordinates, converting to Cartesian, and then
     # taking the norm of the difference of the pairs.
@@ -502,15 +508,18 @@ def plot_band_structure(materials_list, PPlist, PPargs_list, lattice, npts,
         plt.ylim(energy_limits)
     
     # Adjust the legend.
-    lgd = plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    # lgd = plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     plt.xlim([0,np.sum(distances)])
     plt.xlabel("Symmetry points")
     plt.ylabel("Energy (eV)")
     plt.title("%s Band Structure" %materials_list[0])
     plt.grid(linestyle="dotted")
     if save:
+        # plt.savefig("%s_band_structure.pdf" %materials_list[0],
+        #             bbox_extra_artists=(lgd,), bbox_inches='tight')
         plt.savefig("%s_band_structure.pdf" %materials_list[0],
-                    bbox_extra_artists=(lgd,), bbox_inches='tight')
+                    bbox_inches='tight')
+        
     if show:
         plt.show()
     return None
@@ -728,11 +737,8 @@ def plot_paths(PP, npts, save=False):
     """Plot the path along which the band structure is plotted.
     """
     
-    # k-points between symmetry point pairs in lattice coordinates.
-    lat_kpoints = sym_path(PP.lattice, npts)
-
     # k-points between symmetry point pairs in Cartesian coordinates.
-    car_kpoints = [np.dot(PP.lattice.reciprocal_vectors, k) for k in lat_kpoints]
+    car_kpoints = sym_path(PP.lattice, npts, cart=True)
 
     # Plot the paths.
     fig = plt.figure()
@@ -1260,7 +1266,7 @@ def plot_states_data(EPM, file_location, file_number, file_name, quantity, metho
     plt.savefig(file_prefix + "/" + file_name + ".pdf")
 
 
-def plot_simplex_edges(vertices, axes):
+def plot_simplex_edges(vertices, axes, color="blue"):
     """Plot the edges of a 3-simplex.
 
     Args:
@@ -1281,10 +1287,10 @@ def plot_simplex_edges(vertices, axes):
         zstart = vertices[i][2]
         zfinish = vertices[i+1][2]
         zs = np.linspace(zstart, zfinish, 100)
-        axes.plot(xs, ys, zs, c="blue")
+        axes.plot(xs, ys, zs, c=color)
 
 
-def plot_bz(bz, symmetry_points=None, remove=True):
+def plot_bz(bz, symmetry_points=None, remove=True, ax=None, color="blue"):
     """Plot a Brillouin zone
     
     Args:
@@ -1292,10 +1298,12 @@ def plot_bz(bz, symmetry_points=None, remove=True):
         symmetry_points (dict): a dictionary of symmetry points in Cartesian coordinates.
         remove (bool): if True, plot the facets instead of the simplices that make up the
             boundary of the Brillouin zone or irreducible Brilloun zone.
+        ax (matplotlib.axes): an axes object.
     """
 
     fig = plt.figure()
-    ax = fig.gca(projection='3d')
+    if ax == None:
+        ax = fig.gca(projection='3d')
     ax.set_aspect('equal')
     
     if symmetry_points != None:
@@ -1344,7 +1352,7 @@ def plot_bz(bz, symmetry_points=None, remove=True):
             # We want to plot all the edges, so we append the last vertex to the
             # beginning of the facet.
             facet = np.append(facet, [facet[0]], axis=0)
-            plot_simplex_edges(facet, ax)
+            plot_simplex_edges(facet, ax, color=color)
     else:
         for simplex in bz.simplices:
             # We're going to plot lines between the vertices of the simplex.
@@ -1352,8 +1360,48 @@ def plot_bz(bz, symmetry_points=None, remove=True):
             # to the end of the simplex.
             simplex = np.append(simplex, simplex[0])
             simplex_pts = [bz.points[i] for i in simplex]
-            plot_simplex_edges(simplex_pts, ax)
+            plot_simplex_edges(simplex_pts, ax, color=color)
 
+def plot_all_bz(lat_type, lat_vecs, grid=None, sympts=None, ax=None, convention="ordinary"):
+    """Plot the Brillouin zone and optionally the irreducible Brillouin zone and points
+    within the Brillouin zone.
+
+    Args:
+        lat_type (str): the lattice type, such as 'simple cubic'
+        lat_vecs (numpy.ndarray): a 3x3 array with lattice vectors as columns.
+        grid (list or numpy.ndarray): a list of list or 2D array of points to plot.
+        sympts (list or numpy.ndarray): a dictionary whose key is the Greek or Roman
+            letter representing the symmetry point. The corresponding value is the 
+            coordinate of the point in lattice coordinates.
+        ax (matplotlib.axes): an axes object.
+        convention (str): the convention for finding the reciprocal lattice vectors.
+            Options include 'ordinary' and 'angular'.
+    """
+    rlat_vecs = make_rptvecs(lat_vecs, convention=convention)
+    bz = find_bz(rlat_vecs)
+    plot_bz(bz, ax=ax)    
+    
+    if sympts:
+        # Get the vertices of the IBZ.
+        ibz_vertices = list(sympts.values())
+        ibz_vertices = [np.dot(rlat_vecs, v) for v in ibz_vertices]
+        
+        # Get the symmetry points in Cartesian coordinates.
+        sympts_cart = {}
+        for spt in sympts.keys():
+            sympts_cart[spt] = np.dot(rlat_vecs, sympts[spt])
+
+        ibz = ConvexHull(ibz_vertices)
+        nops = number_of_point_operators(lat_type.split()[-1])
+        plot_bz(ibz, sympts_cart, ax=ax, color="red")
+        
+    if grid:
+        plot_just_points(grid, ax)
+        # ngpts = len(grid)
+        # kxlist = [grid[i][0] for i in range(ngpts)]
+        # kylist = [grid[i][1] for i in range(ngpts)]
+        # kzlist = [grid[i][2] for i in range(ngpts)]
+        # ax.scatter(kxlist, kylist, kzlist, c="black", s=1)
 
 class Arrow3D(FancyArrowPatch):
     def __init__(self, xs, ys, zs, *args, **kwargs):
@@ -1390,4 +1438,4 @@ def plot_vecs(vecs, colors, labels):
     ax.set_ylim(ymin,ymax)
     ax.set_zlim(zmin,zmax)
     plt.legend()
-    plt.show()            
+    plt.show()

@@ -1,4 +1,8 @@
-"""Methods to calculate the irreducible Brillouin zone (IBZ)."""
+"""Methods to calculate the irreducible Brillouin zone (IBZ).
+
+This module is a modified version of code written by Dr. Hess at BYU. See
+https://www.physics.byu.edu/department/directory/hess.
+"""
 
 import numpy as np
 from numpy.linalg import norm, det, inv
@@ -220,7 +224,7 @@ def planar3dTo2d(points, eps=1e-6):
         coords (numpy.ndarray): a list of points in the coordinate system of the plane.
     """
     
-    coords = zeros((len(points), 2))
+    coords = np.zeros((len(points), 2))
     
     # Find the vector normal to the plane
     uvec = plane3pts(points,eps)[0]
@@ -235,14 +239,14 @@ def planar3dTo2d(points, eps=1e-6):
     xunitv =  (points[0] - rcenter)/norm(points[0] - rcenter)
     
     # The y-axis in the new coordinate system.
-    crss = cross(xunitv, uvec)
+    crss = np.cross(xunitv, uvec)
     yunitv = crss/norm(crss)
     
     for i, vec in enumerate(points):
         # Find a vector that points from the new orign to the point in the plane.
         vc = vec - rcenter
         # Project this vector onto the new coordinate system.
-        coords[i,0] = dot(vc, xunitv); coords[i,1] = dot(vc, yunitv)
+        coords[i,0] = np.dot(vc, xunitv); coords[i,1] = np.dot(vc, yunitv)
     return coords
         
 def orderAngle(facet, eps=1e-6):
@@ -263,8 +267,52 @@ def orderAngle(facet, eps=1e-6):
     xy = planar3dTo2d(facet, eps)    
     angles = []
     for i, vec in enumerate(facet):
-        angle = arctan2(xy[i,1], xy[i,0])
+        angle = np.arctan2(xy[i,1], xy[i,0])
         if angle < (0 - eps):
-            angle += 2*pi
+            angle += 2*np.pi
         angles.append(angle)
     return [point for (angle,point) in sorted(zip(angles,facet), key = lambda x: x[0])]
+
+def plane3pts(points, eps=1e-3):
+    """From a list of points in a plane, find the vector normal to the plane (pointing
+    away from the origin) and the closest distance from the origin to the plane. If the
+    plane passes through the origin, no choice is made concerning the direction of the 
+    vector normal to the plane.
+
+    Args:
+        points (numpy.ndarray): a list of points in plane
+        eps (float): finite tolerance parameter that determines if two vectors are
+            parallel.
+    Returns:
+        n (numpy.ndarray): a vector normal to the plane of points.
+        dist (float): the distance from the origin to the plane.
+    """
+    
+    # """From the first 3 (noncollinear) points of a list of points,
+    # returns a normal and closest distance to origin of the plane
+    # The closest distance is d = dot(r0, u). The normal's direction
+    # (degenerate vs multiplication by -1)
+    # is chosen to be that which points away from the side the origin is on.  If the 
+    # plane goes through the origin, then all the r's are in the plane, and no choice is made
+    # """
+    
+    r0 = points[0]; r1 = points[1]; r2 = points[2];
+    vec = np.cross(r1-r0, r2-r0)
+    nv = norm(vec)
+
+    # Two points are very close, use a 4th point.
+    if nv < eps and len(points) > 3:
+        if norm(r1-r0) > norm(r2-r0):
+            r2 = points[3]
+        else:
+            r1 = points[3]
+            
+        vec = np.cross(r1-r0, r2-r0)
+        nv = norm(vec)
+        
+    n = vec/nv
+    if np.dot(n, r0) < -eps:
+        n = -n        
+    dist = np.dot(n, r0)
+    return n, dist
+

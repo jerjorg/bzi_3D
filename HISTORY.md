@@ -1,5 +1,16 @@
 # Revision History
 
+## Revision 0.3.1
+- Added `plot_all_bz` which can plot the Brillouin zone, the
+  irreducible wedge of the Brillouin zone, and a mesh. The mesh can be
+  any list of points, such as points along symmetry points, the
+  irreducible k-points, etc.
+- Added `plane3pts` to make_IBZ. It finds a plane given three points
+  in the plane.
+- Ran into trouble with variations on reciprocal lattice
+  definitions. Added arguments to `Lattice`, `get_sympts`, and
+  `get_sympaths` that allow freedom in selecting a convention.
+
 ## Revision 0.3.0
 - Added new modules and notebooks:
   - `make_ibz.py` is a module that creates the first Brillouin zone
