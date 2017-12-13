@@ -28,6 +28,18 @@
   - `indexing tetrahedron grid.ipynb` is a notebook that works out how
 	the grid and tetrahedra are indexed in Blochl's method.
 
+## Revision 0.2.15
+- Small changes to setup and run of VASP and QE jobs. Now able to
+  get input parameters and run convergence tests.
+
+## Revision 0.2.14
+- Added a function that will plot the data gathered while testing
+  the energy cutoffs and number bands for QE runs.
+
+## Revision 0.2.13
+- Added functions that test the input parameters for Quantum 
+  Espresso runs. 
+
 ## Revision 0.2.12
 - Added a function that pickles Quantum Espresso convergence data.
 
