@@ -12,7 +12,7 @@ from itertools import combinations
 from BZI.sampling import make_cell_points
 
 from BZI.symmetry import (get_sympts, get_sympaths, make_ptvecs, make_rptvecs,
-                          make_lattice_vectors, get_orbitals, reduce_kpoint_list,
+                          make_lattice_vectors, get_orbits, reduce_kpoint_list,
                           get_point_group, number_of_point_operators)
 from conftest import run
 
@@ -233,8 +233,8 @@ def test_make_lattice_vectors():
 
     lat_type = "rhombohedral"
     lat_consts = [1., 1., 1.]
-    lat_angles1 = [np.pi/3]*3
-    lat_angles2 = [np.pi/3]*3
+    lat_angles1 = [.3*np.pi]*3
+    lat_angles2 = [.3*np.pi]*3
     lat_centering = "prim"
     lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles1)
     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles2)
@@ -769,8 +769,7 @@ def test_sympts_sympaths():
                "L": [a, a, a],
                "U": [5./8, b, 5./8],
                "W": [a, b, 3./4],
-               "X": [a, z, a],
-               "G2": [1., 1., 1.]} # This point was added for the Si pseudopotential    
+               "X": [a, z, a]}
     lattice_centering = "face"
     lattice_constants = [1.3,1.3,1.3]
     lattice_angles = [np.pi/2, np.pi/2, np.pi/2]
@@ -1477,8 +1476,8 @@ def test_sympts_sympaths():
     for p1, p2 in zip(sympath1, sympath2):
         assert p1 == p2
 
-@pytest.mark.skipif("test_get_orbitals" not in tests, reason="different tests")     
-def test_get_orbitals():
+@pytest.mark.skipif("test_get_orbits" not in tests, reason="different tests")     
+def test_get_orbits():
 
     # Make sure duplicate points get removed from the grid.
     lat_angles = [np.pi/2]*3
@@ -1491,7 +1490,7 @@ def test_get_orbitals():
             [0,.5,-.5], [.5,-.5,0], [.5,0,-.5], 
             [0,-.5,-.5], [-.5,-.5,0], [-.5,0,-.5]]
 
-    orbitals = get_orbitals(grid, lat_vecs, duplicates=True)
+    orbitals = get_orbits(grid, lat_vecs, duplicates=True)
     
     assert len(orbitals.keys()) == 1
     assert np.allclose(orbitals[1], [0,0,0])
@@ -1505,7 +1504,7 @@ def test_get_orbitals():
             [.5,.5,-.5], [-.5,.5,-.5], [.5,-.5,-.5],
             [-.5,-.5,-.5], [0,0,0]]
 
-    orbitals = get_orbitals(grid, lat_vecs, duplicates=True)
+    orbitals = get_orbits(grid, lat_vecs, duplicates=True)
     assert len(orbitals.keys()) == 1
     assert np.allclose(orbitals[1], [0,0,0])
 
@@ -1636,7 +1635,7 @@ def test_reduce_simple_cubic():
     
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in get_orbitals(grid, rlat_vecs).values():
+    for v in get_orbits(grid, rlat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -1755,7 +1754,7 @@ def test_reduce_body_centered_cubic():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in get_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -1874,7 +1873,7 @@ def test_reduce_face_centered_cubic():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in get_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -1995,7 +1994,7 @@ def test_reduce_orthorhombic():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in get_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -2101,7 +2100,7 @@ def test_reduce_base_centered_orthorhombic():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in get_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -2205,7 +2204,7 @@ def test_reduce_body_centered_orthorhombic():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in get_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -2312,7 +2311,7 @@ def test_reduce_face_centered_orthorhombic():
 
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in get_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -2428,7 +2427,7 @@ def test_reduce_monoclinic():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in get_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -2541,7 +2540,7 @@ def test_reduce_base_centered_monoclinic():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in get_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -2641,7 +2640,7 @@ def test_reduce_tetragonal():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in get_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -2740,7 +2739,7 @@ def test_reduce_body_centered_tetragonal():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in get_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:

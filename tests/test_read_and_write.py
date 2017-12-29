@@ -2,14 +2,14 @@
 
 import numpy as np
 import pytest
-from BZI.read_and_write import read_QE, read_vasp
+from BZI.read_and_write import read_QE, read_vasp, read_vasp_input
 from conftest import run
 import os
 
 tests = run("all read_and_write")
 
-@pytest.mark.skipif("test_read_QE" not in tests, reason="different tests")
-def test_read_QE():
+@pytest.mark.skipif("test_read_qe" not in tests, reason="different tests")
+def test_read_qe():
     location = os.path.join(os.getcwd(), "tests")
     QE_data_Al = read_QE(location, "Al")
 
@@ -310,120 +310,147 @@ def test_read_QE():
 def test_read_vasp():
 
     location = os.path.join(os.getcwd(), "tests", "Al_VASP")
+    vasp_input_data = read_vasp_input(location)
     vasp_data = read_vasp(location)
 
 
+    assert np.allclose(vasp_input_data["ZVAL list"], [11.0])
+    assert np.allclose(vasp_input_data["EAUG list"], [586.98])
+    assert np.allclose(vasp_input_data["ENMAX list"], [295.446])
+    assert vasp_input_data["number of unreduced k-points"] == 512
+    assert np.allclose(vasp_input_data["offset"], [0.5]*3)
+    assert vasp_input_data["name of system"] == "Cu4"
+    assert np.isclose(vasp_input_data["scaling factor"], 1)
+    assert np.allclose(vasp_input_data["lattice vectors"],
+                       np.transpose([[3.616407, 0.000000, 0.000000],
+                                     [0.000000, 3.616407, 0.000000],
+                                     [0.000000, 0.000000, 3.616407]]))
+    assert np.allclose(vasp_input_data["atomic basis"]["atom positions"],
+                       [[0.000000, 0.000000, 0.000000],
+                        [0.000000, 0.500000, 0.500000],
+                        [0.500000, 0.000000, 0.500000],
+                        [0.500000, 0.500000, 0.000000]])
+     
+    assert vasp_input_data["atomic basis"]["coordinates"] == "direct"
+    
+    assert vasp_input_data["atomic basis"]["number of atoms"] == 4
+    assert vasp_input_data["atomic basis"]["number of atoms per atomic species"] == [4]
     assert vasp_data['number of unreduced k-points'] == 512
     assert vasp_data['offset'] == [0.5, 0.5, 0.5]
     assert vasp_data['name of system'] == "Cu4"
     assert vasp_data['scaling factor'] == 1.0
     assert (vasp_data['lattice vectors'] == np.transpose([[3.616407, 0.000000, 0.000000],
-                                                    [0.000000, 3.616407, 0.000000],
-                                                     [0.000000, 0.000000, 3.616407]])).all()
-    assert vasp_data['atomic bases'] == [{"atomic species": "Cu",
-                                          "number of atoms": 4,
-                                          "coordinates": "direct",
-                                          "positions": [[0.000000, 0.000000, 0.000000],
-                                                        [0.000000, 0.500000, 0.500000],
-                                                        [0.500000, 0.000000, 0.500000],
-                                                        [0.500000, 0.500000, 0.000000]]}]
-    assert vasp_data['ALGO'] == "Fast"
-    assert vasp_data['EDIFF'] == "0.0002"
-    assert vasp_data['ENCUT'] == "520"
-    assert vasp_data['IBRION'] == "2"
-    assert vasp_data['ISIF'] == "3"
-    assert vasp_data['ISMEAR'] == "-5"
-    assert vasp_data['LORBIT'] == "11"
-    assert vasp_data['LREAL='] == "False"
-    assert vasp_data['LWAVE'] == "False"
-    assert vasp_data['NELM'] == "100"
-    assert vasp_data['NSW'] == "99"
-    assert vasp_data['PREC'] == "Accurate"
-    assert vasp_data['SIGMA'] == "0.05"
-    assert vasp_data['number of reduced k-points'] == 20
-    weights = [0.1562500E-01,
-               0.4687500E-01,
-               0.4687500E-01,
-               0.4687500E-01,
-               0.4687500E-01,
-               0.9375000E-01,
-               0.9375000E-01,
-               0.4687500E-01,
-               0.9375000E-01,
-               0.4687500E-01,
-               0.1562500E-01,
-               0.4687500E-01,
-               0.4687500E-01,
-               0.4687500E-01,
-               0.9375000E-01,
-               0.4687500E-01,
-               0.1562500E-01,
-               0.4687500E-01,
-               0.4687500E-01,
-               0.1562500E-01]
-    assert (vasp_data['k-point weights'] == weights)
+                                                          [0.000000, 3.616407, 0.000000],
+                                                          [0.000000, 0.000000, 3.616407]])).all()
 
-    rkpts = [[0.062500, 0.062500, 0.062500],
-             [0.187500, 0.062500, 0.062500],
-             [0.312500, 0.062500, 0.062500],
-             [0.437500, 0.062500, 0.062500],
-             [0.187500, 0.187500, 0.062500],
-             [0.312500, 0.187500, 0.062500],
-             [0.437500, 0.187500, 0.062500],
-             [0.312500, 0.312500, 0.062500],
-             [0.437500, 0.312500, 0.062500],
-             [0.437500, 0.437500, 0.062500],
-             [0.187500, 0.187500, 0.187500],
-             [0.312500, 0.187500, 0.187500],
-             [0.437500, 0.187500, 0.187500],
-             [0.312500, 0.312500, 0.187500],
-             [0.437500, 0.312500, 0.187500],
-             [0.437500, 0.437500, 0.187500],
-             [0.312500, 0.312500, 0.312500],
-             [0.437500, 0.312500, 0.312500],
-             [0.437500, 0.437500, 0.312500],
-             [0.437500, 0.437500, 0.437500]]
-    
-    assert vasp_data['reduced k-points'] == rkpts
-    assert (vasp_data['k-point degeneracy'] ==
-            np.array(weights)*vasp_data['number of unreduced k-points']).all()
-    assert vasp_data['NBANDS'] == 26    
-    assert vasp_data['alpha Z'] == 242.15273653
-    assert vasp_data['Ewald energy'] == -4386.48630246
-    assert vasp_data['-1/2 Hartree'] == -1372.67615408
-    assert vasp_data['-exchange'] == 0.00000000
-    assert vasp_data['-V(xc)+E(xc)'] == 178.50223159
-    assert vasp_data['PAW double counting'] == 5237.15909487
-    assert vasp_data['entropy T*S'] == 0.00000000
-    assert vasp_data['eigenvalues'] == 190.83068261
-    assert vasp_data['atomic energy'] == 5563.90821598
-    assert vasp_data['free energy'] == -14.91203703
-    assert vasp_data['energy without entropy'] == -14.91203703
-    assert vasp_data['energy(sigma->0)'] == -14.91203703
-    assert vasp_data['Elapsed time'] == 137.826
-    
-    pw = [1288,
-          1278,
-          1273,
-          1268,
-          1280,
-          1272,
-          1267,
-          1280,
-          1274,
-          1272,
-          1277,
-          1271,
-          1275,
-          1264,
-          1275,
-          1273,
-          1265,
-          1272,
-          1275,
-          1283]
-    assert vasp_data["number of plane waves"] == pw
+    assert vasp_data["number of electronic iterations"] == 26
+    assert vasp_data["number of reduced k-points"] == 20
+    assert np.allclose(vasp_data["k-point weights"],
+                       [0.015625,
+                        0.046875,
+                        0.046875,
+                        0.046875,
+                        0.046875,
+                        0.09375,
+                        0.09375,
+                        0.046875,
+                        0.09375,
+                        0.046875,
+                        0.015625,
+                        0.046875,
+                        0.046875,
+                        0.046875,
+                        0.09375,
+                        0.046875,
+                        0.015625,
+                        0.046875,
+                        0.046875,
+                        0.015625])
+    assert np.isclose(np.sum(vasp_data["k-point weights"]), 1)
+    assert np.allclose(vasp_data["reduced k-points"],
+                       [[0.0625, 0.0625, 0.0625],
+                        [0.1875, 0.0625, 0.0625],
+                        [0.3125, 0.0625, 0.0625],
+                        [0.4375, 0.0625, 0.0625],
+                        [0.1875, 0.1875, 0.0625],
+                        [0.3125, 0.1875, 0.0625],
+                        [0.4375, 0.1875, 0.0625],
+                        [0.3125, 0.3125, 0.0625],
+                        [0.4375, 0.3125, 0.0625],
+                        [0.4375, 0.4375, 0.0625],
+                        [0.1875, 0.1875, 0.1875],
+                        [0.3125, 0.1875, 0.1875],
+                        [0.4375, 0.1875, 0.1875],
+                        [0.3125, 0.3125, 0.1875],
+                        [0.4375, 0.3125, 0.1875],
+                        [0.4375, 0.4375, 0.1875],
+                        [0.3125, 0.3125, 0.3125],
+                        [0.4375, 0.3125, 0.3125],
+                        [0.4375, 0.4375, 0.3125],
+                        [0.4375, 0.4375, 0.4375]])
+    assert np.sum(vasp_data["k-point degeneracy"]) == vasp_data["number of unreduced k-points"]
+    assert vasp_data["NBANDS"] == 26
+    assert vasp_data["alpha Z"] == 242.15273653
+    assert vasp_data["Ewald energy"] == -4386.48630246
+    assert vasp_data["-1/2 Hartree"] == -1372.67615408
+    assert vasp_data["-exchange"] == 0.0
+    assert vasp_data["-V(xc)+E(xc)"] == 178.50223159
+    assert vasp_data["PAW double counting"] == 5237.15909487
+    assert vasp_data["entropy T*S"] == 0.0
+    assert vasp_data["eigenvalues"] == 190.83068261
+    assert vasp_data["atomic energy"] == 5563.90821598
+    assert vasp_data["free energy"] == -14.91203703
+    assert vasp_data["energy without entropy"] == -14.91203703
+    assert vasp_data["energy(sigma->0)"] == -14.91203703
+    assert vasp_data["Fermi level"] == 7.3341
+    assert vasp_data["total wrapped soft charge"] == [0,0,0]
+    assert vasp_data["total wrapped charge"] == [0.0001]*3
+    assert np.allclose(vasp_data["Final lattice vectors"],
+                       [[ 3.64234384, -0.        , -0.        ],
+                        [-0.        ,  3.64234384,  0.        ],
+                        [ 0.        , -0.        ,  3.64234384]])
+    assert np.allclose(vasp_data["Final reciprocal lattice vectors"], 
+                       [[ 0.27454849,  0.        , -0.        ],
+                        [ 0.        ,  0.27454849,  0.        ],
+                        [ 0.        , -0.        ,  0.27454849]])
 
+    assert vasp_data["Net forces acting on ions"] == [{'Electron-ion force': [6.5e-13, 1.42e-12, 1.35e-12]},
+                                                      {'Ewald-force': [-2.75e-16, 6.81e-16, 2.43e-16]},
+                                                      {'Non-local-force': [-8.62e-19, 8.67e-19, 0.0]},
+                                                      {'Convergence-correction-force': [-2.64e-13,
+                                                                                        -3.85e-13,
+                                                                                        -2.96e-13]}]
+    assert vasp_data["Electron-ion force"] == (
+        np.linalg.norm(vasp_data["Net forces acting on ions"][0]["Electron-ion force"]))
+    assert vasp_data["Ewald force"] == (
+        np.linalg.norm(vasp_data["Net forces acting on ions"][1]["Ewald-force"]))
+    assert vasp_data["Non-local force"] == (
+        np.linalg.norm(vasp_data["Net forces acting on ions"][2]["Non-local-force"]))
+    assert vasp_data["Convergence-correction force"] == (
+        np.linalg.norm(vasp_data["Net forces acting on ions"][3]["Convergence-correction-force"]))
+    assert vasp_data["Drift force"] == 0.0
+    assert vasp_data["Elapsed time"] == 137.826
+    assert vasp_data["number of plane waves"] == [1288,
+                                                  1278,
+                                                  1273,
+                                                  1268,
+                                                  1280,
+                                                  1272,
+                                                  1267,
+                                                  1280,
+                                                  1274,
+                                                  1272,
+                                                  1277,
+                                                  1271,
+                                                  1275,
+                                                  1264,
+                                                  1275,
+                                                  1273,
+                                                  1265,
+                                                  1272,
+                                                  1275,
+                                                  1283]
+    
     ops = [np.array([[1,   0,   0], # 1
                      [0,   1,   0],
                      [0,   0,   1]]),

@@ -481,18 +481,20 @@ class SingleFreeElectronModel():
         total_enery (float): the total energy
         total_enery_ans (float): the exact, analytical value for the total
             energy.
-        name (str): the name of the pseudopotential.
+        material (str): the name of the pseudopotential.
+
     """
     
     def __init__(self, lattice, degree, energy_shift=None,
                  fermi_level=None, total_energy=None):
+        self.material = "Free electron model"
         self.lattice = lattice
         self.degree = degree
         # The free electron pseudopotential can only have one valence electron
         # because the energy dispersion relation isn't periodic and with two
         # valence electrons the Fermi surface would extend outside the unit 
         # cell.
-        self.name = "free electron model"
+        # self.name = "free electron model"
         self.nvalence_electrons = 1
         self.energy_shift = energy_shift or 0.
         self.fermi_level = fermi_level or 0.
@@ -540,16 +542,14 @@ class MultipleFreeElectronModel():
         total_enery (float): the total energy
         total_enery_ans (float): the exact, analytical value for the total
             energy.
+        material (str): the material or model name.
     """
     
     def __init__(self, lattice, degree, nvalence_electrons, energy_shift=None,
                  fermi_level=None, total_energy=None):
+        self.material = "Free electron model"
         self.lattice = lattice
         self.degree = degree
-        # The free electron pseudopotential can only have one valence electron
-        # because the energy dispersion relation isn't periodic and with two
-        # valence electrons the Fermi surface would extend outside the unit 
-        # cell.
         self.nvalence_electrons = nvalence_electrons
         self.energy_shift = energy_shift or 0.
         self.fermi_level = fermi_level or 0.        
@@ -569,6 +569,12 @@ class MultipleFreeElectronModel():
         l0 = np.linalg.norm(self.lattice.reciprocal_vectors[:,0])
         l1 = np.linalg.norm(self.lattice.reciprocal_vectors[:,1])
         l2 = np.linalg.norm(self.lattice.reciprocal_vectors[:,2])
+
+        # r = 2*np.dot(self.lattice.reciprocal_vectors[:,0],
+        #              self.lattice.reciprocal_vectors[:,0])
+        # pts = sphere_pts(multiple_free_EPM.lattice.reciprocal_vectors, r)
+
+        
         pts = np.array([[0,0,0], [-l0, 0, 0], [l0, 0, 0],
                         [0, -l1, 0], [0, l1, 0],
                         [0, 0, -l2], [0, 0, l2],
@@ -578,7 +584,7 @@ class MultipleFreeElectronModel():
                         [-l0, 0, l2], [-l0, 0, -l2],
                         [0, l1, l2], [0, l1, -l2],
                         [0, -l1, l2], [0, -l1, -l2]])
-        
+
         return [np.linalg.norm(kpoint - pt)**self.degree for pt in pts][:neigvals]
         
     def set_degree(self, degree):
@@ -914,7 +920,8 @@ free_lat_centering = "prim"
 free_lat_const = 1.
 free_lat_consts = [free_lat_const]*3
 free_lat_angles = [np.pi/2]*3
-free_lattice = Lattice(free_lat_centering, free_lat_consts, free_lat_angles)
+free_lattice = Lattice(free_lat_centering, free_lat_consts, free_lat_angles,
+                       convention="angular")
 
 free_pff = [0.0]
 free_energy_cutoff = 2*(2*np.pi/free_lat_const)**2
@@ -929,7 +936,8 @@ single_free_lat_const = 1.
 single_free_lat_consts = [single_free_lat_const]*3
 single_free_lat_angles = [np.pi/2]*3
 single_free_lattice = Lattice(single_free_lat_centering,
-                              single_free_lat_consts, single_free_lat_angles)
+                              single_free_lat_consts, single_free_lat_angles,
+                              convention="angular")
 
 single_free_pff = [0.0]
 single_free_energy_cutoff = 2*(2*np.pi/single_free_lat_const)**2
@@ -944,7 +952,8 @@ multiple_free_lat_const = 1.
 multiple_free_lat_consts = [multiple_free_lat_const]*3
 multiple_free_lat_angles = [np.pi/2]*3
 multiple_free_lattice = Lattice(multiple_free_lat_centering,
-                                multiple_free_lat_consts, multiple_free_lat_angles)
+                                multiple_free_lat_consts, multiple_free_lat_angles,
+                                convention="angular")
 
 multiple_free_pff = [0.0]
 multiple_free_energy_cutoff = 2*(2*np.pi/multiple_free_lat_const)**2

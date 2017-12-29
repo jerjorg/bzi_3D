@@ -1,5 +1,13 @@
 # Revision History
 
+## Revision 0.3.2
+- Added a new module which contains many of the same methods
+  covered in the other modules but in 2D instead of 3D. This module,
+  `all_2D.py` will be used to test adaptive refinement on 2D models
+  that should be easier to visualize and program.
+- Added a new notebook that looks at the 2D free electron model in
+  detail.
+
 ## Revision 0.3.1
 - Added `plot_all_bz` which can plot the Brillouin zone, the
   irreducible wedge of the Brillouin zone, and a mesh. The mesh can be

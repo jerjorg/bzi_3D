@@ -798,7 +798,7 @@ def read_vasp(location):
         f = file.readlines()
         niters = 0
         for i, line in enumerate(f):
-            if "DAV" in line:
+            if "DAV" in line or "RMM" in line:
                 niters += 1
 
         VASP_data["number of electronic iterations"] = niters
@@ -936,21 +936,25 @@ def read_vasp(location):
                     VASP_data[sigma_name] = float(sigma_line[5].strip("="))
 
             if "VOLUME and BASIS-vectors are now" in line:
-                VASP_data["Final unit cell volume"] = float(f[i+3].split()[-1])
-
                 a1 = [float(a) for a in f[i+5].split()[:3]]
                 b1 = [float(b) for b in f[i+5].split()[3:]]
                 
                 a2 = [float(a) for a in f[i+6].split()[:3]]
                 b2 = [float(b) for b in f[i+6].split()[3:]]
 
-                a3 = [float(a) for a in f[i+6].split()[:3]]
-                b3 = [float(b) for b in f[i+6].split()[3:]]
-                
+                a3 = [float(a) for a in f[i+7].split()[:3]]
+                b3 = [float(b) for b in f[i+7].split()[3:]]
+            
                 VASP_data["Final lattice vectors"] = np.transpose([a1, a2, a3])
                 VASP_data["Final reciprocal lattice vectors"] = np.transpose([b1, b2, b3])
+
+                # VASP_data["Final unit cell volume"] = float(f[i+3].split()[-1])
+                VASP_data["Final unit cell volume"] = np.linalg.det(
+                    np.transpose([a1, a2, a3]))
                 VASP_data["Final reciprocal unit cell volume"] = np.linalg.det(
                     np.transpose([b1, b2, b3]))
+
+                
 
             if "FORCES acting on ions" in line:
                 forces = []
@@ -959,7 +963,10 @@ def read_vasp(location):
                 forces.append({"Ewald-force": [float(fi) for fi in
                                                f[i + natoms + 4].split()[3:6]]})
                 forces.append({"Non-local-force": [float(fi) for fi in
-                                                   f[i + natoms + 4].split()[6:]]})
+                                                   f[i + natoms + 4].split()[6:9]]})
+                forces.append({"Convergence-correction-force": [float(fi) for fi in
+                                                                f[i + natoms + 4].split()[9:]]})
+                
                 VASP_data["Net forces acting on ions"] = forces
 
             if "Elapsed time" in line:
@@ -1818,7 +1825,7 @@ def gen_encut_plots(system_dir):
         if vasp_data != None:
             # Get the cutoff energy for this run, and add it to the list of energies.
             cutoff_plot_list.append(float(encut))
-
+            
             # Find the wrapped charge density in each of the directions.
             for i in range(3):
                 tot_wrapped_charge_list[i].append(vasp_data["total wrapped charge"][i])

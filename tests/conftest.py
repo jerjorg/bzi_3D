@@ -58,7 +58,7 @@ def run(tests):
         tests = ["test_make_ptvecs",
                  "test_make_lattice_vectors",
                  "test_sympts_sympaths",
-                 "test_get_orbitals",
+                 "test_get_orbits",
                  "test_reduce_simple_cubic",
                  "test_reduce_body_centered_cubic",
                  "test_reduce_face_centered_cubic",
@@ -74,7 +74,7 @@ def run(tests):
 
     # Read and write tests
     elif tests == "all read_and_write":
-        tests = ["test_read_QE", "test_read_VASP"]
+        tests = ["test_read_qe", "test_read_vasp"]
     elif tests == "all make_IBZ":
         tests = ["test_get_bragg_planes",
                  "test_trim_small",

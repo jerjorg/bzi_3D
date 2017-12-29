@@ -36,7 +36,7 @@ def test_rectangular():
                          np.dot(lattice.reciprocal_vectors, [.5]*3))
         grid = make_grid(free.lattice.reciprocal_vectors, rgrid_vecs, offset)
         weights = np.ones(len(grid))
-        free.fermi_level = rectangular_fermi_level(free, grid, weights)
+        free.fermi_level, temp = rectangular_method(free, grid, weights)
         sphere_volume = 4./3*np.pi*free.fermi_level**(3./degree)
         occupied_volume = free.lattice.reciprocal_volume*free.nvalence_electrons/2
         fl_answer = (3*occupied_volume/(4*np.pi))**(degree/3.)
@@ -49,7 +49,7 @@ def test_rectangular():
         assert np.isclose(free.fermi_level, fl_answer, 1e-2,1e-2)
 
         weights = np.ones(len(grid))
-        total_energy = rectangular_method(free, grid, weights)
+        temp, total_energy = rectangular_method(free, grid, weights)
         rf = free.fermi_level**(1./degree)
         te_answer = 4*np.pi*(rf**(3 + degree)/(3. + degree))
         assert np.isclose(total_energy, te_answer, 1e-1, 1e-1)
@@ -69,7 +69,7 @@ def test_rectangular_fermi_level():
     grid_vecs = freePP.lattice.reciprocal_vectors/n
     grid = make_cell_points(freePP.lattice.reciprocal_vectors, grid_vecs, offset)
     weights = np.ones(len(grid))
-    fermi_level = rectangular_fermi_level(freePP, grid, weights)
+    fermi_level, temp = rectangular_method(freePP, grid, weights)
 
     norms = np.sort([norm(g)**2 for g in grid])
     ind = int(len(grid)*freePP.nvalence_electrons/2)
@@ -88,7 +88,7 @@ def test_rectangular_fermi_level():
     grid_vecs = freePP.lattice.reciprocal_vectors/n
     grid = make_cell_points(freePP.lattice.reciprocal_vectors, grid_vecs, offset)
     weights = np.ones(len(grid))
-    fermi_level = rectangular_fermi_level(freePP, grid, weights)
+    fermi_level, temp = rectangular_method(freePP, grid, weights)
 
     norms = np.sort([norm(g)**2 for g in grid])
     ind = int(len(grid)*freePP.nvalence_electrons/2)

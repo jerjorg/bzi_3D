@@ -5,10 +5,11 @@ import pytest
 import itertools
 
 from BZI.tetrahedron import *
-from BZI.pseudopots import FreeElectronModel, Al_PP
-from BZI.integration import rectangular_fermi_level
+from BZI.pseudopots import FreeElectronModel, Al_EPM, free_EPM
 from BZI.symmetry import make_ptvecs, make_rptvecs, Lattice
 from conftest import run
+
+print(Al_EPM.energy_cutoff)
 
 tests = run("all tetrahedra")
 @pytest.mark.skipif("test_find_tetrahedra" not in tests, reason="different tests")
@@ -157,7 +158,7 @@ def test_density_of_states():
     
 @pytest.mark.skipif("test_grid_and_tetrahedra" not in tests, reason="different tests")
 def test_grid_and_tetrahedra():
-    grid, tetrahedra1 = grid_and_tetrahedra(Al_PP, [2,2,2], [0,0,0])
+    grid, tetrahedra1 = grid_and_tetrahedra(Al_EPM, [2,2,2], [0,0,0])
 
     # These are the tetrahedra that would be created if the common diagonal
     # were [1,8].
@@ -206,7 +207,7 @@ def test_grid_and_tetrahedra():
     lat_angles =[np.pi/2]*3
     lat_consts = [1]*3
     lat_centering = "prim"
-    lattice = Lattice(lat_centering, lat_consts, lat_angles)
+    lattice = Lattice(lat_centering, lat_consts, lat_angles, convention="angular")
 
     nvalence = 1
     degree = 2
@@ -241,7 +242,7 @@ def test_grid_and_tetrahedra():
     lat_angles =[np.pi/2]*3
     lat_consts = [2*np.pi]*3
     lat_centering = "prim"
-    lattice = Lattice(lat_centering, lat_consts, lat_angles)
+    lattice = Lattice(lat_centering, lat_consts, lat_angles, convention="angular")
     lat_offset = [-1./2]*3
     degree = 2
     nvalence = 1
@@ -307,13 +308,13 @@ def test_find_irreducible_tetrahedra():
 
     ndiv0 = np.array([2,2,2])
     offset = [0]*3
-    grid, tetrahedra = grid_and_tetrahedra(Al_PP, ndiv0, offset)
+    grid, tetrahedra = grid_and_tetrahedra(Al_EPM, ndiv0, offset)
     weights_unreduced = np.ones(len(tetrahedra))
-    fermi_level_unreduced = calc_fermi_level(Al_PP, tetrahedra,
+    fermi_level_unreduced = calc_fermi_level(Al_EPM, tetrahedra,
                                              weights_unreduced, grid)    
-    irreducible_tetrahedra, weights_reduced = find_irreducible_tetrahedra(Al_PP,
+    irreducible_tetrahedra, weights_reduced = find_irreducible_tetrahedra(Al_EPM,
                                                             tetrahedra, grid)
-    fermi_level_reduced = calc_fermi_level(Al_PP, irreducible_tetrahedra,
+    fermi_level_reduced = calc_fermi_level(Al_EPM, irreducible_tetrahedra,
                                     weights_reduced, grid)
 
     assert np.isclose(fermi_level_unreduced, fermi_level_reduced)
@@ -325,7 +326,7 @@ def test_find_irreducible_tetrahedra():
     lat_angles =[np.pi/2]*3
     lat_consts = [2*np.pi]*3
     lat_centering = "prim"
-    lattice = Lattice(lat_centering, lat_consts, lat_angles)
+    lattice = Lattice(lat_centering, lat_consts, lat_angles, convention="angular")
     lat_offset = [-1./2]*3
     degree = 2
     free = FreeElectronModel(lattice, degree)
@@ -544,7 +545,7 @@ def test_integrals():
         lat_angles =[np.pi/2]*3
         lat_consts = [1]*3
         lat_centering = "prim"
-        lattice = Lattice(lat_centering, lat_consts, lat_angles)
+        lattice = Lattice(lat_centering, lat_consts, lat_angles, convention="angular")
         free = FreeElectronModel(lattice, degree)
 
         lat_offset = [-1./2]*3
@@ -572,7 +573,7 @@ def test_adjacent_tetrahedra():
     lat_angles =[np.pi/2]*3
     lat_consts = [1]*3
     lat_centering = "prim"
-    lattice = Lattice(lat_centering, lat_consts, lat_angles)
+    lattice = Lattice(lat_centering, lat_consts, lat_angles, convention="angular")
     lat_offset = [-1./2]*3
     degree = 2
     nvalence = 1
@@ -836,7 +837,7 @@ def test_convert_tet_index():
     lat_angles =[np.pi/2]*3
     lat_consts = [2*np.pi]*3
     lat_centering = "prim"
-    lattice = Lattice(lat_centering, lat_consts, lat_angles)
+    lattice = Lattice(lat_centering, lat_consts, lat_angles, convention="angular")
     lat_shift = [-1./2]*3
     grid_shift = [0.]*3
     degree = 2
@@ -866,38 +867,29 @@ def test_convert_tet_index():
 def test_get_grid_tetrahedra():
     # Compare the new method of getting tetrahedra, with periodic
     # boundary conditions, to the old.
-    lat_angles =[np.pi/2]*3
-    lat_consts = [1]*3
-    lat_centering = "prim"
-    lattice = Lattice(lat_centering, lat_consts, lat_angles)
     lat_shift = [-1./2]*3
     grid_shift = [0.]*3
-    degree = 2
-    nvalence = 1
-    free = FreeElectronModel(lattice, nvalence, degree)
     ndivs = 2
-
-    grid, tetrahedra = grid_and_tetrahedra(free, ndivs, lat_shift)
-    new_grid, new_tetrahedra = get_grid_tetrahedra(free, ndivs, lat_shift)
+    grid, tetrahedra = grid_and_tetrahedra(free_EPM, ndivs, lat_shift)
+    new_grid, new_tetrahedra = get_grid_tetrahedra(free_EPM, ndivs, lat_shift)
     
     weights = np.ones(len(tetrahedra))
-    fermi_level = calc_fermi_level(free, tetrahedra, weights, grid)
-    new_fermi_level = calc_fermi_level(free, new_tetrahedra, weights, new_grid)
+    fermi_level = calc_fermi_level(free_EPM, tetrahedra, weights, grid)
+    new_fermi_level = calc_fermi_level(free_EPM, new_tetrahedra, weights, new_grid)
 
     assert fermi_level == new_fermi_level
 
-    irr_tet, weights = find_irreducible_tetrahedra(free, tetrahedra, grid)
-    new_irr_tet, new_weights = find_irreducible_tetrahedra(free,
+    irr_tet, weights = find_irreducible_tetrahedra(free_EPM, tetrahedra, grid)
+    new_irr_tet, new_weights = find_irreducible_tetrahedra(free_EPM,
                                                     new_tetrahedra, new_grid)
-    fermi_level = calc_fermi_level(free, irr_tet, weights, grid)
-    new_fermi_level = calc_fermi_level(free, new_irr_tet, new_weights, new_grid)
+    fermi_level = calc_fermi_level(free_EPM, irr_tet, weights, grid)
+    new_fermi_level = calc_fermi_level(free_EPM, new_irr_tet, new_weights, new_grid)
 
     assert fermi_level == new_fermi_level
-
-    # Make sure the tetrahedra for the twe methods are the same.
+    # Make sure the tetrahedra for the two methods are the same.
     lat_shift = [-1./2]*3
-    grid, tetrahedra = grid_and_tetrahedra(Al_PP, ndivs, lat_shift)
-    new_grid, new_tetrahedra = get_grid_tetrahedra(Al_PP, ndivs, lat_shift)
+    grid, tetrahedra = grid_and_tetrahedra(Al_EPM, ndivs, lat_shift)
+    new_grid, new_tetrahedra = get_grid_tetrahedra(Al_EPM, ndivs, lat_shift)
     map = {0:0,
        1:1,
        2:0,
@@ -932,36 +924,37 @@ def test_get_grid_tetrahedra():
             
     assert all(np.equal(check_tet, new_tetrahedra).flatten())
 
-    # Verify the Fermi level calculated with the new method gives the value
+    # Verify the Fermi level calculated with the new method gives the same value
     # as the old.
-
-    grid, tetrahedra = grid_and_tetrahedra(Al_PP, ndivs, lat_shift)
-    new_grid, new_tetrahedra = get_grid_tetrahedra(Al_PP, ndivs, lat_shift)
-
-    weights = np.ones(len(tetrahedra))
-    fermi_level = calc_fermi_level(Al_PP, tetrahedra, weights, grid)
+    grid, tetrahedra = grid_and_tetrahedra(Al_EPM, ndivs, lat_shift)
+    new_grid, new_tetrahedra = get_grid_tetrahedra(Al_EPM, ndivs, lat_shift)
 
     weights = np.ones(len(tetrahedra))
-    new_fermi_level = calc_fermi_level(Al_PP, new_tetrahedra, weights, new_grid)
+    fermi_level = calc_fermi_level(Al_EPM, tetrahedra, weights, grid)
 
-    assert fermi_level == new_fermi_level
-    irr_tet, weights = find_irreducible_tetrahedra(Al_PP, tetrahedra, grid)
-    new_irr_tet, new_weights = find_irreducible_tetrahedra(Al_PP,
+    weights = np.ones(len(tetrahedra))
+    new_fermi_level = calc_fermi_level(Al_EPM, new_tetrahedra, weights, new_grid)
+    
+    assert np.isclose(fermi_level, new_fermi_level, atol=1e-1)
+
+    irr_tet, weights = find_irreducible_tetrahedra(Al_EPM, tetrahedra, grid)
+    new_irr_tet, new_weights = find_irreducible_tetrahedra(Al_EPM,
                                                         new_tetrahedra, new_grid)
 
-    red_fermi_level = calc_fermi_level(Al_PP, irr_tet, weights, grid)
-    new_red_fermi_level = calc_fermi_level(Al_PP, new_irr_tet,
+    red_fermi_level = calc_fermi_level(Al_EPM, irr_tet, weights, grid)
+    new_red_fermi_level = calc_fermi_level(Al_EPM, new_irr_tet,
                                            new_weights, new_grid)
-    
-    assert fermi_level == red_fermi_level
-    assert new_red_fermi_level == red_fermi_level
 
+    assert np.isclose(fermi_level, red_fermi_level, atol=1e-1)
+    assert np.isclose(new_red_fermi_level, red_fermi_level, atol=1e-1)
+
+    
 @pytest.mark.skipif("test_find_adjacent_tetrahedra" not in tests, reason="different tests")    
 def test_find_adjacent_tetrahedra():
     lat_angles =[np.pi/2]*3
     lat_consts = [2*np.pi]*3
     lat_centering = "prim"
-    lattice = Lattice(lat_centering, lat_consts, lat_angles)
+    lattice = Lattice(lat_centering, lat_consts, lat_angles, convention="angular")
     lat_shift = [-1./2]*3
     grid_shift = [0.]*3
     degree = 2
@@ -1009,7 +1002,7 @@ def test_corrections():
     lat_angles =[np.pi/2]*3
     lat_consts = [2*np.pi]*3
     lat_centering = "prim"
-    lattice = Lattice(lat_centering, lat_consts, lat_angles)
+    lattice = Lattice(lat_centering, lat_consts, lat_angles, convention="angular")
 
     degree = 1
     free = FreeElectronModel(lattice, degree)
@@ -1098,7 +1091,7 @@ def test_corrections():
     lat_angles =[np.pi/2]*3
     lat_consts = [2*np.pi]*3
     lat_centering = "prim"
-    lattice = Lattice(lat_centering, lat_consts, lat_angles)
+    lattice = Lattice(lat_centering, lat_consts, lat_angles, convention="angular")
 
     degree = 2
     free = FreeElectronModel(lattice, degree)

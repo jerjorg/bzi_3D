@@ -1848,7 +1848,7 @@ def HermiteNormalForm(S, eps=10):
         minidx, maxidx = get_minmax_indices(H[0,:])
         minm = H[0,minidx]
         # Subtract a multiple of the column containing the smallest element from
-        # the row containing the largest element.
+        # the column containing the largest element.
         multiple = int(H[0, maxidx]/minm)
         H[:, maxidx] = H[:, maxidx] - multiple*H[:, minidx]
         B[:, maxidx] = B[:, maxidx] - multiple*B[:, minidx]
@@ -2197,7 +2197,8 @@ def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
 
     return reduced_kpoints, kpoint_weights
 
-def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
+
+def find_orbits(kpoint_list, rlattice_vectors, grid_vectors, shift,
                 eps=9):
     """Use the point group symmetry of the lattice vectors to reduce a list of
     k-points.
@@ -2205,7 +2206,7 @@ def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
     Args:
         kpoint_list (list or numpy.ndarray): a list of k-point positions in
             Cartesian coordinates.
-        lattice_vectors (list or numpy.ndarray): the vectors that generate the
+        rlattice_vectors (list or numpy.ndarray): the vectors that generate the
             reciprocal lattice in a 3x3 array with the vectors as columns.
         grid_vectors (list or numpy.ndarray): the vectors that generate the
             k-point grid in a 3x3 array with the vectors as columns in 
@@ -2219,18 +2220,18 @@ def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
     """
     
     try:
-        inv(lattice_vectors)
+        inv(rlattice_vectors)
     except np.linalg.linalg.LinAlgError:
         msg = "The lattice generating vectors are linearly dependent."
-        raise ValueError(msg.format(lattice_vectors))
+        raise ValueError(msg.format(rlattice_vectors))
     
     try:
         inv(grid_vectors)
     except np.linalg.linalg.LinAlgError:
         msg = "The grid generating vectors are linearly dependent."
-        raise ValueError(msg.format(lattice_vectors))
+        raise ValueError(msg.format(rlattice_vectors))
         
-    if abs(det(lattice_vectors)) < abs(det(grid_vectors)):
+    if abs(det(rlattice_vectors)) < abs(det(grid_vectors)):
         msg = """The k-point generating vectors define a grid with a unit cell 
         larger than the reciprocal lattice unit cell."""
         raise ValueError(msg.format(grid_vectors))
@@ -2239,7 +2240,7 @@ def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
     shift = np.dot(grid_vectors, shift)
 
     # Integer matrix
-    N = np.dot(inv(grid_vectors), lattice_vectors)
+    N = np.dot(inv(grid_vectors), rlattice_vectors)
     # Check that N is an integer matrix. In other words, verify that the grid
     # and lattice are commensurate.
     for i in range(len(N[:,0])):
@@ -2261,7 +2262,7 @@ def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
     D = np.round(np.diag(S), eps).astype(int)
     
     cOrbit = 0 # unique orbit counter
-    pointgroup = get_point_group(lattice_vectors) # a list of point group operators
+    pointgroup = get_point_group(rlattice_vectors) # a list of point group operators
     nSymOps = len(pointgroup) # the number of symmetry operations
     nUR = len(kpoint_list) # the number of unreduced k-points
     # A dictionary to keep track of the number of symmetrically-equivalent
@@ -2293,7 +2294,7 @@ def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
             # Rotate the k-point.
             rot_kpt = np.dot(pg, ur_kpt)
             # Bring it back into the first unit cell.
-            rot_kpt = bring_into_cell(rot_kpt, lattice_vectors)
+            rot_kpt = bring_into_cell(rot_kpt, rlattice_vectors)
             if not np.allclose(np.dot(invK, rot_kpt-shift),
                                np.round(np.dot(invK, rot_kpt-shift))):
                 continue
@@ -2324,7 +2325,7 @@ def minkowski_reduce_basis(basis, eps):
 
     return _minkowski_reduce_basis(basis.T, 10**(-eps)).T
 
-def brillouin_zone_mapper(grid, rlattice_vectors, grid_vectors, shift, eps=15):
+def map_to_bz(grid, rlattice_vectors, grid_vectors, shift, eps=15):
     """Map a grid into the first Brillouin zone in Minkowski space.
     
     Args:
@@ -2332,6 +2333,8 @@ def brillouin_zone_mapper(grid, rlattice_vectors, grid_vectors, shift, eps=15):
         rlattice_vectors (numpy.ndarray): a matrix whose columes are the
             reciprocal lattice generating vectors.
         grid_vectors (numpy.ndarray): the grid generating vectors.
+        shift (list or numpy.ndarray): the offset of the k-point grid in grid
+            coordinates.
         eps (int): finite precision parameter that is the integer exponent in
             10**(-eps).
     Returns:
@@ -2341,8 +2344,9 @@ def brillouin_zone_mapper(grid, rlattice_vectors, grid_vectors, shift, eps=15):
     """
 
     # Reduce the grid and move into the unit cell.
-    reduced_grid, weights = reduce_kpoint_list(grid, rlattice_vectors, grid_vectors,
-                                      shift, eps)    
+    # reduced_grid, weights = reduce_kpoint_list(grid, rlattice_vectors, grid_vectors,
+    #                                   shift, eps)
+    reduced_grid, weights = find_orbits(grid, rlattice_vectors, grid_vectors, shift)
     reduced_grid = np.array(reduced_grid)
     
     # Find the Minkowski basis.
