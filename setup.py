@@ -34,7 +34,8 @@ setup(name='BZI',
           "phenum",
           "pytest",
           "pandas",
-          "xarray"
+          "xarray",
+          "scipy"
       ],
       packages=['BZI'],
       package_data={'BZI': []},
