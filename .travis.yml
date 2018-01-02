@@ -1,8 +1,7 @@
-install: travis_wait mvn install
+install: travis_wait 60 mvn install
 language: python
 cache: pip
 python:
-  - "2.7"
   - "3.6"
 # command to install dependencies
 install:

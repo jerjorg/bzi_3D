@@ -17,7 +17,7 @@ except ImportError:
 
 from os import path
 setup(name='BZI',
-      version='0.2.6',
+      version='0.3.2',
       description='Brillouin zone integration.',
       long_description= "" if not path.isfile("README.md") else read_md('README.md'),
       author='Jeremy J Jorgensen',
