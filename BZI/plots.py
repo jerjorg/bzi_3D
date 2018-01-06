@@ -207,7 +207,7 @@ def plot_just_points(mesh_points, ax=None):
     kzlist = [mesh_points[i][2] for i in range(ngpts)]
     if not ax:
         ax = plt.subplot(1,1,1,projection="3d")        
-    ax.scatter(kxlist, kylist, kzlist, c="black", s=1)
+    ax.scatter(kxlist, kylist, kzlist, c="black", s=10)
 
     
 def plot_mesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
@@ -408,7 +408,8 @@ def PlotSphereMesh(mesh_points,r2, offset = np.asarray([0.,0.,0.]),
 
 def plot_band_structure(materials_list, EPMlist, EPMargs_list, lattice, npts,
                         neigvals, energy_shift=0.0, energy_limits=False,
-                        fermi_level=False, save=False, show=True, sum_bands=None):
+                        fermi_level=False, save=False, show=True, sum_bands=None,
+                        plot_below=False, ax=None):
     """Plot the band structure of a pseudopotential along symmetry paths.
     
     Args:
@@ -429,6 +430,9 @@ def plot_band_structure(materials_list, EPMlist, EPMargs_list, lattice, npts,
     Returns:
         Display or save the band structure.
     """
+
+    if ax is None:
+        fig, ax = plt.subplots()
     
     # k-points between symmetry point pairs in Cartesian coordinates.
     car_kpoints = sym_path(lattice, npts, cart=True)
@@ -467,6 +471,15 @@ def plot_band_structure(materials_list, EPMlist, EPMargs_list, lattice, npts,
         for kpt in car_kpoints:
             EPMargs["kpoint"] = kpt
             energies[i].append(EPM.eval(**EPMargs) - energy_shift)
+            # energies[i].append(EPM.eval(**EPMargs))
+
+
+    colors = ["blue", "green", "red", "violet", "orange", "cyan", "black"]            
+    energies = np.array(energies)
+    if plot_below:
+        colors = ["red", "blue", "green", "violet", "orange", "cyan", "black"]        
+        for i in range(nEPM):
+            energies[i][energies[i] > EPMlist[i].fermi_level] = np.nan
             
     # Find the x-axis labels and label locations.
     plot_xlabels = [lattice.symmetry_paths[0][0]]
@@ -483,7 +496,6 @@ def plot_band_structure(materials_list, EPMlist, EPMargs_list, lattice, npts,
     plot_xlabel_pos.append(np.sum(distances))    
 
     # Plot the energy dispersion curves one at a time.
-    colors = ["blue", "green", "red", "violet", "orange", "cyan", "black"]
     for i in range(nEPM):
         if sum_bands is not None:
             ienergy = []
@@ -492,39 +504,39 @@ def plot_band_structure(materials_list, EPMlist, EPMargs_list, lattice, npts,
                 # print("tmp energies: ", tmp_energies)
                 # print("all included bands: ", tmp_energies[np.where(tmp_energies < sum_bands)])
                 ienergy.append(np.sum(tmp_energies[np.where(tmp_energies < sum_bands)]))
-            plt.plot(lines, ienergy, color=colors[i], label="%s"%materials_list[i])
+            ax.plot(lines, ienergy, color=colors[i], label="%s"%materials_list[i])
         else:
             for ne in range(neigvals):
                 ienergy = []
                 for nk in range(len(car_kpoints)):
-                    ienergy.append(energies[i][nk][ne])
+                    ienergy.append(energies[i][nk][ne])                    
                 if ne == 0:
-                    plt.plot(lines, ienergy, color=colors[i], label="%s"%materials_list[i])
+                    ax.plot(lines, ienergy, color=colors[i], label="%s"%materials_list[i])
                 else:
-                    plt.plot(lines, ienergy, color=colors[i])
+                    ax.plot(lines, ienergy, color=colors[i])
 
     # Plot the Fermi level if provided.
-    if type(fermi_level) != bool:
-        plt.axhline(y = fermi_level, c="yellow", label="Fermi level")
+    if fermi_level:
+        ax.axhline(y = EPMlist[0].fermi_level, c="yellow", label="Fermi level")
 
     # Plot a vertical line at the symmetry points with proper labels.
     for pos in plot_xlabel_pos:
-        plt.axvline(x = pos, c="gray")
-    plt.xticks(plot_xlabel_pos, plot_xlabels)
+        ax.axvline(x = pos, c="gray")
+    plt.xticks(plot_xlabel_pos, plot_xlabels, fontsize=14)
 
     # Adjust the energy range if one was provided.
     if energy_limits:
-        plt.ylim(energy_limits)
+        ax.set_ylim(energy_limits)
     
     # Adjust the legend.
-    # lgd = plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.xlim([0,np.sum(distances)])
-    plt.xlabel("Symmetry points")
-    plt.ylabel("Energy (eV)")
-    plt.title("%s Band Structure" %materials_list[0])
-    plt.grid(linestyle="dotted")
+    # lgd = ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    ax.set_xlim([0,np.sum(distances)])
+    ax.set_xlabel("Symmetry points", fontsize=16)
+    ax.set_ylabel("Energy (eV)", fontsize=16)
+    ax.set_title("%s Band Structure" %materials_list[0], fontsize=16)
+    ax.grid(linestyle="dotted")
     if save:
-        # plt.savefig("%s_band_structure.pdf" %materials_list[0],
+        # ax.savefig("%s_band_structure.pdf" %materials_list[0],
         #             bbox_extra_artists=(lgd,), bbox_inches='tight')
         plt.savefig("%s_band_structure.pdf" %materials_list[0],
                     bbox_inches='tight')
@@ -1373,8 +1385,8 @@ def plot_bz(bz, symmetry_points=None, remove=True, ax=None, color="blue"):
             simplex = np.append(simplex, simplex[0])
             simplex_pts = [bz.points[i] for i in simplex]
             plot_simplex_edges(simplex_pts, ax, color=color)
-
     plt.close()
+
 
 def plot_all_bz(lat_type, lat_vecs, grid=None, sympts=None, ax=None, convention="ordinary"):
     """Plot the Brillouin zone and optionally the irreducible Brillouin zone and points

@@ -82,7 +82,7 @@ class Lattice(object):
         self.reciprocal_volume = det(self.reciprocal_vectors)
 
 # Define the symmetry points for a simple-cubic lattice in lattice coordinates.
-sc_sympts = {"G": [0. ,0., 0.],
+sc_sympts = {"$\Gamma$": [0. ,0., 0.],
               "R": [1./2, 1./2, 1./2],
               "X": [0., 1./2, 0.],
               "M": [1./2, 1./2, 0.]}
@@ -90,7 +90,7 @@ sc_sympts = {"G": [0. ,0., 0.],
 
 # Define the symmetry points for a fcc lattice in lattice coordinates.
 # Coordinates are in lattice coordinates.
-fcc_sympts = {"G": [0., 0., 0.], # G is the gamma point.
+fcc_sympts = {"$\Gamma$": [0., 0., 0.], # G is the gamma point.
               "K": [3./8, 3./8, 3./4],
               "L": [1./2, 1./2, 1./2],
               "U": [5./8, 1./4, 5./8],              
@@ -98,7 +98,7 @@ fcc_sympts = {"G": [0., 0., 0.], # G is the gamma point.
               "X": [1./2, 0., 1./2]}
 
 # One of the band plots needs the gamma point in the neighboring cell.
-mod_fcc_sympts = {"G": [0., 0., 0.], # G is the gamma point.
+mod_fcc_sympts = {"$\Gamma$": [0., 0., 0.], # G is the gamma point.
                   "K": [3./8, 3./8, 3./4],
                   "L": [1./2, 1./2, 1./2],
                   "U": [5./8, 1./4, 5./8],              
@@ -107,13 +107,13 @@ mod_fcc_sympts = {"G": [0., 0., 0.], # G is the gamma point.
                   "G2":[1., 1., 1.]}
 
 # Define the symmetry points for a bcc lattice in lattice coordinates
-bcc_sympts = {"G": [0., 0., 0.],
+bcc_sympts = {"$\Gamma$": [0., 0., 0.],
               "H": [1./2, -1./2, 1./2],
               "P": [1./4, 1./4, 1./4],
               "N": [0., 0., 1./2]}
 
 # Tetragonal high symmetry points
-tet_sympts = {"G": [0., 0., 0.],
+tet_sympts = {"$\Gamma$": [0., 0., 0.],
               "A": [1./2, 1./2, 1./2],
               "M": [1./2, 1./2, 0.],
               "R": [0., 1./2, 1./2],
@@ -126,7 +126,7 @@ def bct1_sympts(a, c):
     """
     
     eta = (1. + c**2/a**2)/4.
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "M": [-1./2, 1./2, 1./2],
             "N": [0., 1./2, 0.],
             "P": [1./4, 1./4, 1./4],
@@ -142,7 +142,7 @@ def bct2_sympts(a, c):
     
     eta = (1. + a**2/c**2)/4.
     zeta = a**2/(2*c**2)
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "N": [0., 1./2, 0.],
             "P": [1./4, 1./4, 1./4],
             "S": [-eta, eta, eta], # Sigma
@@ -154,7 +154,7 @@ def bct2_sympts(a, c):
 
 
 # Orthorhombic high symmetry points
-orc_sympts = {"G": [0., 0., 0.],
+orc_sympts = {"$\Gamma$": [0., 0., 0.],
               "R": [1./2, 1./2, 1./2],
               "S": [1./2, 1./2, 0.],
               "T": [0., 1./2, 1./2],
@@ -175,7 +175,7 @@ def orcf13_sympts(a, b, c):
     zeta = (1 + (a/b)**2 - (a/c)**2)/4.
     eta = (1 + (a/b)**2 + (a/c)**2)/4.
     
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "A": [1./2, 1./2+zeta, zeta],
             "A1": [1./2, 1./2 - zeta, 1 - zeta],
             "L": [1./2, 1./2, 1./2],
@@ -198,7 +198,7 @@ def orcf2_sympts(a, b, c):
     phi = (1 + c**2/b**2 - c**2/a**2)/4
     delta = (1 + b**2/a**2 - b**2/c**2)/4
     
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "C": [1./2, 1./2 - eta, 1. - eta],
             "C1": [1./2, 1./2 + eta, eta],
             "D": [1./2 - delta, 1./2, 1. - delta],
@@ -222,7 +222,7 @@ def orci_sympts(a, b, c):
     delta = (b**2 - a**2)/(4*c**2)
     mu = (a**2 + b**2)/(4*c**2)
     
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "L": [-mu, mu, 1./2 - delta],
             "L1": [mu, -mu, 1./2 + delta],
             "L2": [1./2 - delta, 1./2 + delta, -mu],
@@ -244,7 +244,7 @@ def orcc_sympts(a, b):
     b = float(b)
     zeta = (1 + a**2/b**2)/4
     
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "A": [zeta, zeta, 1./2],
             "A1": [-zeta, 1-zeta, 1./2],
             "R": [0., 1./2, 1./2],
@@ -256,7 +256,7 @@ def orcc_sympts(a, b):
             "Z": [0., 0., 1./2]}
 
 # High symmetry points for a hexagonal lattice.
-hex_sympts = {"G": [0., 0., 0.],
+hex_sympts = {"$\Gamma$": [0., 0., 0.],
               "A": [0., 0., 1./2],
               "H": [1./3, 1./3, 1./2],
               "K": [1./3, 1./3, 0.],
@@ -270,7 +270,7 @@ def rhl1_sympts(alpha):
     eta = (1 + 4*np.cos(alpha))/(2 + 4*np.cos(alpha))
     nu = 3./4 - eta/2
     
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "B": [eta, 1./2, 1-eta],
             "B1": [1./2, 1-eta, eta-1],
             "F": [1./2, 1./2, 0.],
@@ -290,7 +290,7 @@ def rhl2_sympts(alpha):
     alpha = float(alpha)
     eta = 1/(2*np.tan(alpha/2)**2)
     nu = 3./4 - eta/2
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "F": [1./2, -1./2, 0.],
             "L": [1./2, 0., 0.],
             "P": [1-nu, -nu, 1-nu],
@@ -311,7 +311,7 @@ def mcl_sympts(b, c, alpha):
     
     eta = (1 - b*np.cos(alpha)/c)/(2*np.sin(alpha)**2)
     nu = 1./2 - eta*c*np.cos(alpha)/b
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "A": [1./2, 1./2, 0.],
             "C": [0., 1./2, 1./2],
             "D": [1./2, 0., 1./2],
@@ -344,7 +344,7 @@ def mclc12_sympts(a, b, c, alpha):
     psi = 3./4 - a**2/(4*b**2*np.sin(alpha)**2)
     phi = psi + (3./4 - psi)*b*np.cos(alpha)/c
 
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "N": [1./2, 0., 0.],
             "N1": [0., -1./2, 0.],
             "F": [1-zeta, 1-zeta, 1-eta],
@@ -381,7 +381,7 @@ def mclc34_sympts(a, b, c, alpha):
     phi = 1 + zeta - 2*mu
     psi = eta - 2*delta
                 
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "F": [1-phi, 1-phi, 1-psi],
             "F1": [phi, phi-1, psi],
             "F2": [1-phi, -phi, 1-psi],
@@ -419,7 +419,7 @@ def mclc5_sympts(a, b, c, alpha):
     delta = zeta*c*np.cos(alpha)/b + omega/2 - 1./4
     rho = 1 - zeta*a**2/b**2
 
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "F": [nu, nu, omega],
             "F1": [1-nu, 1-nu, 1-omega],
             "F2": [nu, nu-1, omega],
@@ -450,7 +450,7 @@ def mclc5_sympts(a, b, c, alpha):
 # k_alpha > pi/2
 # k_beta > pi/2
 # k_gamma = pi/2
-tri1a2a_sympts = {"G": [0., 0., 0.],
+tri1a2a_sympts = {"$\Gamma$": [0., 0., 0.],
                   "L": [1./2, 1./2, 0.],
                   "M": [0., 1./2, 1./2],
                   "N": [1./2, 0., 1./2],
@@ -470,7 +470,7 @@ tri1a2a_sympts = {"G": [0., 0., 0.],
 # k_alpha < pi/2
 # k_beta < pi/2
 # k_gamma = pi/2
-tr1b2b_sympts = {"G": [0., 0., 0.],
+tr1b2b_sympts = {"$\Gamma$": [0., 0., 0.],
                  "L": [1./2, -1./2, 0.],
                  "M": [0., 0., 1./2],
                  "N": [-1./2, -1./2, 1./2],
@@ -690,14 +690,14 @@ def get_sympaths(centering_type, lattice_constants, lattice_angles,
         if (np.isclose(a, b) and
             np.isclose(b, c)):
             if centering_type == "prim":
-                return [["G", "X"], ["X", "M"], ["M", "G"], ["G", "R"],
+                return [["$\Gamma$", "X"], ["X", "M"], ["M", "$\Gamma$"], ["$\Gamma$", "R"],
                         ["R", "X"], ["M", "R"]]
             elif centering_type == "body":
-                return [["G", "H"], ["H", "N"], ["N", "G"], ["G", "P"],
+                return [["$\Gamma$", "H"], ["H", "N"], ["N", "$\Gamma$"], ["$\Gamma$", "P"],
                         ["P", "H"], ["P", "N"]]
             elif centering_type == "face":
-                return [["G", "X"], ["X", "W"], ["W", "K"], ["K", "G"],
-                        ["G", "L"], ["L", "U"], ["U", "W"], ["W", "L"],
+                return [["$\Gamma$", "X"], ["X", "W"], ["W", "K"], ["K", "$\Gamma$"],
+                        ["$\Gamma$", "L"], ["L", "U"], ["U", "W"], ["W", "L"],
                         ["L", "K"], ["U", "X"]]
             else:
                 msg = ("Valid lattice centerings for cubic latices include "
@@ -707,17 +707,17 @@ def get_sympaths(centering_type, lattice_constants, lattice_angles,
         # Tetragonal.
         elif (np.isclose(a,b) and not np.isclose(b,c)):
             if centering_type == "prim":
-                return [["G", "X"], ["X", "M"], ["M", "G"], ["G", "Z"],
+                return [["$\Gamma$", "X"], ["X", "M"], ["M", "$\Gamma$"], ["$\Gamma$", "Z"],
                         ["Z", "R"], ["R", "A"], ["A", "Z"], ["X", "R"],
                         ["M", "A"]]
             elif centering_type == "body":
                 if c < a:
-                    return [["G", "X"], ["X", "M"], ["M", "G"], ["G", "Z"],
+                    return [["$\Gamma$", "X"], ["X", "M"], ["M", "$\Gamma$"], ["$\Gamma$", "Z"],
                             ["Z", "P"], ["P", "N"], ["N", "Z1"], ["Z1", "M"],
                             ["X", "P"]]
                 else:
-                    return [["G", "X"], ["X", "Y"], ["Y", "S"], ["S", "G"],
-                            ["G", "Z"], ["Z", "S1"], ["S1", "N"], ["N", "P"],
+                    return [["$\Gamma$", "X"], ["X", "Y"], ["Y", "S"], ["S", "$\Gamma$"],
+                            ["$\Gamma$", "Z"], ["Z", "S1"], ["S1", "N"], ["N", "P"],
                             ["P", "Y1"], ["Y1", "Z"], ["X", "P"]]
             else:
                 msg = ("Valid lattice centerings for tetragonal lattices "
@@ -727,32 +727,32 @@ def get_sympaths(centering_type, lattice_constants, lattice_angles,
         # Last of the lattices with all angles equal to pi/2 is orthorhombic.
         else:
             if centering_type == "prim": # orc
-                return [["G", "X"], ["X", "S"], ["S", "Y"], ["Y", "G"],
-                        ["G", "Z"], ["Z", "U"], ["U", "R"], ["R", "T"],
+                return [["$\Gamma$", "X"], ["X", "S"], ["S", "Y"], ["Y", "$\Gamma$"],
+                        ["$\Gamma$", "Z"], ["Z", "U"], ["U", "R"], ["R", "T"],
                         ["T", "Z"], ["Y", "T"], ["U", "X"], ["S", "R"]]
             elif centering_type == "base": # orcc
-                return [["G", "X"], ["X", "S"], ["S", "R"], ["R", "A"],
-                        ["A", "Z"], ["Z", "G"], ["G", "Y"], ["Y", "X1"],
+                return [["$\Gamma$", "X"], ["X", "S"], ["S", "R"], ["R", "A"],
+                        ["A", "Z"], ["Z", "$\Gamma$"], ["$\Gamma$", "Y"], ["Y", "X1"],
                         ["X1", "A1"], ["A1", "T"], ["T", "Y"], ["Z", "T"]]
             elif centering_type == "body": # orci
-                return [["G", "X"], ["X", "L"], ["L", "T"], ["T", "W"],
-                        ["W", "R"], ["R", "X1"], ["X1", "Z"], ["Z", "G"],
-                        ["G", "Y"], ["Y", "S"], ["S", "W"], ["L1", "Y"],
+                return [["$\Gamma$", "X"], ["X", "L"], ["L", "T"], ["T", "W"],
+                        ["W", "R"], ["R", "X1"], ["X1", "Z"], ["Z", "$\Gamma$"],
+                        ["$\Gamma$", "Y"], ["Y", "S"], ["S", "W"], ["L1", "Y"],
                         ["Y1", "Z"]]
             elif centering_type == "face":
                 if (1/a**2 > 1/b**2 +1/c**2): # orcf1
-                    return[["G", "Y"], ["Y", "T"], ["T", "Z"], ["Z", "G"],
-                           ["G", "X"], ["X", "A1"], ["A1", "Y"], ["T", "X1"],
-                           ["X", "A"], ["A", "Z"], ["L", "G"]]
+                    return[["$\Gamma$", "Y"], ["Y", "T"], ["T", "Z"], ["Z", "$\Gamma$"],
+                           ["$\Gamma$", "X"], ["X", "A1"], ["A1", "Y"], ["T", "X1"],
+                           ["X", "A"], ["A", "Z"], ["L", "$\Gamma$"]]
                 elif np.isclose(1/a**2, 1/b**2 +1/c**2): # orcf3
-                    return [["G", "Y"], ["Y", "T"], ["T", "Z"], ["Z", "G"],
-                            ["G", "X"], ["X", "A1"], ["A1", "Y"], ["X", "A"],
-                            ["A", "Z"], ["L", "G"]]                    
+                    return [["$\Gamma$", "Y"], ["Y", "T"], ["T", "Z"], ["Z", "$\Gamma$"],
+                            ["$\Gamma$", "X"], ["X", "A1"], ["A1", "Y"], ["X", "A"],
+                            ["A", "Z"], ["L", "$\Gamma$"]]                    
                 else: #orcf2
-                    return [["G", "Y"], ["Y", "C"], ["C", "D"], ["D", "X"],
-                            ["X", "G"], ["G", "Z"], ["Z", "D1"], ["D1", "H"],
+                    return [["$\Gamma$", "Y"], ["Y", "C"], ["C", "D"], ["D", "X"],
+                            ["X", "$\Gamma$"], ["$\Gamma$", "Z"], ["Z", "D1"], ["D1", "H"],
                             ["H", "C"], ["C1", "Z"], ["X", "H1"], ["H", "Y"],
-                            ["L", "G"]]            
+                            ["L", "$\Gamma$"]]            
             else:
                 msg = ("Valid lattice centerings for orthorhombic lattices "
                        "include 'prim', 'base', 'body', and 'face'.")
@@ -762,51 +762,51 @@ def get_sympaths(centering_type, lattice_constants, lattice_angles,
     if (np.isclose(alpha, beta) and np.isclose(beta, np.pi/2) and
         np.isclose(gamma, 2*np.pi/3) and np.isclose(a, b) and not
         np.isclose(b, c)):
-        return [["G", "M"], ["M", "K"], ["K", "G"], ["G", "A"], ["A", "L"],
+        return [["$\Gamma$", "M"], ["M", "K"], ["K", "$\Gamma$"], ["$\Gamma$", "A"], ["A", "L"],
                 ["L", "H"], ["H", "A"], ["L", "M"], ["K", "H"]]
 
     # Rhombohedral has equal angles and constants.
     elif (np.isclose(alpha, beta) and np.isclose(beta, gamma) and 
           np.isclose(a, b) and np.isclose(b, c)):
             if alpha < np.pi/2: # RHL1
-                return [["G", "L"], ["L", "B1"], ["B", "Z"], ["Z", "G"],
-                        ["G", "X"], ["Q", "F"], ["F", "P1"], ["P1", "Z"],
+                return [["$\Gamma$", "L"], ["L", "B1"], ["B", "Z"], ["Z", "$\Gamma$"],
+                        ["$\Gamma$", "X"], ["Q", "F"], ["F", "P1"], ["P1", "Z"],
                         ["L", "P"]]
             else: #RHL2
-                return [["G", "P"], ["P", "Z"], ["Z", "Q"], ["Q", "G"],
-                        ["G", "F"], ["F", "P1"], ["P1", "Q1"], ["Q1", "L"],
+                return [["$\Gamma$", "P"], ["P", "Z"], ["Z", "Q"], ["Q", "$\Gamma$"],
+                        ["$\Gamma$", "F"], ["F", "P1"], ["P1", "Q1"], ["Q1", "L"],
                         ["L", "Z"]]
 
     # Monoclinic a,b <= c, alpha < pi/2, beta = gamma = pi/2, a != b != c
     elif (not (a > c or b > c) and np.isclose(beta, gamma) and
           np.isclose(beta, np.pi/2) and alpha < np.pi/2):
         if centering_type == "prim":
-            return [["G", "Y"], ["Y", "H"], ["H", "C"], ["C", "E"],
+            return [["$\Gamma$", "Y"], ["Y", "H"], ["H", "C"], ["C", "E"],
                     ["E", "M1"], ["M1", "A"], ["A", "X"], ["X", "H1"],
                     ["M", "D"], ["D", "Z"], ["Y", "D"]]
         elif centering_type == "base": # MCLC1
             if kgamma > np.pi/2:
-                return [["G", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
-                        ["I1", "Z"], ["Z", "F1"], ["Y", "X1"], ["X", "G"],
-                        ["G", "N"], ["M", "G"]]
+                return [["$\Gamma$", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
+                        ["I1", "Z"], ["Z", "F1"], ["Y", "X1"], ["X", "$\Gamma$"],
+                        ["$\Gamma$", "N"], ["M", "$\Gamma$"]]
             elif np.isclose(kgamma, np.pi/2): # MCLC2
-                return [["G", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
-                        ["I1", "Z"], ["Z", "F1"], ["N", "G"], ["G", "M"]]
+                return [["$\Gamma$", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
+                        ["I1", "Z"], ["Z", "F1"], ["N", "$\Gamma$"], ["$\Gamma$", "M"]]
             elif (kgamma < np.pi/2 # MCLC3
                   and ((b*np.cos(alpha)/c + (b*np.sin(alpha)/a)**2) < 1)):
-                return [["G", "Y"], ["Y", "F"], ["F", "H"], ["H", "Z"],
+                return [["$\Gamma$", "Y"], ["Y", "F"], ["F", "H"], ["H", "Z"],
                         ["Z", "I"], ["I", "F1"], ["H1", "Y1"], ["Y1", "X"],
-                        ["X", "G"], ["G", "N"], ["M", "G"]]
+                        ["X", "$\Gamma$"], ["$\Gamma$", "N"], ["M", "$\Gamma$"]]
             elif (kgamma < np.pi/2 and # MCLC4
                   np.isclose(b*np.cos(alpha)/c + (b*np.sin(alpha)/a)**2, 1)):
-                return [["G", "Y"], ["Y", "F"], ["F", "H"], ["H", "Z"], 
-                        ["Z", "I"], ["H1", "Y1"], ["Y1", "X"], ["X", "G"],
-                        ["G", "N"], ["M", "G"]]
+                return [["$\Gamma$", "Y"], ["Y", "F"], ["F", "H"], ["H", "Z"], 
+                        ["Z", "I"], ["H1", "Y1"], ["Y1", "X"], ["X", "$\Gamma$"],
+                        ["$\Gamma$", "N"], ["M", "$\Gamma$"]]
             elif (kgamma < np.pi/2 and # MCLC5
                   (b*np.cos(alpha)/c + (b*np.sin(alpha)/a)**2) > 1.):
-                return [["G", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
+                return [["$\Gamma$", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
                         ["I1", "Z"], ["Z", "H"], ["H", "F1"], ["H1", "Y1"],
-                        ["Y1", "X"], ["X", "G"], ["G", "N"], ["M", "G"]]
+                        ["Y1", "X"], ["X", "$\Gamma$"], ["$\Gamma$", "N"], ["M", "$\Gamma$"]]
             else:
                 msg = "Something is wrong with the monoclinic lattice provided."
                 raise ValueError(msg.format(reciprocal_lattice_vectors))
@@ -821,19 +821,19 @@ def get_sympaths(centering_type, lattice_constants, lattice_angles,
               np.isclose(alpha, gamma)):
         kangles = np.sort([kalpha, kbeta, kgamma])
         if kangles[0] > np.pi/2: # TRI1a
-            return [["X", "G"], ["G", "Y"], ["L", "G"], ["G", "Z"], ["N", "G"],
-                    ["G", "M"], ["R", "G"]]
+            return [["X", "$\Gamma$"], ["$\Gamma$", "Y"], ["L", "$\Gamma$"], ["$\Gamma$", "Z"], ["N", "$\Gamma$"],
+                    ["$\Gamma$", "M"], ["R", "$\Gamma$"]]
         elif kangles[2] < np.pi/2: #TRI1b
-            return [["X", "G"], ["G", "Y"], ["L", "G"], ["G", "Z"],
-                    ["N", "G"], ["G", "M"], ["R", "G"]]
+            return [["X", "$\Gamma$"], ["$\Gamma$", "Y"], ["L", "$\Gamma$"], ["$\Gamma$", "Z"],
+                    ["N", "$\Gamma$"], ["$\Gamma$", "M"], ["R", "$\Gamma$"]]
         elif (np.isclose(kangles[0], np.pi/2) and (kangles[1] > np.pi/2) and
               (kangles[2] > np.pi/2)): #TRI2a
-            return [["X", "G"], ["G", "Y"], ["L", "G"], ["G", "Z"], ["N", "G"],
-                    ["G", "M"], ["R", "G"]]
+            return [["X", "$\Gamma$"], ["$\Gamma$", "Y"], ["L", "$\Gamma$"], ["$\Gamma$", "Z"], ["N", "$\Gamma$"],
+                    ["$\Gamma$", "M"], ["R", "$\Gamma$"]]
         elif (np.isclose(kangles[2], np.pi/2) and (kangles[0] < np.pi/2) and
               (kangles[1] < np.pi/2)): #TRI2b
-            return [["X", "G"], ["G", "Y"], ["L", "G"], ["G", "Z"],
-                    ["N", "G"], ["G", "M"], ["R", "G"]]
+            return [["X", "$\Gamma$"], ["$\Gamma$", "Y"], ["L", "$\Gamma$"], ["$\Gamma$", "Z"],
+                    ["N", "$\Gamma$"], ["$\Gamma$", "M"], ["R", "$\Gamma$"]]
         else:
             msg = "Something is wrong with the triclinic lattice provided."
             raise ValueError(msg.format(reciprocal_lattice_vectors))

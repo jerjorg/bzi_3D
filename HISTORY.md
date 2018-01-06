@@ -1,5 +1,8 @@
 # Revision History
 
+## Revision 0.3.3
+- Small changes to band plot functions and unit tests.
+
 ## Revision 0.3.2
 - Added a new module which contains many of the same methods
   covered in the other modules but in 2D instead of 3D. This module,
