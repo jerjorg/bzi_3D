@@ -742,7 +742,7 @@ def test_sympts_sympaths():
     a = 1./2
     b = 1./4
     c = 1./8
-
+    
     # Simple cubic
     sympts1 = {"$\Gamma$": [z, z, z],
               "M": [a, a, z],
@@ -1246,7 +1246,7 @@ def test_sympts_sympaths():
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
     for p1, p2 in zip(sympath1, sympath2):
-        assert p1 == p2                                                        
+        assert p1 == p2
         
     # Base-centered Monoclinic 3 (kgamma < pi/2, other condition < 1)
     mu = 5./4
