@@ -2,4 +2,5 @@ matplotlib
 numpy
 phenum
 sympy
+pyyaml
 pytest
