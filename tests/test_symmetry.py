@@ -18,720 +18,720 @@ from conftest import run
 
 tests = run("all symmetry")
 
-# @pytest.mark.skipif("test_make_ptvecs" not in tests, reason="different tests")            
-# def test_make_ptvecs():
-#     """Verify the primitive translation vectors are correct.
-#     """
-#     center_list = ["prim", "base", "body", "face"]# , "hex", "rhom"]
-#     consts_list = [[1]*3, [1.2]*3, [np.pi]*3, [1, 1, 2],
-#                    [1, 2, 3],[1.2, 1.5, 3], [np.pi, np.pi, 4],
-#                    [100,110.3,210.3]]
-#     angles_list = [[np.pi/2]*3, [1]*3,
-#                    [np.pi/3, np.pi/3, np.pi/4],
-#                    [2, 2, 1], [1, 2, 2.1],
-#                    [np.pi/2, np.pi/3, np.pi/3],
-#                    [np.pi/2, np.pi/2, np.pi/4]]
+@pytest.mark.skipif("test_make_ptvecs" not in tests, reason="different tests")            
+def test_make_ptvecs():
+    """Verify the primitive translation vectors are correct.
+    """
+    center_list = ["prim", "base", "body", "face"]# , "hex", "rhom"]
+    consts_list = [[1]*3, [1.2]*3, [np.pi]*3, [1, 1, 2],
+                   [1, 2, 3],[1.2, 1.5, 3], [np.pi, np.pi, 4],
+                   [100,110.3,210.3]]
+    angles_list = [[np.pi/2]*3, [1]*3,
+                   [np.pi/3, np.pi/3, np.pi/4],
+                   [2, 2, 1], [1, 2, 2.1],
+                   [np.pi/2, np.pi/3, np.pi/3],
+                   [np.pi/2, np.pi/2, np.pi/4]]
 
-#     for center_type in center_list:
-#         for lat_consts in consts_list:
-#             for lat_angles in angles_list:
-#                 vecs = make_ptvecs(center_type,
-#                                    lat_consts,
-#                                    lat_angles)
-#                 a = float(lat_consts[0])
-#                 b = float(lat_consts[1])
-#                 c = float(lat_consts[2])
+    for center_type in center_list:
+        for lat_consts in consts_list:
+            for lat_angles in angles_list:
+                vecs = make_ptvecs(center_type,
+                                   lat_consts,
+                                   lat_angles)
+                a = float(lat_consts[0])
+                b = float(lat_consts[1])
+                c = float(lat_consts[2])
                 
-#                 alpha = float(lat_angles[0])
-#                 beta = float(lat_angles[1])
-#                 gamma = float(lat_angles[2])
+                alpha = float(lat_angles[0])
+                beta = float(lat_angles[1])
+                gamma = float(lat_angles[2])
                 
-#                 v0 = vecs[:,0]
-#                 v1 = vecs[:,1]
-#                 v2 = vecs[:,2]
+                v0 = vecs[:,0]
+                v1 = vecs[:,1]
+                v2 = vecs[:,2]
                 
-#                 # Primitive centering type
-#                 if center_type == "prim":
-#                     # Verify the vectors have the correct lengths.
-#                     assert np.isclose(norm(v0), a)
-#                     assert np.isclose(norm(v1), b)
-#                     assert np.isclose(norm(v2), c)                                        
+                # Primitive centering type
+                if center_type == "prim":
+                    # Verify the vectors have the correct lengths.
+                    assert np.isclose(norm(v0), a)
+                    assert np.isclose(norm(v1), b)
+                    assert np.isclose(norm(v2), c)                                        
                     
-#                     # Verify the angles between the vectors are correct.
-#                     assert np.isclose(np.dot(v0,v1), a*b*np.cos(gamma))
-#                     assert np.isclose(np.dot(v1,v2), b*c*np.cos(alpha))
-#                     assert np.isclose(np.dot(v2,v0), a*c*np.cos(beta))
-#                 # Base centering type
-#                 elif center_type == "base":
-#                     # Verify the vectors have the correct lengths.
-#                     assert np.isclose(norm(v0),
-#                                       1./2*np.sqrt(a**2 + b**2 -
-#                                                   2*a*b*np.cos(gamma)))
-#                     assert np.isclose(norm(v1),
-#                                       1./2*np.sqrt(a**2 + b**2 +
-#                                                   2*a*b*np.cos(gamma)))
-#                     assert np.isclose(norm(v2), c)
+                    # Verify the angles between the vectors are correct.
+                    assert np.isclose(np.dot(v0,v1), a*b*np.cos(gamma))
+                    assert np.isclose(np.dot(v1,v2), b*c*np.cos(alpha))
+                    assert np.isclose(np.dot(v2,v0), a*c*np.cos(beta))
+                # Base centering type
+                elif center_type == "base":
+                    # Verify the vectors have the correct lengths.
+                    assert np.isclose(norm(v0),
+                                      1./2*np.sqrt(a**2 + b**2 -
+                                                  2*a*b*np.cos(gamma)))
+                    assert np.isclose(norm(v1),
+                                      1./2*np.sqrt(a**2 + b**2 +
+                                                  2*a*b*np.cos(gamma)))
+                    assert np.isclose(norm(v2), c)
 
-#                     # Verify the angles between the vectors are correct.
-#                     assert np.isclose(np.dot(v0, v1), 1./4*(a**2 - b**2))
-#                     assert np.isclose(np.dot(v1, v2), 1./2*a*c*np.cos(beta)
-#                                       + 1./2*b*c*np.cos(alpha))
-#                     assert np.isclose(np.dot(v0, v2), 1./2*a*c*np.cos(beta)
-#                                       - 1./2*b*c*np.cos(alpha))
+                    # Verify the angles between the vectors are correct.
+                    assert np.isclose(np.dot(v0, v1), 1./4*(a**2 - b**2))
+                    assert np.isclose(np.dot(v1, v2), 1./2*a*c*np.cos(beta)
+                                      + 1./2*b*c*np.cos(alpha))
+                    assert np.isclose(np.dot(v0, v2), 1./2*a*c*np.cos(beta)
+                                      - 1./2*b*c*np.cos(alpha))
 
-#                 # Body centering type
-#                 elif center_type == "body":
-#                     # Verify the vectors have the correct lengths.
-#                     assert np.isclose(norm(v0), 1./2*np.sqrt(
-#                         a**2 + b**2 + c**2
-#                         - 2*a*b*np.cos(gamma)
-#                         + 2*b*c*np.cos(alpha)
-#                         - 2*a*c*np.cos(beta)))                    
-#                     assert np.isclose(norm(v1), 1./2*np.sqrt(
-#                         a**2 + b**2 + c**2
-#                         - 2*a*b*np.cos(gamma)
-#                         - 2*b*c*np.cos(alpha)
-#                         + 2*a*c*np.cos(beta)))
-#                     assert np.isclose(norm(v2), 1./2*np.sqrt(
-#                         a**2 + b**2 + c**2
-#                         + 2*a*b*np.cos(gamma)
-#                         - 2*b*c*np.cos(alpha)
-#                         - 2*a*c*np.cos(beta)))
+                # Body centering type
+                elif center_type == "body":
+                    # Verify the vectors have the correct lengths.
+                    assert np.isclose(norm(v0), 1./2*np.sqrt(
+                        a**2 + b**2 + c**2
+                        - 2*a*b*np.cos(gamma)
+                        + 2*b*c*np.cos(alpha)
+                        - 2*a*c*np.cos(beta)))                    
+                    assert np.isclose(norm(v1), 1./2*np.sqrt(
+                        a**2 + b**2 + c**2
+                        - 2*a*b*np.cos(gamma)
+                        - 2*b*c*np.cos(alpha)
+                        + 2*a*c*np.cos(beta)))
+                    assert np.isclose(norm(v2), 1./2*np.sqrt(
+                        a**2 + b**2 + c**2
+                        + 2*a*b*np.cos(gamma)
+                        - 2*b*c*np.cos(alpha)
+                        - 2*a*c*np.cos(beta)))
                     
-#                     # Verify the angles between the vectors are correct.
-#                     assert np.isclose(gamma, (np.arccos((4*np.dot(v0,v1)
-#                                               + a**2 + b**2 - c**2)/(2*a*b))))
-#                     assert np.isclose(beta, (np.arccos((4*np.dot(v0,v2)
-#                                               + a**2 - b**2 + c**2)/(2*a*c))))
-#                     assert np.isclose(alpha, (np.arccos((4*np.dot(v1,v2)
-#                                               - a**2 + b**2 + c**2)/(2*b*c))))
-#                 # Face centering type
-#                 elif center_type == "face":
-#                     # Verify the vectors have the correct lengths.
-#                     assert np.isclose(norm(v0), 1./2*np.sqrt(b**2 + c**2 +
-#                                                         2*b*c*np.cos(alpha)))
-#                     assert np.isclose(norm(v1), 1./2*np.sqrt(a**2 + c**2 +
-#                                                         2*a*c*np.cos(beta)))
-#                     assert np.isclose(norm(v2), 1./2*np.sqrt(a**2 + b**2 +
-#                                                         2*a*b*np.cos(gamma)))
+                    # Verify the angles between the vectors are correct.
+                    assert np.isclose(gamma, (np.arccos((4*np.dot(v0,v1)
+                                              + a**2 + b**2 - c**2)/(2*a*b))))
+                    assert np.isclose(beta, (np.arccos((4*np.dot(v0,v2)
+                                              + a**2 - b**2 + c**2)/(2*a*c))))
+                    assert np.isclose(alpha, (np.arccos((4*np.dot(v1,v2)
+                                              - a**2 + b**2 + c**2)/(2*b*c))))
+                # Face centering type
+                elif center_type == "face":
+                    # Verify the vectors have the correct lengths.
+                    assert np.isclose(norm(v0), 1./2*np.sqrt(b**2 + c**2 +
+                                                        2*b*c*np.cos(alpha)))
+                    assert np.isclose(norm(v1), 1./2*np.sqrt(a**2 + c**2 +
+                                                        2*a*c*np.cos(beta)))
+                    assert np.isclose(norm(v2), 1./2*np.sqrt(a**2 + b**2 +
+                                                        2*a*b*np.cos(gamma)))
 
-#                     # Verify the angles between the vectors are correct.
-#                     common = (a*b*np.cos(gamma) + a*c*np.cos(beta) +
-#                               b*c*np.cos(alpha))
-#                     assert np.isclose(np.dot(v0,v1), 1./4*(common + c**2))
-#                     assert np.isclose(np.dot(v0,v2), 1./4*(common + b**2))
-#                     assert np.isclose(np.dot(v1,v2), 1./4*(common + a**2))
+                    # Verify the angles between the vectors are correct.
+                    common = (a*b*np.cos(gamma) + a*c*np.cos(beta) +
+                              b*c*np.cos(alpha))
+                    assert np.isclose(np.dot(v0,v1), 1./4*(common + c**2))
+                    assert np.isclose(np.dot(v0,v2), 1./4*(common + b**2))
+                    assert np.isclose(np.dot(v1,v2), 1./4*(common + a**2))
 
-#                 # Primitive centering type
-#                 if center_type == "hex":
-#                     # Verify the vectors have the correct lengths.
-#                     assert np.isclose(norm(v0), a)
-#                     assert np.isclose(norm(v1), b)
-#                     assert np.isclose(norm(v2), c)                                        
+                # Primitive centering type
+                if center_type == "hex":
+                    # Verify the vectors have the correct lengths.
+                    assert np.isclose(norm(v0), a)
+                    assert np.isclose(norm(v1), b)
+                    assert np.isclose(norm(v2), c)                                        
                     
-#                     # Verify the angles between the vectors are correct.
-#                     assert np.isclose(np.dot(v0,v1), a*b*np.cos(gamma))
-#                     assert np.isclose(np.dot(v1,v2), b*c*np.cos(alpha))
-#                     assert np.isclose(np.dot(v2,v0), a*c*np.cos(beta))                    
+                    # Verify the angles between the vectors are correct.
+                    assert np.isclose(np.dot(v0,v1), a*b*np.cos(gamma))
+                    assert np.isclose(np.dot(v1,v2), b*c*np.cos(alpha))
+                    assert np.isclose(np.dot(v2,v0), a*c*np.cos(beta))                    
                     
-#                 # Rhombohedral centering type
-#                 elif center_type == "rhom":
-#                     # Verify the vectors have the correct lengths.
-#                     assert np.isclose(norm(v0), a)
-#                     assert np.isclose(norm(v1), b)
-#                     assert np.isclose(norm(v2), c)                                        
+                # Rhombohedral centering type
+                elif center_type == "rhom":
+                    # Verify the vectors have the correct lengths.
+                    assert np.isclose(norm(v0), a)
+                    assert np.isclose(norm(v1), b)
+                    assert np.isclose(norm(v2), c)                                        
                     
-#                     # Verify the angles between the vectors are correct.
-#                     assert np.isclose(np.dot(v0,v1), a*b*np.cos(gamma))
-#                     assert np.isclose(np.dot(v1,v2), b*c*np.cos(alpha))
-#                     assert np.isclose(np.dot(v2,v0), a*c*np.cos(beta))
+                    # Verify the angles between the vectors are correct.
+                    assert np.isclose(np.dot(v0,v1), a*b*np.cos(gamma))
+                    assert np.isclose(np.dot(v1,v2), b*c*np.cos(alpha))
+                    assert np.isclose(np.dot(v2,v0), a*c*np.cos(beta))
 
-# @pytest.mark.skipif("test_make_lattice_vectors" not in tests, reason="different tests")     
-# def test_make_lattice_vectors():
-#     """Check that make_lattice_vectors agrees with what is obtained with
-#     make_ptvecs."""
+@pytest.mark.skipif("test_make_lattice_vectors" not in tests, reason="different tests")     
+def test_make_lattice_vectors():
+    """Check that make_lattice_vectors agrees with what is obtained with
+    make_ptvecs."""
     
-#     lat_type = "simple cubic"
-#     lat_consts = [1]*3
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "prim"
-#     lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
-#     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     assert np.allclose(lat_vecs1, lat_vecs2)
+    lat_type = "simple cubic"
+    lat_consts = [1]*3
+    lat_angles = [np.pi/2]*3
+    lat_centering = "prim"
+    lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    assert np.allclose(lat_vecs1, lat_vecs2)
 
-#     lat_type = "body-centered cubic"
-#     lat_consts = [1]*3
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "body"
-#     lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
-#     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     assert np.allclose(lat_vecs1, lat_vecs2)
+    lat_type = "body-centered cubic"
+    lat_consts = [1]*3
+    lat_angles = [np.pi/2]*3
+    lat_centering = "body"
+    lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    assert np.allclose(lat_vecs1, lat_vecs2)
 
-#     lat_type = "face-centered cubic"
-#     lat_consts = [1]*3
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "face"
-#     lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
-#     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     assert np.allclose(lat_vecs1, lat_vecs2)
+    lat_type = "face-centered cubic"
+    lat_consts = [1]*3
+    lat_angles = [np.pi/2]*3
+    lat_centering = "face"
+    lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    assert np.allclose(lat_vecs1, lat_vecs2)
 
-#     lat_type = "tetragonal"
-#     lat_consts = [1, 1, 2]
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "prim"
-#     lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
-#     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     assert np.allclose(lat_vecs1, lat_vecs2)
+    lat_type = "tetragonal"
+    lat_consts = [1, 1, 2]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "prim"
+    lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    assert np.allclose(lat_vecs1, lat_vecs2)
 
-#     lat_type = "body-centered tetragonal"
-#     lat_consts = [1, 1, 2]
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "body"
-#     lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
-#     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     assert np.allclose(lat_vecs1, lat_vecs2)
+    lat_type = "body-centered tetragonal"
+    lat_consts = [1, 1, 2]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "body"
+    lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    assert np.allclose(lat_vecs1, lat_vecs2)
 
-#     lat_type = "orthorhombic"
-#     lat_consts = [1, 2, 3]
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "prim"
-#     lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
-#     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     assert np.allclose(lat_vecs1, lat_vecs2)
+    lat_type = "orthorhombic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "prim"
+    lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    assert np.allclose(lat_vecs1, lat_vecs2)
 
-#     lat_type = "face-centered orthorhombic"
-#     lat_consts = [1, 2, 3]
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "face"
-#     lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
-#     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     assert np.allclose(lat_vecs1, lat_vecs2)
+    lat_type = "face-centered orthorhombic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "face"
+    lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    assert np.allclose(lat_vecs1, lat_vecs2)
 
-#     lat_type = "body-centered orthorhombic"
-#     lat_consts = [1, 2, 3]
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "body"
-#     lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
-#     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     assert np.allclose(lat_vecs1, lat_vecs2)
+    lat_type = "body-centered orthorhombic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "body"
+    lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    assert np.allclose(lat_vecs1, lat_vecs2)
 
-#     lat_type = "base-centered orthorhombic"
-#     lat_consts = [1, 2, 3]
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "base"
-#     lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
-#     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     assert np.allclose(lat_vecs1, lat_vecs2)
+    lat_type = "base-centered orthorhombic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "base"
+    lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    assert np.allclose(lat_vecs1, lat_vecs2)
 
-#     lat_type = "hexagonal"
-#     lat_consts = [1., 1., 3.]
-#     lat_angles = [np.pi/2, np.pi/2, 2*np.pi/3]
-#     lat_centering = "prim"
-#     lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
-#     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     assert np.allclose(lat_vecs1, lat_vecs2)
+    lat_type = "hexagonal"
+    lat_consts = [1., 1., 3.]
+    lat_angles = [np.pi/2, np.pi/2, 2*np.pi/3]
+    lat_centering = "prim"
+    lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    assert np.allclose(lat_vecs1, lat_vecs2)
 
-#     lat_type = "rhombohedral"
-#     lat_consts = [1., 1., 1.]
-#     lat_angles1 = [.3*np.pi]*3
-#     lat_angles2 = [.3*np.pi]*3
-#     lat_centering = "prim"
-#     lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles1)
-#     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles2)
-#     assert np.allclose(lat_vecs1, lat_vecs2)
+    lat_type = "rhombohedral"
+    lat_consts = [1., 1., 1.]
+    lat_angles1 = [.3*np.pi]*3
+    lat_angles2 = [.3*np.pi]*3
+    lat_centering = "prim"
+    lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles1)
+    lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles2)
+    assert np.allclose(lat_vecs1, lat_vecs2)
 
-#     lat_type = "monoclinic"
-#     lat_consts = [1, 2, 3]
-#     lat_angles = [np.pi/3, np.pi/2, np.pi/2]
-#     lat_centering = "prim"
-#     lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
-#     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     assert np.allclose(lat_vecs1, lat_vecs2)
+    lat_type = "monoclinic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/3, np.pi/2, np.pi/2]
+    lat_centering = "prim"
+    lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    assert np.allclose(lat_vecs1, lat_vecs2)
 
-#     lat_type = "base-centered monoclinic"
-#     lat_consts = [1, 2, 3]
-#     lat_angles = [np.pi/4, np.pi/2, np.pi/2]
-#     lat_centering = "base"
-#     lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
-#     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "base-centered monoclinic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/4, np.pi/2, np.pi/2]
+    lat_centering = "base"
+    lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     assert np.allclose(lat_vecs1, lat_vecs2)
+    assert np.allclose(lat_vecs1, lat_vecs2)
 
-#     lat_type = "triclinic"
-#     lat_consts = [1.1, 2.8, 4.3]
-#     lat_angles = [np.pi/6, np.pi/4, np.pi/3]
-#     lat_centering = "prim"
-#     lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
-#     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "triclinic"
+    lat_consts = [1.1, 2.8, 4.3]
+    lat_angles = [np.pi/6, np.pi/4, np.pi/3]
+    lat_centering = "prim"
+    lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     assert np.allclose(lat_vecs1, lat_vecs2)    
+    assert np.allclose(lat_vecs1, lat_vecs2)    
 
-#     # Verify that an error gets raised for poor input parameters.
+    # Verify that an error gets raised for poor input parameters.
     
-#     # Simple cubic
-#     lat_type = "simple cubic"
-#     lat_consts = [1, 2, 3]
-#     lat_angles = [np.pi/2]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    # Simple cubic
+    lat_type = "simple cubic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/2]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "simple cubic"
-#     lat_consts = [1, 1, 1]
-#     lat_angles = [np.pi/2, np.pi/2, np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "simple cubic"
+    lat_consts = [1, 1, 1]
+    lat_angles = [np.pi/2, np.pi/2, np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "simple cubic"
-#     lat_consts = [1, 1, 2]
-#     lat_angles = [np.pi/3, np.pi/2, np.pi/2]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "simple cubic"
+    lat_consts = [1, 1, 2]
+    lat_angles = [np.pi/3, np.pi/2, np.pi/2]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     # Body-centered cubic
-#     lat_type = "body-centered cubic"
-#     lat_consts = [1, 2, 1]
-#     lat_angles = [np.pi/2]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    # Body-centered cubic
+    lat_type = "body-centered cubic"
+    lat_consts = [1, 2, 1]
+    lat_angles = [np.pi/2]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "body-centered cubic"
-#     lat_consts = [1, 1, 1]
-#     lat_angles = [np.pi/2, np.pi/3, np.pi/2]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "body-centered cubic"
+    lat_consts = [1, 1, 1]
+    lat_angles = [np.pi/2, np.pi/3, np.pi/2]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "body-centered cubic"
-#     lat_consts = [2, 1, 1]
-#     lat_angles = [np.pi/2, np.pi/3, np.pi/2]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "body-centered cubic"
+    lat_consts = [2, 1, 1]
+    lat_angles = [np.pi/2, np.pi/3, np.pi/2]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     # Face-centered cubic
-#     lat_type = "face-centered cubic"
-#     lat_consts = [3.3, 1, 1]
-#     lat_angles = [np.pi/2]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    # Face-centered cubic
+    lat_type = "face-centered cubic"
+    lat_consts = [3.3, 1, 1]
+    lat_angles = [np.pi/2]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "face-centered cubic"
-#     lat_consts = [np.pi, np.pi, np.pi]
-#     lat_angles = [np.pi/2, np.pi/2, np.pi/5]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "face-centered cubic"
+    lat_consts = [np.pi, np.pi, np.pi]
+    lat_angles = [np.pi/2, np.pi/2, np.pi/5]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "face-centered cubic"
-#     lat_consts = [np.pi, np.pi, np.pi]
-#     lat_angles = [np.pi/2, np.pi/5, np.pi/5]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "face-centered cubic"
+    lat_consts = [np.pi, np.pi, np.pi]
+    lat_angles = [np.pi/2, np.pi/5, np.pi/5]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     # Tetragonal
+    # Tetragonal
 
-#     lat_type = "tetragonal"
-#     lat_consts = [1, 1, 1]
-#     lat_angles = [np.pi/2]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "tetragonal"
+    lat_consts = [1, 1, 1]
+    lat_angles = [np.pi/2]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "tetragonal"
-#     lat_consts = [1, 1, 3]
-#     lat_angles = [np.pi/2, np.pi/2, np.pi/8]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "tetragonal"
+    lat_consts = [1, 1, 3]
+    lat_angles = [np.pi/2, np.pi/2, np.pi/8]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "tetragonal"
-#     lat_consts = [1, 1, 3]
-#     lat_angles = [np.pi/8, np.pi/8, np.pi/8]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "tetragonal"
+    lat_consts = [1, 1, 3]
+    lat_angles = [np.pi/8, np.pi/8, np.pi/8]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     # Body-centered tetragonal
-#     lat_type = "body-centered tetragonal"
-#     lat_consts = [np.pi/3, np.pi/3, np.pi/3]
-#     lat_angles = [np.pi/2]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    # Body-centered tetragonal
+    lat_type = "body-centered tetragonal"
+    lat_consts = [np.pi/3, np.pi/3, np.pi/3]
+    lat_angles = [np.pi/2]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "body-centered tetragonal"
-#     lat_consts = [1, 1, 2]
-#     lat_angles = [np.pi/2, np.pi/3, np.pi/4]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "body-centered tetragonal"
+    lat_consts = [1, 1, 2]
+    lat_angles = [np.pi/2, np.pi/3, np.pi/4]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "body-centered tetragonal"
-#     lat_consts = [1.1, 1.1, 2.2]
-#     lat_angles = [np.pi/2, 1, 1]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "body-centered tetragonal"
+    lat_consts = [1.1, 1.1, 2.2]
+    lat_angles = [np.pi/2, 1, 1]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     # Orthorhombic        
-#     lat_type = "orthorhombic"
-#     lat_consts = [2, 2, 3]
-#     lat_angles = [np.pi/2]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    # Orthorhombic        
+    lat_type = "orthorhombic"
+    lat_consts = [2, 2, 3]
+    lat_angles = [np.pi/2]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "orthorhombic"
-#     lat_consts = [2.2, 2.2, 2.2]
-#     lat_angles = [np.pi/2]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "orthorhombic"
+    lat_consts = [2.2, 2.2, 2.2]
+    lat_angles = [np.pi/2]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "orthorhombic"
-#     lat_consts = [1, 2, 3]
-#     lat_angles = [np.pi/2, np.pi/2, np.pi/10]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "orthorhombic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/2, np.pi/2, np.pi/10]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "orthorhombic"
-#     lat_consts = [1, 2, 3]
-#     lat_angles = [np.pi/10, np.pi/10, np.pi/10]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "orthorhombic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/10, np.pi/10, np.pi/10]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "orthorhombic"
-#     lat_consts = [1, 2, 3]
-#     lat_angles = [np.pi/3, np.pi/2, np.pi/2]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "orthorhombic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/3, np.pi/2, np.pi/2]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     # Face-centered orthorhombic
-#     lat_type = "face-centered orthorhombic"
-#     lat_consts = [1, 1, 3]
-#     lat_angles = [np.pi/2]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    # Face-centered orthorhombic
+    lat_type = "face-centered orthorhombic"
+    lat_consts = [1, 1, 3]
+    lat_angles = [np.pi/2]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "face-centered orthorhombic"
-#     lat_consts = [1, 1, 1]
-#     lat_angles = [np.pi/2]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "face-centered orthorhombic"
+    lat_consts = [1, 1, 1]
+    lat_angles = [np.pi/2]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "face-centered orthorhombic"
-#     lat_consts = [1, 1, 1]
-#     lat_angles = [np.pi/2, np.pi/2, np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "face-centered orthorhombic"
+    lat_consts = [1, 1, 1]
+    lat_angles = [np.pi/2, np.pi/2, np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "face-centered orthorhombic"
-#     lat_consts = [1, 1, 1]
-#     lat_angles = [np.pi/2, np.pi/4, np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "face-centered orthorhombic"
+    lat_consts = [1, 1, 1]
+    lat_angles = [np.pi/2, np.pi/4, np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "face-centered orthorhombic"
-#     lat_consts = [1, 1, 1]
-#     lat_angles = [np.pi/5, np.pi/4, np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "face-centered orthorhombic"
+    lat_consts = [1, 1, 1]
+    lat_angles = [np.pi/5, np.pi/4, np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     # Body-centered orthorhombic    
-#     lat_type = "body-centered orthorhombic"
-#     lat_consts = [2.2, 2.2, 5.5]
-#     lat_angles = [np.pi/2]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    # Body-centered orthorhombic    
+    lat_type = "body-centered orthorhombic"
+    lat_consts = [2.2, 2.2, 5.5]
+    lat_angles = [np.pi/2]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "body-centered orthorhombic"
-#     lat_consts = [2.2, 5.5, 5.5]
-#     lat_angles = [np.pi/2]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "body-centered orthorhombic"
+    lat_consts = [2.2, 5.5, 5.5]
+    lat_angles = [np.pi/2]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "body-centered orthorhombic"
-#     lat_consts = [5.5, 5.5, 5.5]
-#     lat_angles = [np.pi/2]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "body-centered orthorhombic"
+    lat_consts = [5.5, 5.5, 5.5]
+    lat_angles = [np.pi/2]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
     
-#     lat_type = "body-centered orthorhombic"
-#     lat_consts = [1.1, 1.2, 1.3]
-#     lat_angles = [np.pi/2, np.pi/2, np.pi/7]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "body-centered orthorhombic"
+    lat_consts = [1.1, 1.2, 1.3]
+    lat_angles = [np.pi/2, np.pi/2, np.pi/7]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "body-centered orthorhombic"
-#     lat_consts = [1.1, 1.2, 1.3]
-#     lat_angles = [np.pi/2, np.pi/7, np.pi/7]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "body-centered orthorhombic"
+    lat_consts = [1.1, 1.2, 1.3]
+    lat_angles = [np.pi/2, np.pi/7, np.pi/7]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "body-centered orthorhombic"
-#     lat_consts = [1.1, 1.2, 1.3]
-#     lat_angles = [np.pi/7, np.pi/7, np.pi/7]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "body-centered orthorhombic"
+    lat_consts = [1.1, 1.2, 1.3]
+    lat_angles = [np.pi/7, np.pi/7, np.pi/7]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     # Base-centered orthorhombic    
-#     lat_type = "base-centered orthorhombic"
-#     lat_consts = [1, 2, 2]
-#     lat_angles = [np.pi/2]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    # Base-centered orthorhombic    
+    lat_type = "base-centered orthorhombic"
+    lat_consts = [1, 2, 2]
+    lat_angles = [np.pi/2]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "base-centered orthorhombic"
-#     lat_consts = [2, 2, 2]
-#     lat_angles = [np.pi/2]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "base-centered orthorhombic"
+    lat_consts = [2, 2, 2]
+    lat_angles = [np.pi/2]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "base-centered orthorhombic"
-#     lat_consts = [2, 2, 2]
-#     lat_angles = [np.pi/2, np.pi/2, 1]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "base-centered orthorhombic"
+    lat_consts = [2, 2, 2]
+    lat_angles = [np.pi/2, np.pi/2, 1]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "base-centered orthorhombic"
-#     lat_consts = [2, 2, 2]
-#     lat_angles = [np.pi/2, 1, 1]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "base-centered orthorhombic"
+    lat_consts = [2, 2, 2]
+    lat_angles = [np.pi/2, 1, 1]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "base-centered orthorhombic"
-#     lat_consts = [2, 2, 2]
-#     lat_angles = [1, 1, 1]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "base-centered orthorhombic"
+    lat_consts = [2, 2, 2]
+    lat_angles = [1, 1, 1]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     # Hexagonal        
-#     lat_type = "hexagonal"
-#     lat_consts = [1., 1., 3.]
-#     lat_angles = [np.pi/2, np.pi/2, 2*np.pi/4]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    # Hexagonal        
+    lat_type = "hexagonal"
+    lat_consts = [1., 1., 3.]
+    lat_angles = [np.pi/2, np.pi/2, 2*np.pi/4]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "hexagonal"
-#     lat_consts = [1., 1., 3.]
-#     lat_angles = [np.pi/2, np.pi/3, 2*np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "hexagonal"
+    lat_consts = [1., 1., 3.]
+    lat_angles = [np.pi/2, np.pi/3, 2*np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "hexagonal"
-#     lat_consts = [1., 1., 3.]
-#     lat_angles = [np.pi/3, np.pi/2, 2*np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "hexagonal"
+    lat_consts = [1., 1., 3.]
+    lat_angles = [np.pi/3, np.pi/2, 2*np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "hexagonal"
-#     lat_consts = [1., 1., 3.]
-#     lat_angles = [np.pi/3, np.pi/3, 2*np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "hexagonal"
+    lat_consts = [1., 1., 3.]
+    lat_angles = [np.pi/3, np.pi/3, 2*np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "hexagonal"
-#     lat_consts = [1., 2., 3.]
-#     lat_angles = [np.pi/2, np.pi/2, 2*np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "hexagonal"
+    lat_consts = [1., 2., 3.]
+    lat_angles = [np.pi/2, np.pi/2, 2*np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "hexagonal"
-#     lat_consts = [1., 3., 3.]
-#     lat_angles = [np.pi/2, np.pi/2, 2*np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "hexagonal"
+    lat_consts = [1., 3., 3.]
+    lat_angles = [np.pi/2, np.pi/2, 2*np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "hexagonal"
-#     lat_consts = [3., 2., 3.]
-#     lat_angles = [np.pi/2, np.pi/2, 2*np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "hexagonal"
+    lat_consts = [3., 2., 3.]
+    lat_angles = [np.pi/2, np.pi/2, 2*np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "hexagonal"
-#     lat_consts = [3.1, 3.1, 3.1]
-#     lat_angles = [np.pi/2, np.pi/2, 2*np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "hexagonal"
+    lat_consts = [3.1, 3.1, 3.1]
+    lat_angles = [np.pi/2, np.pi/2, 2*np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     # Rhombohedral    
-#     lat_type = "rhombohedral"
-#     lat_consts = [1., 1., 2.]
-#     lat_angles = [np.pi/3]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    # Rhombohedral    
+    lat_type = "rhombohedral"
+    lat_consts = [1., 1., 2.]
+    lat_angles = [np.pi/3]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "rhombohedral"
-#     lat_consts = [1., 1.1, 1.]
-#     lat_angles = [np.pi/3]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "rhombohedral"
+    lat_consts = [1., 1.1, 1.]
+    lat_angles = [np.pi/3]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "rhombohedral"
-#     lat_consts = [np.pi/3, 1., 1.]
-#     lat_angles = [np.pi/3]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "rhombohedral"
+    lat_consts = [np.pi/3, 1., 1.]
+    lat_angles = [np.pi/3]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "rhombohedral"
-#     lat_consts = [np.pi/3, np.pi/3, 1.]
-#     lat_angles = [np.pi/3]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "rhombohedral"
+    lat_consts = [np.pi/3, np.pi/3, 1.]
+    lat_angles = [np.pi/3]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "rhombohedral"
-#     lat_consts = [np.pi/3, np.pi/2, np.pi/3]
-#     lat_angles = [np.pi/3]*3
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "rhombohedral"
+    lat_consts = [np.pi/3, np.pi/2, np.pi/3]
+    lat_angles = [np.pi/3]*3
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "rhombohedral"
-#     lat_consts = [np.pi/3, np.pi/3, np.pi/3]
-#     lat_angles = [1, 1, 2]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "rhombohedral"
+    lat_consts = [np.pi/3, np.pi/3, np.pi/3]
+    lat_angles = [1, 1, 2]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "rhombohedral"
-#     lat_consts = [np.pi/3, np.pi/3, np.pi/3]
-#     lat_angles = [1, 2, 2]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "rhombohedral"
+    lat_consts = [np.pi/3, np.pi/3, np.pi/3]
+    lat_angles = [1, 2, 2]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "rhombohedral"
-#     lat_consts = [np.pi/3, np.pi/3, np.pi/3]
-#     lat_angles = [2, 1, 2]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "rhombohedral"
+    lat_consts = [np.pi/3, np.pi/3, np.pi/3]
+    lat_angles = [2, 1, 2]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     # Monoclinic
-#     lat_type = "monoclinic"
-#     lat_consts = [1, 3, 2]
-#     lat_angles = [np.pi/3, np.pi/2, np.pi/2]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    # Monoclinic
+    lat_type = "monoclinic"
+    lat_consts = [1, 3, 2]
+    lat_angles = [np.pi/3, np.pi/2, np.pi/2]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "monoclinic"
-#     lat_consts = [3, 1, 2]
-#     lat_angles = [np.pi/3, np.pi/2, np.pi/2]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "monoclinic"
+    lat_consts = [3, 1, 2]
+    lat_angles = [np.pi/3, np.pi/2, np.pi/2]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "monoclinic"
-#     lat_consts = [1, 2.00001, 2]
-#     lat_angles = [np.pi/3, np.pi/2, np.pi/2]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "monoclinic"
+    lat_consts = [1, 2.00001, 2]
+    lat_angles = [np.pi/3, np.pi/2, np.pi/2]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "monoclinic"
-#     lat_consts = [1, 1, 2]
-#     lat_angles = [np.pi/3, np.pi/2, np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "monoclinic"
+    lat_consts = [1, 1, 2]
+    lat_angles = [np.pi/3, np.pi/2, np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "monoclinic"
-#     lat_consts = [1, 1, 2]
-#     lat_angles = [np.pi/3, np.pi/3, np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "monoclinic"
+    lat_consts = [1, 1, 2]
+    lat_angles = [np.pi/3, np.pi/3, np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "monoclinic"
-#     lat_consts = [1, 1, 2]
-#     lat_angles = [np.pi, np.pi/3, np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "monoclinic"
+    lat_consts = [1, 1, 2]
+    lat_angles = [np.pi, np.pi/3, np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "monoclinic"
-#     lat_consts = [1, 1, 2]
-#     lat_angles = [np.pi, np.pi, np.pi]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "monoclinic"
+    lat_consts = [1, 1, 2]
+    lat_angles = [np.pi, np.pi, np.pi]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "monoclinic"
-#     lat_consts = [1, 1, 2]
-#     lat_angles = [np.pi, np.pi/2, np.pi/2]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "monoclinic"
+    lat_consts = [1, 1, 2]
+    lat_angles = [np.pi, np.pi/2, np.pi/2]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     # Base-centered monoclinic        
-#     lat_type = "base-centered monoclinic"
-#     lat_consts = [1, 3.1, 3]
-#     lat_angles = [np.pi/4, np.pi/2, np.pi/2]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    # Base-centered monoclinic        
+    lat_type = "base-centered monoclinic"
+    lat_consts = [1, 3.1, 3]
+    lat_angles = [np.pi/4, np.pi/2, np.pi/2]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "base-centered monoclinic"
-#     lat_consts = [3+1e-6, 3, 3]
-#     lat_angles = [np.pi/4, np.pi/2, np.pi/2]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "base-centered monoclinic"
+    lat_consts = [3+1e-6, 3, 3]
+    lat_angles = [np.pi/4, np.pi/2, np.pi/2]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "base-centered monoclinic"
-#     lat_consts = [3+1e-6, 3+1e-6, 3]
-#     lat_angles = [np.pi/4, np.pi/2, np.pi/2]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "base-centered monoclinic"
+    lat_consts = [3+1e-6, 3+1e-6, 3]
+    lat_angles = [np.pi/4, np.pi/2, np.pi/2]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "base-centered monoclinic"
-#     lat_consts = [1, 1, 3]
-#     lat_angles = [np.pi, np.pi/2, np.pi/2]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "base-centered monoclinic"
+    lat_consts = [1, 1, 3]
+    lat_angles = [np.pi, np.pi/2, np.pi/2]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
     
-#     lat_type = "base-centered monoclinic"
-#     lat_consts = [3, 3, 3]
-#     lat_angles = [np.pi, np.pi, np.pi]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "base-centered monoclinic"
+    lat_consts = [3, 3, 3]
+    lat_angles = [np.pi, np.pi, np.pi]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "base-centered monoclinic"
-#     lat_consts = [3, 2, 3]
-#     lat_angles = [np.pi/3, np.pi, np.pi]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "base-centered monoclinic"
+    lat_consts = [3, 2, 3]
+    lat_angles = [np.pi/3, np.pi, np.pi]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "base-centered monoclinic"
-#     lat_consts = [2, 2, 3]
-#     lat_angles = [np.pi/3, np.pi/2+1e-2, np.pi/2]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "base-centered monoclinic"
+    lat_consts = [2, 2, 3]
+    lat_angles = [np.pi/3, np.pi/2+1e-2, np.pi/2]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     # Triclinic    
-#     lat_type = "triclinic"
-#     lat_consts = [1, 2, 2+1e-14]
-#     lat_angles = [np.pi/6, np.pi/4, np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    # Triclinic    
+    lat_type = "triclinic"
+    lat_consts = [1, 2, 2+1e-14]
+    lat_angles = [np.pi/6, np.pi/4, np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "triclinic"
-#     lat_consts = [1, 2, 2]
-#     lat_angles = [np.pi/6, np.pi/4, np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "triclinic"
+    lat_consts = [1, 2, 2]
+    lat_angles = [np.pi/6, np.pi/4, np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "triclinic"
-#     lat_consts = [2, 2, 2]
-#     lat_angles = [np.pi/6, np.pi/4, np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "triclinic"
+    lat_consts = [2, 2, 2]
+    lat_angles = [np.pi/6, np.pi/4, np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "triclinic"
-#     lat_consts = [8, 2, 2]
-#     lat_angles = [np.pi/6, np.pi/4, np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "triclinic"
+    lat_consts = [8, 2, 2]
+    lat_angles = [np.pi/6, np.pi/4, np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "triclinic"
-#     lat_consts = [8, 2, 2]
-#     lat_angles = [np.pi/4, np.pi/4, np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "triclinic"
+    lat_consts = [8, 2, 2]
+    lat_angles = [np.pi/4, np.pi/4, np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
         
-#     lat_type = "triclinic"
-#     lat_consts = [8, 2, 2]
-#     lat_angles = [np.pi/3, np.pi/4, np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "triclinic"
+    lat_consts = [8, 2, 2]
+    lat_angles = [np.pi/3, np.pi/4, np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
     
-#     lat_type = "triclinic"
-#     lat_consts = [8, 2, 2]
-#     lat_angles = [np.pi/3, np.pi/3, np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "triclinic"
+    lat_consts = [8, 2, 2]
+    lat_angles = [np.pi/3, np.pi/3, np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
 
-#     lat_type = "triclinic"
-#     lat_consts = [8.1, 8.1, 8.1]
-#     lat_angles = [np.pi/3, np.pi/3, np.pi/3]
-#     with pytest.raises(ValueError) as error:
-#         lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    lat_type = "triclinic"
+    lat_consts = [8.1, 8.1, 8.1]
+    lat_angles = [np.pi/3, np.pi/3, np.pi/3]
+    with pytest.raises(ValueError) as error:
+        lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
                               
 @pytest.mark.skipif("test_sympts_sympaths" not in tests, reason="different tests")     
 def test_sympts_sympaths():
@@ -1476,1463 +1476,1463 @@ def test_sympts_sympaths():
     for p1, p2 in zip(sympath1, sympath2):
         assert p1 == p2
 
-# @pytest.mark.skipif("test_get_orbits" not in tests, reason="different tests")     
-# def test_get_orbits():
+@pytest.mark.skipif("test_get_orbits" not in tests, reason="different tests")     
+def test_get_orbits():
 
-#     # Make sure duplicate points get removed from the grid.
-#     lat_angles = [np.pi/2]*3
-#     lat_consts = [1]*3
-#     lat_centering = "face"
-#     lat_vecs = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    # Make sure duplicate points get removed from the grid.
+    lat_angles = [np.pi/2]*3
+    lat_consts = [1]*3
+    lat_centering = "face"
+    lat_vecs = make_ptvecs(lat_centering, lat_consts, lat_angles)
     
-#     grid = [[0,.5,.5], [.5,.5,0], [.5,0,.5], 
-#             [0,-.5,.5], [-.5,.5,0], [-.5,0,.5],
-#             [0,.5,-.5], [.5,-.5,0], [.5,0,-.5], 
-#             [0,-.5,-.5], [-.5,-.5,0], [-.5,0,-.5]]
+    grid = [[0,.5,.5], [.5,.5,0], [.5,0,.5], 
+            [0,-.5,.5], [-.5,.5,0], [-.5,0,.5],
+            [0,.5,-.5], [.5,-.5,0], [.5,0,-.5], 
+            [0,-.5,-.5], [-.5,-.5,0], [-.5,0,-.5]]
 
-#     orbitals = get_orbits(grid, lat_vecs, duplicates=True)
+    orbitals = get_orbits(grid, lat_vecs, duplicates=True)
     
-#     assert len(orbitals.keys()) == 1
-#     assert np.allclose(orbitals[1], [0,0,0])
+    assert len(orbitals.keys()) == 1
+    assert np.allclose(orbitals[1], [0,0,0])
 
-#     lat_angles = [np.pi/2]*3
-#     lat_consts = [1]*3
-#     lat_centering = "body"
-#     lat_vecs = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    lat_angles = [np.pi/2]*3
+    lat_consts = [1]*3
+    lat_centering = "body"
+    lat_vecs = make_ptvecs(lat_centering, lat_consts, lat_angles)
     
-#     grid = [[-.5,.5,.5], [.5,-.5,.5], [-.5,-.5,.5], 
-#             [.5,.5,-.5], [-.5,.5,-.5], [.5,-.5,-.5],
-#             [-.5,-.5,-.5], [0,0,0]]
+    grid = [[-.5,.5,.5], [.5,-.5,.5], [-.5,-.5,.5], 
+            [.5,.5,-.5], [-.5,.5,-.5], [.5,-.5,-.5],
+            [-.5,-.5,-.5], [0,0,0]]
 
-#     orbitals = get_orbits(grid, lat_vecs, duplicates=True)
-#     assert len(orbitals.keys()) == 1
-#     assert np.allclose(orbitals[1], [0,0,0])
+    orbitals = get_orbits(grid, lat_vecs, duplicates=True)
+    assert len(orbitals.keys()) == 1
+    assert np.allclose(orbitals[1], [0,0,0])
 
-#     lat_angles = [np.pi/2]*3
-#     lat_consts = [1]*3
-#     lat_centering = "prim"
-#     lat_vecs = make_ptvecs(lat_centering, lat_consts, lat_angles)
+    lat_angles = [np.pi/2]*3
+    lat_consts = [1]*3
+    lat_centering = "prim"
+    lat_vecs = make_ptvecs(lat_centering, lat_consts, lat_angles)
     
-#     grid = [[-1,1,1], [1,-1,1], [-1,-1,1], [1,1,-1], [-1,1,-1], [1,-1,-1],
-#             [-1,-1,-1], [0,0,0], [0,1,1], [1,0,1], [0,0,1], [1,1,0], [0,1,0],
-#             [1,0,0], [0,-1,0]]
+    grid = [[-1,1,1], [1,-1,1], [-1,-1,1], [1,1,-1], [-1,1,-1], [1,-1,-1],
+            [-1,-1,-1], [0,0,0], [0,1,1], [1,0,1], [0,0,1], [1,1,0], [0,1,0],
+            [1,0,0], [0,-1,0]]
 
 
-#     assert len(orbitals.keys()) == 1
-#     assert np.allclose(orbitals[1], [0,0,0])    
+    assert len(orbitals.keys()) == 1
+    assert np.allclose(orbitals[1], [0,0,0])    
 
 
-# @pytest.mark.skipif("test_reduce_simple_cubic" not in tests, reason="different tests")     
-# def test_reduce_simple_cubic():
+@pytest.mark.skipif("test_reduce_simple_cubic" not in tests, reason="different tests")     
+def test_reduce_simple_cubic():
 
-#     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
 
-#     ### Simple Cubic ###
-#     lat_consts = [2.8272]*3
-#     lat_angles = [np.pi/2]*3
-#     centering = 'prim'
+    ### Simple Cubic ###
+    lat_consts = [2.8272]*3
+    lat_angles = [np.pi/2]*3
+    centering = 'prim'
 
-#     lat_vecs = make_ptvecs(centering, lat_consts, lat_angles)
-#     rlat_vecs = make_rptvecs(lat_vecs)
+    lat_vecs = make_ptvecs(centering, lat_consts, lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
 
-#     H = np.array([[40,0,0],
-#                   [0,40,0],
-#                   [0,0,40]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([1./2, 1./2, 1./2])
+    H = np.array([[40,0,0],
+                  [0,40,0],
+                  [0,0,40]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2, 1./2, 1./2])
 
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid, rlat_vecs, grid_vecs,
-#                                           offset)
-#     assert len(weights) == 1540
-#     assert len(red_grid) == 1540
-#     assert np.sum(weights) == 40**3
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid, rlat_vecs, grid_vecs,
+                                          offset)
+    assert len(weights) == 1540
+    assert len(red_grid) == 1540
+    assert np.sum(weights) == 40**3
 
-#     H = np.array([[41,0,0],
-#                   [0,41,0],
-#                   [0,0,41]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
+    H = np.array([[41,0,0],
+                  [0,41,0],
+                  [0,0,41]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
 
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid, rlat_vecs, grid_vecs,
-#                                           offset)
-#     assert len(weights) == 1771
-#     assert len(red_grid) == 1771
-#     assert np.sum(weights) == 41**3
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid, rlat_vecs, grid_vecs,
+                                          offset)
+    assert len(weights) == 1771
+    assert len(red_grid) == 1771
+    assert np.sum(weights) == 41**3
 
-#     H = np.array([[42,0,0],
-#                   [0,42,0],
-#                   [0,0,42]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
+    H = np.array([[42,0,0],
+                  [0,42,0],
+                  [0,0,42]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
 
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 2024
-#     assert len(red_grid) == 2024
-#     assert np.sum(weights) == 42**3
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 2024
+    assert len(red_grid) == 2024
+    assert np.sum(weights) == 42**3
 
-#     H = np.array([[40,0,0],
-#                   [0,40,0],
-#                   [0,0,20]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([1./2, 1./2, 1./2])
+    H = np.array([[40,0,0],
+                  [0,40,0],
+                  [0,0,20]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2, 1./2, 1./2])
 
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 2100
-#     assert len(red_grid) == 2100
-#     assert np.sum(weights) == 40*40*20
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 2100
+    assert len(red_grid) == 2100
+    assert np.sum(weights) == 40*40*20
 
 
-#     H = np.array([[41,0,0],
-#                   [0,21,0],
-#                   [0,0,41]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.0]*3)
+    H = np.array([[41,0,0],
+                  [0,21,0],
+                  [0,0,41]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.0]*3)
 
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 2541
-#     assert len(red_grid) == 2541
-#     assert np.sum(weights) == 41*41*21
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 2541
+    assert len(red_grid) == 2541
+    assert np.sum(weights) == 41*41*21
 
-#     H = np.array([[22,0,0],
-#                   [0,42,0],
-#                   [0,0,42]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.0]*3)
+    H = np.array([[22,0,0],
+                  [0,42,0],
+                  [0,0,42]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.0]*3)
 
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 3014
-#     assert len(red_grid) == 3014
-#     assert np.sum(weights) == 42*42*22
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3014
+    assert len(red_grid) == 3014
+    assert np.sum(weights) == 42*42*22
 
     
-#     H = np.array([[3,0,0],
-#                   [0,3,0],
-#                   [0,0,3]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.0]*3)
+    H = np.array([[3,0,0],
+                  [0,3,0],
+                  [0,0,3]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.0]*3)
 
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
     
-#     irrkpts = list(range(len(weights)))
-#     grid_copy = deepcopy(red_grid)
-#     for v in get_orbits(grid, rlat_vecs).values():
-#         for k1 in v:
-#             for k2 in red_grid:
-#                 if irrkpts == []:
-#                     break
-#                 ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
-#                 del grid_copy[ind]
-#                 del irrkpts[ind]
-#     assert irrkpts == []
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in get_orbits(grid, rlat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+    assert irrkpts == []
 
-# @pytest.mark.skipif("test_reduce_body_centered_cubic" not in tests,
-#                     reason="different tests")     
-# def test_reduce_body_centered_cubic():
-#     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
+@pytest.mark.skipif("test_reduce_body_centered_cubic" not in tests,
+                    reason="different tests")     
+def test_reduce_body_centered_cubic():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
 
-#     ### Body-centered cubic ###
-#     lat_consts = [2*1.580307]*3
-#     lat_angles = [np.pi/2]*3
-#     centering = 'body'
-#     lat_vecs = make_ptvecs(centering, lat_consts,
-#                            lat_angles)
-#     rlat_vecs = make_rptvecs(lat_vecs)
+    ### Body-centered cubic ###
+    lat_consts = [2*1.580307]*3
+    lat_angles = [np.pi/2]*3
+    centering = 'body'
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
 
-#     H = np.array([[40,0,0],
-#                   [0,40,0],
-#                   [0,0,40]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([1./2]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[40,0,0],
+                  [0,40,0],
+                  [0,0,40]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 1650
-#     assert len(red_grid) == 1650
-#     assert np.sum(weights) == 40**3
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 1650
+    assert len(red_grid) == 1650
+    assert np.sum(weights) == 40**3
 
-#     H = np.array([[41,0,0],
-#                   [0,41,0],
-#                   [0,0,41]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[41,0,0],
+                  [0,41,0],
+                  [0,0,41]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 1771
-#     assert len(red_grid) == 1771
-#     assert np.sum(weights) == 41**3
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 1771
+    assert len(red_grid) == 1771
+    assert np.sum(weights) == 41**3
 
-#     H = np.array([[42,0,0],
-#                   [0,42,0],
-#                   [0,0,42]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[42,0,0],
+                  [0,42,0],
+                  [0,0,42]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 1903
-#     assert len(red_grid) == 1903
-#     assert np.sum(weights) == 42**3
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 1903
+    assert len(red_grid) == 1903
+    assert np.sum(weights) == 42**3
 
-#     H = np.array([[20,0,0],
-#                   [0,40,0],
-#                   [0,0,40]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[20,0,0],
+                  [0,40,0],
+                  [0,0,40]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 1411
-#     assert len(red_grid) == 1411
-#     assert np.sum(weights) == 20*40*40
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 1411
+    assert len(red_grid) == 1411
+    assert np.sum(weights) == 20*40*40
 
-#     H = np.array([[41,0,0],
-#                   [0,21,0],
-#                   [0,0,41]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[41,0,0],
+                  [0,21,0],
+                  [0,0,41]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 8771
-#     assert len(red_grid) == 8771
-#     assert np.sum(weights) == 41*21*41
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 8771
+    assert len(red_grid) == 8771
+    assert np.sum(weights) == 41*21*41
 
-#     H = np.array([[18,0,0],
-#                   [0,38,0],
-#                   [0,0,38]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([1./2]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[18,0,0],
+                  [0,38,0],
+                  [0,0,38]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 6108
-#     assert len(red_grid) == 6108
-#     assert np.sum(weights) == 18*38*38
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 6108
+    assert len(red_grid) == 6108
+    assert np.sum(weights) == 18*38*38
 
-#     H = np.array([[3,0,0],
-#                   [0,3,0],
-#                   [0,0,3]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[3,0,0],
+                  [0,3,0],
+                  [0,0,3]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     irrkpts = list(range(len(weights)))
-#     grid_copy = deepcopy(red_grid)
-#     for v in get_orbits(grid, lat_vecs).values():
-#         for k1 in v:
-#             for k2 in red_grid:
-#                 if irrkpts == []:
-#                     break
-#                 ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
-#                 del grid_copy[ind]
-#                 del irrkpts[ind]
-#     assert irrkpts == []
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in get_orbits(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+    assert irrkpts == []
     
 
-# @pytest.mark.skipif("test_reduce_face_centered_cubic" not in tests,
-#                     reason="different tests")     
-# def test_reduce_face_centered_cubic():
-#     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
+@pytest.mark.skipif("test_reduce_face_centered_cubic" not in tests,
+                    reason="different tests")     
+def test_reduce_face_centered_cubic():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
     
-#     ### Face-centered cubic ###
-#     lat_consts = [3.248231]*3
-#     lat_angles = [np.pi/2]*3
-#     centering = 'face'
-#     lat_vecs = make_ptvecs(centering, lat_consts, lat_angles)
-#     rlat_vecs = make_rptvecs(lat_vecs)
+    ### Face-centered cubic ###
+    lat_consts = [3.248231]*3
+    lat_angles = [np.pi/2]*3
+    centering = 'face'
+    lat_vecs = make_ptvecs(centering, lat_consts, lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
     
-#     H = np.array([[20,0,0],
-#                   [0,20,0],
-#                   [0,0,20]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([1./2]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[20,0,0],
+                  [0,20,0],
+                  [0,0,20]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 770
-#     assert len(red_grid) == 770
-#     assert np.sum(weights) == 20**3
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 770
+    assert len(red_grid) == 770
+    assert np.sum(weights) == 20**3
 
-#     H = np.array([[41,0,0],
-#                   [0,41,0],
-#                   [0,0,41]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[41,0,0],
+                  [0,41,0],
+                  [0,0,41]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 1771
-#     assert len(red_grid) == 1771
-#     assert np.sum(weights) == 41**3
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 1771
+    assert len(red_grid) == 1771
+    assert np.sum(weights) == 41**3
 
-#     H = np.array([[40,0,0],
-#                   [0,40,0],
-#                   [0,0,40]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[40,0,0],
+                  [0,40,0],
+                  [0,0,40]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 1661
-#     assert len(red_grid) == 1661
-#     assert np.sum(weights) == 40**3
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 1661
+    assert len(red_grid) == 1661
+    assert np.sum(weights) == 40**3
 
-#     H = np.array([[40,0,0],
-#                   [0,20,0],
-#                   [0,0,20]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[40,0,0],
+                  [0,20,0],
+                  [0,0,20]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 1026
-#     assert len(red_grid) == 1026
-#     assert np.sum(weights) == 40*20**2
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 1026
+    assert len(red_grid) == 1026
+    assert np.sum(weights) == 40*20**2
 
-#     H = np.array([[21,0,0],
-#                   [0,41,0],
-#                   [0,0,21]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[21,0,0],
+                  [0,41,0],
+                  [0,0,21]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 4741
-#     assert len(red_grid) == 4741
-#     assert np.sum(weights) == 41*21**2
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 4741
+    assert len(red_grid) == 4741
+    assert np.sum(weights) == 41*21**2
 
-#     H = np.array([[18,0,0],
-#                   [0,18,0],
-#                   [0,0,38]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[18,0,0],
+                  [0,18,0],
+                  [0,0,38]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 3043
-#     assert len(red_grid) == 3043
-#     assert np.sum(weights) == 38*18**2
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3043
+    assert len(red_grid) == 3043
+    assert np.sum(weights) == 38*18**2
 
-#     H = np.array([[3,0,0],
-#                   [0,3,0],
-#                   [0,0,3]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[3,0,0],
+                  [0,3,0],
+                  [0,0,3]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     irrkpts = list(range(len(weights)))
-#     grid_copy = deepcopy(red_grid)
-#     for v in get_orbits(grid, lat_vecs).values():
-#         for k1 in v:
-#             for k2 in red_grid:
-#                 if irrkpts == []:
-#                     break
-#                 ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
-#                 del grid_copy[ind]
-#                 del irrkpts[ind]
-#     assert irrkpts == []
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in get_orbits(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+    assert irrkpts == []
     
-# @pytest.mark.skipif("test_reduce_orthorhombic" not in tests,
-#                     reason="different tests")     
-# def test_reduce_orthorhombic():
-#     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
+@pytest.mark.skipif("test_reduce_orthorhombic" not in tests,
+                    reason="different tests")     
+def test_reduce_orthorhombic():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
 
-#     ### Orthorhombic ###
+    ### Orthorhombic ###
 
-#     lat_consts = [2.95, 3.92, 8.55]
-#     lat_angles = [np.pi/2]*3
-#     centering = 'prim'
+    lat_consts = [2.95, 3.92, 8.55]
+    lat_angles = [np.pi/2]*3
+    centering = 'prim'
 
-#     lat_vecs = make_ptvecs(centering, lat_consts,
-#                            lat_angles)
-#     rlat_vecs = make_rptvecs(lat_vecs)
-#     H = np.array([[40,0,0],
-#                   [0,40,0],
-#                   [0,0,40]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([1./2]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
+    H = np.array([[40,0,0],
+                  [0,40,0],
+                  [0,0,40]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 8000
-#     assert len(red_grid) == 8000
-#     assert np.sum(weights) == 40**3
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 8000
+    assert len(red_grid) == 8000
+    assert np.sum(weights) == 40**3
 
-#     H = np.array([[40,0,0],
-#                   [0,40,0],
-#                   [0,0,40]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[40,0,0],
+                  [0,40,0],
+                  [0,0,40]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
 
-#     assert len(weights) == 9261
-#     assert len(red_grid) == 9261
-#     assert np.sum(weights) == 40**3
+    assert len(weights) == 9261
+    assert len(red_grid) == 9261
+    assert np.sum(weights) == 40**3
 
-#     H = np.array([[41,0,0],
-#                   [0,41,0],
-#                   [0,0,41]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[41,0,0],
+                  [0,41,0],
+                  [0,0,41]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 9261
-#     assert len(red_grid) == 9261
-#     assert np.sum(weights) == 41**3
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 9261
+    assert len(red_grid) == 9261
+    assert np.sum(weights) == 41**3
 
-#     H = np.array([[21,0,0],
-#                   [0,41,0],
-#                   [0,0,41]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[21,0,0],
+                  [0,41,0],
+                  [0,0,41]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 4851
-#     assert len(red_grid) == 4851
-#     assert np.sum(weights) == 21*41**2
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 4851
+    assert len(red_grid) == 4851
+    assert np.sum(weights) == 21*41**2
 
-#     H = np.array([[40,0,0],
-#                   [0,20,0],
-#                   [0,0,40]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([1./2]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[40,0,0],
+                  [0,20,0],
+                  [0,0,40]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 4000
-#     assert len(red_grid) == 4000
-#     assert np.sum(weights) == 20*40**2
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 4000
+    assert len(red_grid) == 4000
+    assert np.sum(weights) == 20*40**2
 
-#     H = np.array([[40,0,0],
-#                   [0,41,0],
-#                   [0,0,20]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[40,0,0],
+                  [0,41,0],
+                  [0,0,20]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 4851
-#     assert len(red_grid) == 4851
-#     assert np.sum(weights) == 40*41*20
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 4851
+    assert len(red_grid) == 4851
+    assert np.sum(weights) == 40*41*20
 
-#     H = np.array([[3,0,0],
-#                   [0,3,0],
-#                   [0,0,3]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[3,0,0],
+                  [0,3,0],
+                  [0,0,3]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     irrkpts = list(range(len(weights)))
-#     grid_copy = deepcopy(red_grid)
-#     for v in get_orbits(grid, lat_vecs).values():
-#         for k1 in v:
-#             for k2 in red_grid:
-#                 if irrkpts == []:
-#                     break
-#                 ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
-#                 del grid_copy[ind]
-#                 del irrkpts[ind]
-#     assert irrkpts == []
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in get_orbits(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+    assert irrkpts == []
     
-# @pytest.mark.skipif("test_reduce_base_centered_orthorhombic" not in tests,
-#                     reason="different tests")     
-# def test_reduce_base_centered_orthorhombic():
-#     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
+@pytest.mark.skipif("test_reduce_base_centered_orthorhombic" not in tests,
+                    reason="different tests")     
+def test_reduce_base_centered_orthorhombic():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
 
-#     ### Base-centered orthorhombic ###
-#     lat_consts = [2.95, 3.92, 8.55]
-#     lat_angles = [np.pi/2]*3
-#     centering = 'base'
+    ### Base-centered orthorhombic ###
+    lat_consts = [2.95, 3.92, 8.55]
+    lat_angles = [np.pi/2]*3
+    centering = 'base'
     
-#     lat_vecs = make_ptvecs(centering, lat_consts,
-#                            lat_angles)
-#     rlat_vecs = make_rptvecs(lat_vecs)
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
 
-#     H = np.array([[30,0,0],
-#                   [0,30,0],
-#                   [0,0,30]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[30,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 3856
-#     assert len(red_grid) == 3856
-#     assert np.sum(weights) == 30**3
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3856
+    assert len(red_grid) == 3856
+    assert np.sum(weights) == 30**3
     
-#     H = np.array([[31,0,0],
-#                   [0,31,0],
-#                   [0,0,31]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[31,0,0],
+                  [0,31,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 4096
-#     assert len(red_grid) == 4096
-#     assert np.sum(weights) == 31**3
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 4096
+    assert len(red_grid) == 4096
+    assert np.sum(weights) == 31**3
 
-#     H = np.array([[14,0,0],
-#                   [0,30,0],
-#                   [0,0,30]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[14,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 3376
-#     assert len(red_grid) == 3376
-#     assert np.sum(weights) == 14*30*30
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3376
+    assert len(red_grid) == 3376
+    assert np.sum(weights) == 14*30*30
 
-#     H = np.array([[31,0,0],
-#                   [0,15,0],
-#                   [0,0,31]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[31,0,0],
+                  [0,15,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 3728
-#     assert len(red_grid) == 3728
-#     assert np.sum(weights) == 15*31**2
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3728
+    assert len(red_grid) == 3728
+    assert np.sum(weights) == 15*31**2
 
-#     H = np.array([[30,0,0],
-#                   [0,31,0],
-#                   [0,0,15]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[30,0,0],
+                  [0,31,0],
+                  [0,0,15]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 3728
-#     assert len(red_grid) == 3728
-#     assert np.sum(weights) == 30*31*15
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3728
+    assert len(red_grid) == 3728
+    assert np.sum(weights) == 30*31*15
 
-#     H = np.array([[3,0,0],
-#                   [0,3,0],
-#                   [0,0,3]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[3,0,0],
+                  [0,3,0],
+                  [0,0,3]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     irrkpts = list(range(len(weights)))
-#     grid_copy = deepcopy(red_grid)
-#     for v in get_orbits(grid, lat_vecs).values():
-#         for k1 in v:
-#             for k2 in red_grid:
-#                 if irrkpts == []:
-#                     break
-#                 ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
-#                 del grid_copy[ind]
-#                 del irrkpts[ind]
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in get_orbits(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
                 
-# @pytest.mark.skipif("test_reduce_body_centered_orthorhombic" not in tests,
-#                     reason="different tests")     
-# def test_reduce_body_centered_orthorhombic():
-#     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
+@pytest.mark.skipif("test_reduce_body_centered_orthorhombic" not in tests,
+                    reason="different tests")     
+def test_reduce_body_centered_orthorhombic():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
 
-#     ### Body-centered orthorhombic ###
-#     lat_consts = [2.95, 3.92, 8.55]
-#     lat_angles = [np.pi/2]*3
-#     centering = 'body'
+    ### Body-centered orthorhombic ###
+    lat_consts = [2.95, 3.92, 8.55]
+    lat_angles = [np.pi/2]*3
+    centering = 'body'
 
-#     lat_vecs = make_ptvecs(centering, lat_consts,
-#                            lat_angles)
-#     rlat_vecs = make_rptvecs(lat_vecs)    
-#     H = np.array([[30,0,0],
-#                   [0,30,0],
-#                   [0,0,30]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)    
+    H = np.array([[30,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 3736
-#     assert len(red_grid) == 3736
-#     assert np.sum(weights) == 30**3
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3736
+    assert len(red_grid) == 3736
+    assert np.sum(weights) == 30**3
 
-#     H = np.array([[31,0,0],
-#                   [0,31,0],
-#                   [0,0,31]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[31,0,0],
+                  [0,31,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 4096
-#     assert len(red_grid) == 4096
-#     assert np.sum(weights) == 31**3
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 4096
+    assert len(red_grid) == 4096
+    assert np.sum(weights) == 31**3
 
-#     H = np.array([[14,0,0],
-#                   [0,30,0],
-#                   [0,0,30]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[14,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 6169
-#     assert len(red_grid) == 6169
-#     assert np.sum(weights) == 14*30**2
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 6169
+    assert len(red_grid) == 6169
+    assert np.sum(weights) == 14*30**2
 
-#     H = np.array([[30,0,0],
-#                   [0,14,0],
-#                   [0,0,30]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[30,0,0],
+                  [0,14,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 6169
-#     assert len(red_grid) == 6169
-#     assert np.sum(weights) == 14*30**2
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 6169
+    assert len(red_grid) == 6169
+    assert np.sum(weights) == 14*30**2
 
-#     H = np.array([[30,0,0],
-#                   [0,31,0],
-#                   [0,0,14]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[30,0,0],
+                  [0,31,0],
+                  [0,0,14]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 6512
-#     assert len(red_grid) == 6512
-#     assert np.sum(weights) == 14*30*31
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 6512
+    assert len(red_grid) == 6512
+    assert np.sum(weights) == 14*30*31
 
-#     H = np.array([[3,0,0],
-#                   [0,3,0],
-#                   [0,0,3]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[3,0,0],
+                  [0,3,0],
+                  [0,0,3]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     irrkpts = list(range(len(weights)))
-#     grid_copy = deepcopy(red_grid)
-#     for v in get_orbits(grid, lat_vecs).values():
-#         for k1 in v:
-#             for k2 in red_grid:
-#                 if irrkpts == []:
-#                     break
-#                 ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
-#                 del grid_copy[ind]
-#                 del irrkpts[ind]
-#     assert irrkpts == []
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in get_orbits(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+    assert irrkpts == []
 
-# @pytest.mark.skipif("test_reduce_face_centered_orthorhombic" not in tests,
-#                     reason="different tests")     
-# def test_reduce_face_centered_orthorhombic():
-#     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
+@pytest.mark.skipif("test_reduce_face_centered_orthorhombic" not in tests,
+                    reason="different tests")     
+def test_reduce_face_centered_orthorhombic():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
     
-#     ### Face-centered orthorhombic ###
-#     lat_consts = [2.95, 3.92, 8.55]
-#     lat_angles = [np.pi/2]*3
-#     centering = 'face'
+    ### Face-centered orthorhombic ###
+    lat_consts = [2.95, 3.92, 8.55]
+    lat_angles = [np.pi/2]*3
+    centering = 'face'
 
-#     lat_vecs = make_ptvecs(centering, lat_consts,
-#                            lat_angles)
-#     rlat_vecs = make_rptvecs(lat_vecs)
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
 
-#     H = np.array([[30,0,0],
-#                   [0,30,0],
-#                   [0,0,30]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[30,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 3736
-#     assert len(red_grid) == 3736
-#     assert np.sum(weights) == 30**3
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3736
+    assert len(red_grid) == 3736
+    assert np.sum(weights) == 30**3
 
-#     H = np.array([[31,0,0],
-#                   [0,31,0],
-#                   [0,0,31]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[31,0,0],
+                  [0,31,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 4096
-#     assert len(red_grid) == 4096
-#     assert np.sum(weights) == 31**3
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 4096
+    assert len(red_grid) == 4096
+    assert np.sum(weights) == 31**3
 
-#     H = np.array([[14,0,0],
-#                   [0,30,0],
-#                   [0,0,30]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[14,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 5874
-#     assert len(red_grid) == 5874
-#     assert np.sum(weights) == 14*30**2
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 5874
+    assert len(red_grid) == 5874
+    assert np.sum(weights) == 14*30**2
 
-#     H = np.array([[32,0,0],
-#                   [0,16,0],
-#                   [0,0,32]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[32,0,0],
+                  [0,16,0],
+                  [0,0,32]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 3281
-#     assert len(red_grid) == 3281
-#     assert np.sum(weights) == 16*32**2
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3281
+    assert len(red_grid) == 3281
+    assert np.sum(weights) == 16*32**2
 
-#     H = np.array([[34,0,0],
-#                   [0,35,0],
-#                   [0,0,13]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[34,0,0],
+                  [0,35,0],
+                  [0,0,13]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 7736
-#     assert len(red_grid) == 7736
-#     assert np.sum(weights) == 34*35*13
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 7736
+    assert len(red_grid) == 7736
+    assert np.sum(weights) == 34*35*13
 
-#     H = np.array([[3,0,0],
-#                   [0,3,0],
-#                   [0,0,3]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[3,0,0],
+                  [0,3,0],
+                  [0,0,3]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
 
-#     irrkpts = list(range(len(weights)))
-#     grid_copy = deepcopy(red_grid)
-#     for v in get_orbits(grid, lat_vecs).values():
-#         for k1 in v:
-#             for k2 in red_grid:
-#                 if irrkpts == []:
-#                     break
-#                 ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
-#                 del grid_copy[ind]
-#                 del irrkpts[ind]
-# @pytest.mark.skipif("test_reduce_monoclinic" not in tests,
-#                     reason="different tests")                     
-# def test_reduce_monoclinic():
-#     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in get_orbits(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+@pytest.mark.skipif("test_reduce_monoclinic" not in tests,
+                    reason="different tests")                     
+def test_reduce_monoclinic():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
 
-#     ### Monoclinic ###
-#     lat_consts = [5.596, 3.533, 4.274]
-#     lat_angles = [np.pi/2, 119.069*np.pi/180, np.pi/2]
-#     centering = 'prim'
+    ### Monoclinic ###
+    lat_consts = [5.596, 3.533, 4.274]
+    lat_angles = [np.pi/2, 119.069*np.pi/180, np.pi/2]
+    centering = 'prim'
 
-#     lat_vecs = make_ptvecs(centering, lat_consts,
-#                            lat_angles)
-#     rlat_vecs = make_rptvecs(lat_vecs)
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
     
-#     H = np.array([[30,0,0],
-#                   [0,30,0],
-#                   [0,0,30]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[30,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 7232
-#     assert len(red_grid) == 7232
-#     assert np.sum(weights) == 30**3
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 7232
+    assert len(red_grid) == 7232
+    assert np.sum(weights) == 30**3
 
-#     H = np.array([[31,0,0],
-#                   [0,31,0],
-#                   [0,0,31]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[31,0,0],
+                  [0,31,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)                
-#     assert len(weights) == 7696
-#     assert len(red_grid) == 7696
-#     assert np.sum(weights) == 31**3
-#     H = np.array([[14,0,0],
-#                   [0,30,0],
-#                   [0,0,30]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)                
+    assert len(weights) == 7696
+    assert len(red_grid) == 7696
+    assert np.sum(weights) == 31**3
+    H = np.array([[14,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                        rlat_vecs, grid_vecs,
-#                        offset)
-#     assert len(weights) == 3392
-#     assert len(red_grid) == 3392
-#     assert np.sum(weights) == 14*30**2
+    red_grid, weights = reduce_kpoint_list(grid,
+                       rlat_vecs, grid_vecs,
+                       offset)
+    assert len(weights) == 3392
+    assert len(red_grid) == 3392
+    assert np.sum(weights) == 14*30**2
 
-#     H = np.array([[31,0,0],
-#                   [0,15,0],
-#                   [0,0,31]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[31,0,0],
+                  [0,15,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 3848
-#     assert len(red_grid) == 3848
-#     assert np.sum(weights) == 15*31**2
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3848
+    assert len(red_grid) == 3848
+    assert np.sum(weights) == 15*31**2
 
-#     H = np.array([[31,0,0],
-#                   [0,15,0],
-#                   [0,0,31]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[31,0,0],
+                  [0,15,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 3848
-#     assert len(red_grid) == 3848
-#     assert np.sum(weights) == 15*31**2
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3848
+    assert len(red_grid) == 3848
+    assert np.sum(weights) == 15*31**2
 
-#     H = np.array([[30,0,0],
-#                   [0,31,0],
-#                   [0,0,14]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([1./2]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    H = np.array([[30,0,0],
+                  [0,31,0],
+                  [0,0,14]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
 
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 3360
-#     assert len(red_grid) == 3360
-#     assert np.sum(weights) == 30*31*14
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 3360
+    assert len(red_grid) == 3360
+    assert np.sum(weights) == 30*31*14
 
-#     H = np.array([[3,0,0],
-#                   [0,3,0],
-#                   [0,0,3]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([1./2]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     irrkpts = list(range(len(weights)))
-#     grid_copy = deepcopy(red_grid)
-#     for v in get_orbits(grid, lat_vecs).values():
-#         for k1 in v:
-#             for k2 in red_grid:
-#                 if irrkpts == []:
-#                     break
-#                 ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
-#                 del grid_copy[ind]
-#                 del irrkpts[ind]
-#     assert irrkpts == []
+    H = np.array([[3,0,0],
+                  [0,3,0],
+                  [0,0,3]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in get_orbits(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+    assert irrkpts == []
 
-# @pytest.mark.skipif("test_reduce_base_centered_monoclinic" not in tests,
-#                     reason="different tests")                     
-# def test_reduce_base_centered_monoclinic():
-#     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
+@pytest.mark.skipif("test_reduce_base_centered_monoclinic" not in tests,
+                    reason="different tests")                     
+def test_reduce_base_centered_monoclinic():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
     
-#     ### Base-centered monoclinic ###
-#     lat_consts = [5.596, 3.533, 4.274]
-#     lat_angles = [np.pi/2, 119.069*np.pi/180, np.pi/2]
-#     centering = 'base'
+    ### Base-centered monoclinic ###
+    lat_consts = [5.596, 3.533, 4.274]
+    lat_angles = [np.pi/2, 119.069*np.pi/180, np.pi/2]
+    centering = 'base'
 
-#     lat_vecs = make_ptvecs(centering, lat_consts,
-#                            lat_angles)
-#     rlat_vecs = make_rptvecs(lat_vecs)    
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)    
 
-#     H = np.array([[30,0,0],
-#                   [0,30,0],
-#                   [0,0,30]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 6992
-#     assert len(red_grid) == 6992
-#     assert np.sum(weights) == 30**3
+    H = np.array([[30,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 6992
+    assert len(red_grid) == 6992
+    assert np.sum(weights) == 30**3
 
-#     H = np.array([[31,0,0],
-#                   [0,31,0],
-#                   [0,0,31]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 7696
-#     assert len(red_grid) == 7696
-#     assert np.sum(weights) == 31**3
+    H = np.array([[31,0,0],
+                  [0,31,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 7696
+    assert len(red_grid) == 7696
+    assert np.sum(weights) == 31**3
 
-#     H = np.array([[14,0,0],
-#                   [0,30,0],
-#                   [0,0,30]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 6288
-#     assert len(red_grid) == 6288
-#     assert np.sum(weights) == 14*30**2
+    H = np.array([[14,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 6288
+    assert len(red_grid) == 6288
+    assert np.sum(weights) == 14*30**2
                 
-#     H = np.array([[31,0,0],
-#                   [0,15,0],
-#                   [0,0,31]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 7208
-#     assert len(red_grid) == 7208
-#     assert np.sum(weights) == 15*31**2
+    H = np.array([[31,0,0],
+                  [0,15,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 7208
+    assert len(red_grid) == 7208
+    assert np.sum(weights) == 15*31**2
 
-#     H = np.array([[31,0,0],
-#                   [0,15,0],
-#                   [0,0,31]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 7208
-#     assert len(red_grid) == 7208
-#     assert np.sum(weights) == 15*31**2
+    H = np.array([[31,0,0],
+                  [0,15,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 7208
+    assert len(red_grid) == 7208
+    assert np.sum(weights) == 15*31**2
 
-#     H = np.array([[31,0,0],
-#                   [0,20,0],
-#                   [0,0,15]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = [0.0, 0.5, 0.5]
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 4650
-#     assert len(red_grid) == 4650
-#     assert np.sum(weights) == 31*20*15
+    H = np.array([[31,0,0],
+                  [0,20,0],
+                  [0,0,15]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = [0.0, 0.5, 0.5]
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 4650
+    assert len(red_grid) == 4650
+    assert np.sum(weights) == 31*20*15
 
-#     H = np.array([[4,0,0],
-#                   [0,4,0],
-#                   [0,2,3]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = [0.0, 0.5, 0.5]
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     irrkpts = list(range(len(weights)))
-#     grid_copy = deepcopy(red_grid)
-#     for v in get_orbits(grid, lat_vecs).values():
-#         for k1 in v:
-#             for k2 in red_grid:
-#                 if irrkpts == []:
-#                     break
-#                 ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
-#                 del grid_copy[ind]
-#                 del irrkpts[ind]
-#     assert irrkpts == []
+    H = np.array([[4,0,0],
+                  [0,4,0],
+                  [0,2,3]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = [0.0, 0.5, 0.5]
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in get_orbits(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+    assert irrkpts == []
                 
-# @pytest.mark.skipif("test_reduce_tetragonal" not in tests,
-#                     reason="different tests")                     
-# def test_reduce_tetragonal():
-#     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
+@pytest.mark.skipif("test_reduce_tetragonal" not in tests,
+                    reason="different tests")                     
+def test_reduce_tetragonal():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
     
-#     ### Tetragonal ###
-#     lat_consts = [4.93777, 4.93777, 7.461038]
-#     lat_angles = [np.pi/2]*3
-#     centering = 'prim'
+    ### Tetragonal ###
+    lat_consts = [4.93777, 4.93777, 7.461038]
+    lat_angles = [np.pi/2]*3
+    centering = 'prim'
 
-#     lat_vecs = make_ptvecs(centering, lat_consts,
-#                            lat_angles)
-#     rlat_vecs = make_rptvecs(lat_vecs)
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
 
-#     H = np.array([[30,0,0],
-#                   [0,30,0],
-#                   [0,0,30]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 2176
-#     assert len(red_grid) == 2176
-#     assert np.sum(weights) == 30**3
+    H = np.array([[30,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 2176
+    assert len(red_grid) == 2176
+    assert np.sum(weights) == 30**3
     
-#     H = np.array([[31,0,0],
-#                   [0,31,0],
-#                   [0,0,31]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([1./2]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 2176
-#     assert len(red_grid) == 2176
-#     assert np.sum(weights) == 31**3
+    H = np.array([[31,0,0],
+                  [0,31,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 2176
+    assert len(red_grid) == 2176
+    assert np.sum(weights) == 31**3
 
-#     H = np.array([[14,0,0],
-#                   [0,30,0],
-#                   [0,0,30]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([1./2]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 1575
-#     assert len(red_grid) == 1575
-#     assert np.sum(weights) == 14*30**2
+    H = np.array([[14,0,0],
+                  [0,30,0],
+                  [0,0,30]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 1575
+    assert len(red_grid) == 1575
+    assert np.sum(weights) == 14*30**2
 
-#     H = np.array([[31,0,0],
-#                   [0,15,0],
-#                   [0,0,31]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([1./2]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 2048
-#     assert len(red_grid) == 2048
-#     assert np.sum(weights) == 15*31**2
+    H = np.array([[31,0,0],
+                  [0,15,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 2048
+    assert len(red_grid) == 2048
+    assert np.sum(weights) == 15*31**2
 
-#     H = np.array([[33,0,0],
-#                   [0,31,0],
-#                   [0,0,17]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([1./2]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 2448
-#     assert len(red_grid) == 2448
-#     assert np.sum(weights) == 33*31*17
+    H = np.array([[33,0,0],
+                  [0,31,0],
+                  [0,0,17]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 2448
+    assert len(red_grid) == 2448
+    assert np.sum(weights) == 33*31*17
 
-#     H = np.array([[5,0,0],
-#                   [3,4,0],
-#                   [1,2,7]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([1./2]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     irrkpts = list(range(len(weights)))
-#     grid_copy = deepcopy(red_grid)
-#     for v in get_orbits(grid, lat_vecs).values():
-#         for k1 in v:
-#             for k2 in red_grid:
-#                 if irrkpts == []:
-#                     break
-#                 ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
-#                 del grid_copy[ind]
-#                 del irrkpts[ind]
-#     assert irrkpts == []
+    H = np.array([[5,0,0],
+                  [3,4,0],
+                  [1,2,7]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in get_orbits(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+    assert irrkpts == []
     
-# @pytest.mark.skipif("test_reduce_body_centered_tetragonal" not in tests,
-#                     reason="different tests")                     
-# def test_reduce_body_centered_tetragonal():
-#     # Compare symmetry reduction to the symmetry reduction obtain in VASP.
-#     ### Body-centered tetragonal ###
-#     lat_consts = [4.93777, 4.93777, 7.461038]
-#     lat_angles = [np.pi/2]*3
-#     centering = 'body'
+@pytest.mark.skipif("test_reduce_body_centered_tetragonal" not in tests,
+                    reason="different tests")                     
+def test_reduce_body_centered_tetragonal():
+    # Compare symmetry reduction to the symmetry reduction obtain in VASP.
+    ### Body-centered tetragonal ###
+    lat_consts = [4.93777, 4.93777, 7.461038]
+    lat_angles = [np.pi/2]*3
+    centering = 'body'
 
-#     lat_vecs = make_ptvecs(centering, lat_consts,
-#                            lat_angles)
-#     rlat_vecs = make_rptvecs(lat_vecs)
+    lat_vecs = make_ptvecs(centering, lat_consts,
+                           lat_angles)
+    rlat_vecs = make_rptvecs(lat_vecs)
     
-#     H = np.array([[32,0,0],
-#                   [0,32,0],
-#                   [0,0,32]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 2393
-#     assert len(red_grid) == 2393
-#     assert np.sum(weights) == 32**3
+    H = np.array([[32,0,0],
+                  [0,32,0],
+                  [0,0,32]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 2393
+    assert len(red_grid) == 2393
+    assert np.sum(weights) == 32**3
 
-#     H = np.array([[33,0,0],
-#                   [0,33,0],
-#                   [0,0,33]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([1./2]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 2601
-#     assert len(red_grid) == 2601
-#     assert np.sum(weights) == 33**3
+    H = np.array([[33,0,0],
+                  [0,33,0],
+                  [0,0,33]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([1./2]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 2601
+    assert len(red_grid) == 2601
+    assert np.sum(weights) == 33**3
 
-#     H = np.array([[15,0,0],
-#                   [0,31,0],
-#                   [0,0,31]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 6983
-#     assert len(red_grid) == 6983
-#     assert np.sum(weights) == 15*31**2
+    H = np.array([[15,0,0],
+                  [0,31,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 6983
+    assert len(red_grid) == 6983
+    assert np.sum(weights) == 15*31**2
 
-#     H = np.array([[31,0,0],
-#                   [0,15,0],
-#                   [0,0,31]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 6983
-#     assert len(red_grid) == 6983
-#     assert np.sum(weights) == 15*31**2
+    H = np.array([[31,0,0],
+                  [0,15,0],
+                  [0,0,31]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 6983
+    assert len(red_grid) == 6983
+    assert np.sum(weights) == 15*31**2
 
-#     H = np.array([[31,0,0],
-#                   [0,32,0],
-#                   [0,0,15]])
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     offset = np.array([0.]*3)
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     assert len(weights) == 7441
-#     assert len(red_grid) == 7441
-#     assert np.sum(weights) == 31*32*15
+    H = np.array([[31,0,0],
+                  [0,32,0],
+                  [0,0,15]])
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    offset = np.array([0.]*3)
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    assert len(weights) == 7441
+    assert len(red_grid) == 7441
+    assert np.sum(weights) == 31*32*15
 
-#     H = np.array([[3,0,0],
-#                   [0,4,0],
-#                   [0,0,5]])
-#     offset = np.array([1./2]*3)
-#     grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
-#     grid = make_cell_points(rlat_vecs, grid_vecs, offset)
-#     red_grid, weights = reduce_kpoint_list(grid,
-#                         rlat_vecs, grid_vecs,
-#                         offset)
-#     irrkpts = list(range(len(weights)))
-#     grid_copy = deepcopy(red_grid)
-#     for v in get_orbits(grid, lat_vecs).values():
-#         for k1 in v:
-#             for k2 in red_grid:
-#                 if irrkpts == []:
-#                     break
-#                 ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
-#                 del grid_copy[ind]
-#                 del irrkpts[ind]
-#     assert irrkpts == []
+    H = np.array([[3,0,0],
+                  [0,4,0],
+                  [0,0,5]])
+    offset = np.array([1./2]*3)
+    grid_vecs = np.dot(rlat_vecs, np.linalg.inv(H))
+    grid = make_cell_points(rlat_vecs, grid_vecs, offset)
+    red_grid, weights = reduce_kpoint_list(grid,
+                        rlat_vecs, grid_vecs,
+                        offset)
+    irrkpts = list(range(len(weights)))
+    grid_copy = deepcopy(red_grid)
+    for v in get_orbits(grid, lat_vecs).values():
+        for k1 in v:
+            for k2 in red_grid:
+                if irrkpts == []:
+                    break
+                ind = np.where([np.allclose(k2, k) for k in grid_copy])[0][0]
+                del grid_copy[ind]
+                del irrkpts[ind]
+    assert irrkpts == []
 
 
-# @pytest.mark.skipif("test_get_point_group" not in tests,
-#                     reason="different tests")
-# def test_get_point_group():
+@pytest.mark.skipif("test_get_point_group" not in tests,
+                    reason="different tests")
+def test_get_point_group():
 
-#     lat_type = "simple cubic"
-#     lat_consts = [1]*3
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "prim"
-#     lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     volume = det(lat_vecs)
-#     point_group = get_point_group(lat_vecs)
-#     assert len(point_group) == 48
-#     for pg in point_group:
-#         assert np.isclose(abs(det(pg)), 1)
-#         assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
-#         assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+    lat_type = "simple cubic"
+    lat_consts = [1]*3
+    lat_angles = [np.pi/2]*3
+    lat_centering = "prim"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)
+    point_group = get_point_group(lat_vecs)
+    assert len(point_group) == 48
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
         
-#     lat_type = "body-centered cubic"
-#     lat_consts = [1]*3
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "body"
-#     lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     volume = det(lat_vecs)    
-#     point_group = get_point_group(lat_vecs)    
-#     assert len(point_group) == 48
-#     for pg in point_group:
-#         assert np.isclose(abs(det(pg)), 1)
-#         assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
-#         assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+    lat_type = "body-centered cubic"
+    lat_consts = [1]*3
+    lat_angles = [np.pi/2]*3
+    lat_centering = "body"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == 48
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
 
         
-#     lat_type = "face-centered cubic"
-#     lat_consts = [1]*3
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "face"
-#     lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     volume = det(lat_vecs)    
-#     point_group = get_point_group(lat_vecs)    
-#     assert len(point_group) == 48
-#     for pg in point_group:
-#         assert np.isclose(abs(det(pg)), 1)
-#         assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
-#         assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+    lat_type = "face-centered cubic"
+    lat_consts = [1]*3
+    lat_angles = [np.pi/2]*3
+    lat_centering = "face"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == 48
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
     
-#     lat_type = "tetragonal"
-#     lat_consts = [1, 1, 2]
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "prim"
-#     lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     volume = det(lat_vecs)    
-#     point_group = get_point_group(lat_vecs)    
-#     assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
-#     for pg in point_group:
-#         assert np.isclose(abs(det(pg)), 1)
-#         assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
-#         assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+    lat_type = "tetragonal"
+    lat_consts = [1, 1, 2]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "prim"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
 
-#     lat_type = "body-centered tetragonal"
-#     lat_consts = [1, 1, 2]
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "body"
-#     lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     volume = det(lat_vecs)    
-#     point_group = get_point_group(lat_vecs)    
-#     assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
-#     for pg in point_group:
-#         assert np.isclose(abs(det(pg)), 1)
-#         assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
-#         assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+    lat_type = "body-centered tetragonal"
+    lat_consts = [1, 1, 2]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "body"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
 
-#     lat_type = "orthorhombic"
-#     lat_consts = [1, 2, 3]
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "prim"
-#     lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     volume = det(lat_vecs)    
-#     point_group = get_point_group(lat_vecs)    
-#     assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
-#     for pg in point_group:
-#         assert np.isclose(abs(det(pg)), 1)
-#         assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
-#         assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+    lat_type = "orthorhombic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "prim"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
 
-#     lat_type = "face-centered orthorhombic"
-#     lat_consts = [1, 2, 3]
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "face"
-#     lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     volume = det(lat_vecs)    
-#     point_group = get_point_group(lat_vecs)    
-#     assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
-#     for pg in point_group:
-#         assert np.isclose(abs(det(pg)), 1)
-#         assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
-#         assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+    lat_type = "face-centered orthorhombic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "face"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
 
-#     lat_type = "body-centered orthorhombic"
-#     lat_consts = [1, 2, 3]
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "body"
-#     lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     volume = det(lat_vecs)    
-#     point_group = get_point_group(lat_vecs)    
-#     assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
-#     for pg in point_group:
-#         assert np.isclose(abs(det(pg)), 1)
-#         assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
-#         assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+    lat_type = "body-centered orthorhombic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "body"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
 
-#     lat_type = "base-centered orthorhombic"
-#     lat_consts = [1, 2, 3]
-#     lat_angles = [np.pi/2]*3
-#     lat_centering = "base"
-#     lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     volume = det(lat_vecs)    
-#     point_group = get_point_group(lat_vecs)    
-#     assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
-#     for pg in point_group:
-#         assert np.isclose(abs(det(pg)), 1)
-#         assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
-#         assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+    lat_type = "base-centered orthorhombic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "base"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
 
-#     lat_type = "hexagonal"
-#     lat_consts = [1., 1., 3.]
-#     lat_angles = [np.pi/2, np.pi/2, 2*np.pi/3]
-#     lat_centering = "prim"
-#     lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     volume = det(lat_vecs)    
-#     point_group = get_point_group(lat_vecs)    
-#     assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
-#     for pg in point_group:
-#         assert np.isclose(abs(det(pg)), 1)
-#         assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
-#         assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+    lat_type = "hexagonal"
+    lat_consts = [1., 1., 3.]
+    lat_angles = [np.pi/2, np.pi/2, 2*np.pi/3]
+    lat_centering = "prim"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
 
-#     lat_type = "rhombohedral"
-#     lat_consts = [1., 1., 1.]
-#     lat_angles = [.55*np.pi]*3
-#     lat_centering = "prim"
-#     lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     volume = det(lat_vecs)    
-#     point_group = get_point_group(lat_vecs)    
-#     assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
-#     for pg in point_group:
-#         assert np.isclose(abs(det(pg)), 1)
-#         assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
-#         assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+    lat_type = "rhombohedral"
+    lat_consts = [1., 1., 1.]
+    lat_angles = [.55*np.pi]*3
+    lat_centering = "prim"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
 
-#     lat_type = "monoclinic"
-#     lat_consts = [1, 2, 3]
-#     lat_angles = [np.pi/3, np.pi/2, np.pi/2]
-#     lat_centering = "prim"
-#     lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     volume = det(lat_vecs)    
-#     point_group = get_point_group(lat_vecs)    
-#     assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
-#     for pg in point_group:
-#         assert np.isclose(abs(det(pg)), 1)
-#         assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
-#         assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+    lat_type = "monoclinic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/3, np.pi/2, np.pi/2]
+    lat_centering = "prim"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
 
-#     lat_type = "base-centered monoclinic"
-#     lat_consts = [1, 2, 3]
-#     lat_angles = [np.pi/4, np.pi/2, np.pi/2]
-#     lat_centering = "base"
-#     lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     volume = det(lat_vecs)    
-#     point_group = get_point_group(lat_vecs)    
-#     assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
-#     for pg in point_group:
-#         assert np.isclose(abs(det(pg)), 1)
-#         assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
-#         assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+    lat_type = "base-centered monoclinic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/4, np.pi/2, np.pi/2]
+    lat_centering = "base"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
 
-#     lat_type = "triclinic"
-#     lat_consts = [1.1, 2.8, 4.3]
-#     lat_angles = [np.pi/6, np.pi/4, np.pi/3]
-#     lat_centering = "prim"
-#     lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
-#     volume = det(lat_vecs)    
-#     point_group = get_point_group(lat_vecs)    
-#     assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
-#     for pg in point_group:
-#         assert np.isclose(abs(det(pg)), 1)
-#         assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
-#         assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+    lat_type = "triclinic"
+    lat_consts = [1.1, 2.8, 4.3]
+    lat_angles = [np.pi/6, np.pi/4, np.pi/3]
+    lat_centering = "prim"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))

@@ -785,13 +785,13 @@ def get_sympaths(centering_type, lattice_constants, lattice_angles,
                     ["E", "M1"], ["M1", "A"], ["A", "X"], ["X", "H1"],
                     ["M", "D"], ["D", "Z"], ["Y", "D"]]
         elif centering_type == "base": # MCLC1
-            if kgamma > np.pi/2:
+            if np.isclose(kgamma, np.pi/2): # MCLC2
+                return [["$\Gamma$", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
+                        ["I1", "Z"], ["Z", "F1"], ["N", "$\Gamma$"], ["$\Gamma$", "M"]]        
+            elif kgamma > np.pi/2:
                 return [["$\Gamma$", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
                         ["I1", "Z"], ["Z", "F1"], ["Y", "X1"], ["X", "$\Gamma$"],
                         ["$\Gamma$", "N"], ["M", "$\Gamma$"]]
-            elif np.isclose(kgamma, np.pi/2): # MCLC2
-                return [["$\Gamma$", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
-                        ["I1", "Z"], ["Z", "F1"], ["N", "$\Gamma$"], ["$\Gamma$", "M"]]
             elif (kgamma < np.pi/2 # MCLC3
                   and ((b*np.cos(alpha)/c + (b*np.sin(alpha)/a)**2) < 1)):
                 return [["$\Gamma$", "Y"], ["Y", "F"], ["F", "H"], ["H", "Z"],
