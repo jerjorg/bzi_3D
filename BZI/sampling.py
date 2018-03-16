@@ -4,12 +4,14 @@
 import numpy as np
 from numpy.linalg import inv, norm
 from copy import deepcopy
-from itertools import product
+import itertools as it
 from math import ceil
 
 from BZI.symmetry import (make_ptvecs, UpperHermiteNormalForm,
                           HermiteNormalForm)
 
+
+# make_grid has a bug for some triclinic lattices. Fix then uncomment.
 def make_grid(lat_vecs, grid_vecs, offset, cart=True):
     """Sample within a parallelepiped using any regular grid.
 
@@ -137,7 +139,7 @@ def make_large_grid(cell_vectors, grid_vectors, offset, cart=True):
                            for i in range(3)])*1.5).astype(int)
     grid = []
     null_grid = []
-    for nv in product(range(-n[0] + oi[0], n[0] + oi[0]),
+    for nv in it.product(range(-n[0] + oi[0], n[0] + oi[0]),
                       range(-n[1] + oi[1], n[1] + oi[1]),
                       range(-n[2] + oi[2], n[2] + oi[2])):    
         grid_pt = np.dot(grid_vectors, nv) + offset
@@ -181,7 +183,7 @@ def large_sphere_pts(A, r2, offset=[0.,0.,0.], eps=1e-12):
     n = [int(np.ceil(norm(np.cross(A[:,(i+1)%3],A[:,(i+2)%3]))*r/V) + 1)
          for i in range(3)]
 
-    ints = np.array(list(product(range(-n[0] + oi[0], n[0] + oi[0] + 1),
+    ints = np.array(list(it.product(range(-n[0] + oi[0], n[0] + oi[0] + 1),
                    range(-n[1] + oi[1], n[1] + oi[1] + 1),
                    range(-n[2] + oi[2], n[2] + oi[2] + 1))))
     
@@ -204,7 +206,7 @@ def sphere_pts(A, r2, offset=[0.,0.,0.], eps=1e-12):
         grid (list): an array of grid coordinates in cartesian
             coordinates.
     """
-
+    
     offset = np.asarray(offset)
     
     # Put the offset in cell coordinates and find a cell point close to the
@@ -215,12 +217,13 @@ def sphere_pts(A, r2, offset=[0.,0.,0.], eps=1e-12):
     n = [int(np.ceil(norm(np.cross(A[:,(i+1)%3],A[:,(i+2)%3]))*r/V) + 10)
          for i in range(3)]
 
-    ints = np.array(list(product(range(-n[0] + oi[0], n[0] + oi[0] + 1),
+    ints = np.array(list(it.product(range(-n[0] + oi[0], n[0] + oi[0] + 1),
                    range(-n[1] + oi[1], n[1] + oi[1] + 1),
                    range(-n[2] + oi[2], n[2] + oi[2] + 1))))
     
     grid = np.dot(A, ints.T).T - offset
     norms = np.array([np.dot(p,p) for p in grid])
+    
     return grid[np.where(norms < (r2 + eps))] + offset
 
 def make_cell_points(lat_vecs, grid_vecs, offset=[0,0,0], cart=True):
@@ -231,11 +234,9 @@ def make_cell_points(lat_vecs, grid_vecs, offset=[0,0,0], cart=True):
             to sample. The vectors are the columns of the matrix.
         grid_vecs (numpy.ndarray): the vectors that generate the grid as 
             columns of a matrix..
-        offset: the offset of the coordinate system in grid coordinates.
+        offset (numpy.ndarray): the offset of the coordinate system in grid coordinates.
         cart (bool): if true, return the grid in Cartesian coordinates; other-
-            wise, return the grid in cell coordinates. If cart == True, the
-            offset must be in Cartesian coordinates. If cart == False, the offset 
-            must be in cell coordinates.
+            wise, return the grid in cell coordinates. 
 
     Returns:
         grid (list): an array of sampling-point coordinates.
@@ -263,19 +264,19 @@ def make_cell_points(lat_vecs, grid_vecs, offset=[0,0,0], cart=True):
     N = np.dot(inv(grid_vecs), lat_vecs)
 
     # Check that N is an integer matrix.
-    for i in range(len(N[:,0])):
-        for j in range(len(N[0,:])):
-            if np.isclose(N[i,j]%1, 0) or np.isclose(N[i,j]%1, 1):
-                N[i,j] = int(np.round(N[i,j]))
-            else:
-                raise ValueError("The cell and grid vectors are incommensurate.")
+    for i,j in it.product(range(len(N[:,0])), repeat=2):
+        if np.isclose(N[i,j]%1, 0) or np.isclose(N[i,j]%1, 1):
+            N[i,j] = int(np.round(N[i,j]))
+        else:
+            raise ValueError("The cell and grid vectors are incommensurate.")
 
     H, U = HermiteNormalForm(N)
     D = np.diag(H).astype(int)    
     grid = []
     if cart == True:
         # Loop through the diagonal of the HNF matrix.
-        for i,j,k in product(range(D[0]), range(D[1]), range(D[2])):
+        for i,j,k in it.product(range(D[0]), range(D[1]), range(D[2])):
+            
             # Find the point in Cartesian coordinates.
             pt = np.dot(grid_vecs, [i,j,k]) + car_offset
             
@@ -289,7 +290,7 @@ def make_cell_points(lat_vecs, grid_vecs, offset=[0,0,0], cart=True):
             grid.append(pt)
         return grid
     else:
-        for i,j,k in product(range(D[0]), range(D[1]), range(D[2])):
+        for i,j,k in it.product(range(D[0]), range(D[1]), range(D[2])):
             # Find the point in cartesian coordinates.
             pt = np.dot(grid_vecs, [i,j,k])
             # Put the point in cell coordinates and move it to the 

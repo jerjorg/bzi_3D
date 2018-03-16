@@ -2,24 +2,29 @@
 """
 
 import numpy as np
-from numpy.linalg import norm, inv
+from numpy.linalg import norm, inv, det
 from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.patches import FancyArrowPatch
+from mpl_toolkits.mplot3d import proj3d
 import matplotlib.pyplot as plt
 from itertools import product, chain
-import time
-import pickle
-import os
+from scipy.spatial import ConvexHull
+from copy import deepcopy
+import time, pickle, os
 
-from BZI.pseudopots import free_PP
 from BZI.symmetry import (bcc_sympts, fcc_sympts, sc_sympts, make_ptvecs,
-                          make_rptvecs, sym_path)
-from BZI.sampling import make_grid
-from BZI.integration import (rectangular_fermi_level, rectangular_method,
-                             rec_dos_nos)
+                          make_rptvecs, sym_path, number_of_point_operators,
+                          find_orbits)
+from BZI.sampling import make_cell_points
+# from BZI.integration import (rectangular_fermi_level, rectangular_method,
+#                              rec_dos_nos)
+from BZI.integration import rectangular_method, rec_dos_nos
 from BZI.tetrahedron import (grid_and_tetrahedra, calc_fermi_level,
                              calc_total_energy, get_extended_tetrahedra,
                              get_corrected_total_energy, density_of_states,
-                             number_of_states, tet_dos_nos)
+                             number_of_states, tet_dos_nos, find_irreducible_tetrahedra)
+from BZI.make_IBZ import find_bz, orderAngle, planar3dTo2d
+from BZI.utilities import remove_points, find_point_indices, check_contained
 
 def ScatterPlotMultiple(func, states, ndivisions, cutoff=None):
     """Plot the energy states of a multivalued toy pseudo-potential using 
@@ -76,13 +81,13 @@ def ScatterPlotMultiple(func, states, ndivisions, cutoff=None):
     plt.show()
 
     
-def scatter_plot_pp(PP, states, nbands, ndivisions, grid_vectors,
+def scatter_plot_pp(EPM, states, nbands, ndivisions, grid_vectors,
                     plane_value, offset, cutoff=None):
     """Plot the energy states of a multivalued toy pseudo-potential using 
     matplotlib's function scatter.
     
     Args:
-        PP (:py:obj:`BZI.pseudopots.EmpiricalPP`): a pseudopotential object.
+        EPM (:py:obj:`BZI.pseudopots.EmpiricalPseudopotential`): a pseudopotential object.
         states (list): a list of states to plot.
         nbands (int): the number of bands to include. No value in states can be 
             greater than nbands.
@@ -104,11 +109,11 @@ def scatter_plot_pp(PP, states, nbands, ndivisions, grid_vectors,
         >>> ScatterPlotMultiple(nstates, ndivisions)
     """
 
-    g1 = PP.lattice.reciprocal_vectors[:, grid_vectors[0]]/ndivisions
-    g2 = PP.lattice.reciprocal_vectors[:, grid_vectors[1]]/ndivisions
+    g1 = EPM.lattice.reciprocal_vectors[:, grid_vectors[0]]/ndivisions
+    g2 = EPM.lattice.reciprocal_vectors[:, grid_vectors[1]]/ndivisions
 
     orth_vec = np.setdiff1d([0, 1, 2], grid_vectors)[0]    
-    orthogonal_vector = PP.lattice.reciprocal_vectors[orth_vec]
+    orthogonal_vector = EPM.lattice.reciprocal_vectors[orth_vec]
 
     # Distance in the direction orthogonal to the plane.
     d = plane_value*orthogonal_vector
@@ -121,7 +126,7 @@ def scatter_plot_pp(PP, states, nbands, ndivisions, grid_vectors,
         kxlist.append(grid[-1][grid_vectors[0]])
         kylist.append(grid[-1][grid_vectors[1]])
     
-    all_estates = [PP.eval(kpt, nbands) for kpt in grid]
+    all_estates = [EPM.eval(kpt, nbands) for kpt in grid]
     prows = int(np.sqrt(len(states)))
     pcols = int(np.ceil(len(states)/prows))
     
@@ -188,6 +193,22 @@ def ScatterPlotSingle(func, ndivisions, cutoff=None):
         ax = plt.subplot(1,1,1,projection="3d")
         ax.scatter(kxlist, kylist, estates,s=.5);
     plt.show()
+
+def plot_just_points(mesh_points, ax=None):
+    """Plot just the points in a mesh.
+
+    Args:
+        mesh_points (numpy.ndarray or list): a list of points
+    """
+
+    ngpts = len(mesh_points)
+    kxlist = [mesh_points[i][0] for i in range(ngpts)]
+    kylist = [mesh_points[i][1] for i in range(ngpts)]
+    kzlist = [mesh_points[i][2] for i in range(ngpts)]
+    if not ax:
+        ax = plt.subplot(1,1,1,projection="3d")        
+    ax.scatter(kxlist, kylist, kzlist, c="black", s=10)
+
     
 def plot_mesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
               indices=None, show=True, save=False, file_name=None):
@@ -197,7 +218,7 @@ def plot_mesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
         mesh_points (list or numpy.ndarray): a list of mesh points in Cartesian
             coordinates.
         cell_vecs (list or numpy.ndarray): a list vectors that define a cell.
-        offset (list or numpy.ndarray): the offset of the unit cell, which is 
+        offset (list or numpy.ndarray): the offset of the unit cell, which is
            also plotted, in Cartesian coordinates.
         indices (list or numpy.ndarray): the indices of the points. If
             provided, they will be plotted with the mesh points.
@@ -252,6 +273,33 @@ def plot_mesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
         else:
             plt.savefig("mesh.pdf")
     return None
+
+def plot_bz_mesh(mesh_points, lat_vecs):
+    """Plot the irreducible k-points inside the Wigner-Seitz construction of the first
+    Brillouin zone.
+
+    Args:
+        mesh_points (numpy.ndarray): an 2D array of mesh points.
+        lat_vecs (numpy.ndarray): an array of lattice vectors as columns of a 3x3 array.
+    """
+
+    ngpts = len(mesh_points)
+    kxlist = [mesh_points[i][0] for i in range(ngpts)]
+    kylist = [mesh_points[i][1] for i in range(ngpts)]
+    kzlist = [mesh_points[i][2] for i in range(ngpts)]
+
+    ax = plt.subplot(1,1,1,projection="3d")
+    ax.scatter(kxlist, kylist, kzlist, c="red")
+
+    BZ = find_bz(lat_vecs)
+    for simplex in BZ.simplices:
+        # We're going to plot lines between the vertices of the simplex.
+        # To make sure we make it all the way around, append the first element
+        # to the end of the simplex.
+        simplex = np.append(simplex, simplex[0])
+        simplex_pts = [BZ.points[i] for i in simplex]
+        plot_simplex_edges(simplex_pts, ax)
+
 
 def PlotMeshes(mesh_points_list, cell_vecs, atoms, offset = np.asarray([0.,0.,0.])):
     """Create a 3D scatter plot of a set of mesh points inside a cell.
@@ -358,16 +406,17 @@ def PlotSphereMesh(mesh_points,r2, offset = np.asarray([0.,0.,0.]),
         plt.show()
     return None
 
-def plot_band_structure(materials_list, PPlist, PPargs_list, lattice, npts,
+def plot_band_structure(materials_list, EPMlist, EPMargs_list, lattice, npts,
                         neigvals, energy_shift=0.0, energy_limits=False,
-                        fermi_level=False, save=False, show=True):
+                        fermi_level=False, save=False, show=True, sum_bands=None,
+                        plot_below=False, ax=None):
     """Plot the band structure of a pseudopotential along symmetry paths.
     
     Args:
         materials_list (str): a list of materials whose bandstructures will be 
         plotted. The first string will label figures and files.
-        PPlist (function): a list of pseudopotenial functions.
-        PPargs_list (list): a list of pseudopotential arguments as dictionaries.
+        EPMlist (function): a list of pseudopotenial functions.
+        EPMargs_list (list): a list of pseudopotential arguments as dictionaries.
         lattice
         npts (int): the number of points to plot along each symmetry line.
         neigvals (int): the number of lower-most eigenvalues to include 
@@ -381,13 +430,13 @@ def plot_band_structure(materials_list, PPlist, PPargs_list, lattice, npts,
     Returns:
         Display or save the band structure.
     """
+
+    if ax is None:
+        fig, ax = plt.subplots()
     
-    # k-points between symmetry point pairs in lattice coordinates.
-    lat_kpoints = sym_path(lattice, npts)
-
     # k-points between symmetry point pairs in Cartesian coordinates.
-    car_kpoints = [np.dot(lattice.reciprocal_vectors, k) for k in lat_kpoints]
-
+    car_kpoints = sym_path(lattice, npts, cart=True)
+    
     # Find the distance of each symmetry path by putting the symmetry point pairs 
     # that make up a path in lattice coordinates, converting to Cartesian, and then
     # taking the norm of the difference of the pairs.
@@ -413,15 +462,24 @@ def plot_band_structure(materials_list, PPlist, PPargs_list, lattice, npts,
             lines += list(np.delete(np.linspace(start, stop, npts),-1))
             
     # Store the energy eigenvalues in an nested array.
-    nPP = len(PPlist)
-    energies = [[] for i in range(nPP)]
-    for i in range(nPP):
-        PP = PPlist[i]
-        PPargs = PPargs_list[i]
-        PPargs["neigvals"] = neigvals
+    nEPM = len(EPMlist)
+    energies = [[] for i in range(nEPM)]
+    for i in range(nEPM):
+        EPM = EPMlist[i]
+        EPMargs = EPMargs_list[i]
+        EPMargs["neigvals"] = neigvals
         for kpt in car_kpoints:
-            PPargs["kpoint"] = kpt
-            energies[i].append(PP.eval(**PPargs) - energy_shift)
+            EPMargs["kpoint"] = kpt
+            energies[i].append(EPM.eval(**EPMargs) - energy_shift)
+            # energies[i].append(EPM.eval(**EPMargs))
+
+
+    colors = ["blue", "green", "red", "violet", "orange", "cyan", "black"]            
+    energies = np.array(energies)
+    if plot_below:
+        colors = ["red", "blue", "green", "violet", "orange", "cyan", "black"]        
+        for i in range(nEPM):
+            energies[i][energies[i] > EPMlist[i].fermi_level] = np.nan
             
     # Find the x-axis labels and label locations.
     plot_xlabels = [lattice.symmetry_paths[0][0]]
@@ -438,40 +496,51 @@ def plot_band_structure(materials_list, PPlist, PPargs_list, lattice, npts,
     plot_xlabel_pos.append(np.sum(distances))    
 
     # Plot the energy dispersion curves one at a time.
-    colors = ["blue", "green", "red", "violet", "orange", "cyan", "black"]
-    for i in range(nPP):
-        for ne in range(neigvals):
+    for i in range(nEPM):
+        if sum_bands is not None:
             ienergy = []
             for nk in range(len(car_kpoints)):
-                ienergy.append(energies[i][nk][ne])
-            if ne == 0:
-                plt.plot(lines, ienergy, color=colors[i], label="%s"%materials_list[i])
-            else:
-                plt.plot(lines, ienergy, color=colors[i])
+                tmp_energies = np.array(energies[i][nk][:neigvals])
+                # print("tmp energies: ", tmp_energies)
+                # print("all included bands: ", tmp_energies[np.where(tmp_energies < sum_bands)])
+                ienergy.append(np.sum(tmp_energies[np.where(tmp_energies < sum_bands)]))
+            ax.plot(lines, ienergy, color=colors[i], label="%s"%materials_list[i])
+        else:
+            for ne in range(neigvals):
+                ienergy = []
+                for nk in range(len(car_kpoints)):
+                    ienergy.append(energies[i][nk][ne])                    
+                if ne == 0:
+                    ax.plot(lines, ienergy, color=colors[i], label="%s"%materials_list[i])
+                else:
+                    ax.plot(lines, ienergy, color=colors[i])
 
     # Plot the Fermi level if provided.
-    if type(fermi_level) != bool:
-        plt.axhline(y = fermi_level, c="yellow", label="Fermi level")
+    if fermi_level:
+        ax.axhline(y = EPMlist[0].fermi_level, c="yellow", label="Fermi level")
 
     # Plot a vertical line at the symmetry points with proper labels.
     for pos in plot_xlabel_pos:
-        plt.axvline(x = pos, c="gray")
-    plt.xticks(plot_xlabel_pos, plot_xlabels)
+        ax.axvline(x = pos, c="gray")
+    plt.xticks(plot_xlabel_pos, plot_xlabels, fontsize=14)
 
     # Adjust the energy range if one was provided.
     if energy_limits:
-        plt.ylim(energy_limits)
+        ax.set_ylim(energy_limits)
     
     # Adjust the legend.
-    lgd = plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.xlim([0,np.sum(distances)])
-    plt.xlabel("Symmetry points")
-    plt.ylabel("Energy (eV)")
-    plt.title("%s Band Structure" %materials_list[0])
-    plt.grid(linestyle="dotted")
+    # lgd = ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    ax.set_xlim([0,np.sum(distances)])
+    ax.set_xlabel("Symmetry points", fontsize=16)
+    ax.set_ylabel("Energy (eV)", fontsize=16)
+    ax.set_title("%s Band Structure" %materials_list[0], fontsize=16)
+    ax.grid(linestyle="dotted")
     if save:
+        # ax.savefig("%s_band_structure.pdf" %materials_list[0],
+        #             bbox_extra_artists=(lgd,), bbox_inches='tight')
         plt.savefig("%s_band_structure.pdf" %materials_list[0],
-                    bbox_extra_artists=(lgd,), bbox_inches='tight')
+                    bbox_inches='tight')
+        
     if show:
         plt.show()
     return None
@@ -685,15 +754,12 @@ def PlotVaspBandStructure(file_loc, material, lat_type, lat_consts, lat_angles,
         return None
 
 
-def plot_paths(PP, npts, save=False):
+def plot_paths(EPM, npts, save=False):
     """Plot the path along which the band structure is plotted.
     """
     
-    # k-points between symmetry point pairs in lattice coordinates.
-    lat_kpoints = sym_path(PP.lattice, npts)
-
     # k-points between symmetry point pairs in Cartesian coordinates.
-    car_kpoints = [np.dot(PP.lattice.reciprocal_vectors, k) for k in lat_kpoints]
+    car_kpoints = sym_path(EPM.lattice, npts, cart=True)
 
     # Plot the paths.
     fig = plt.figure()
@@ -705,9 +771,9 @@ def plot_paths(PP, npts, save=False):
     ax.plot(x,y,z)
 
     # Label the paths.
-    sympt_labels = list(PP.lattice.symmetry_points.keys())
-    sympts = [np.dot(PP.lattice.reciprocal_vectors, p) for p in
-              list(PP.lattice.symmetry_points.values())]
+    sympt_labels = list(EPM.lattice.symmetry_points.keys())
+    sympts = [np.dot(EPM.lattice.reciprocal_vectors, p) for p in
+              list(EPM.lattice.symmetry_points.values())]
 
     x_list = [sp[0] for sp in sympts]
     y_list = [sp[1] for sp in sympts]
@@ -719,8 +785,9 @@ def plot_paths(PP, npts, save=False):
     plt.show()
 
 
-def create_convergence_plot(PP, ndivisions, degree, exact_fl, improved, symmetry,
-                            PP_name, file_names, location, err_correlation=False):
+def create_convergence_plot(EPM, ndivisions, exact_fl, improved, symmetry,
+                            file_names, location, err_correlation=False,
+                            convention="ordinary", degree=None):
     """Create a convergence plot of the total energy fermi level convergence for the
     free elecetron model.
     
@@ -730,7 +797,7 @@ def create_convergence_plot(PP, ndivisions, degree, exact_fl, improved, symmetry
         exact_fl (bool): if true fix the Fermi level at the exact value.
         improved (bool): if true include the improved tetrahedron method.
         symmetry (bool): if true, use symmetry reduction with tetrahedron method.
-        PP_name (str): the name of the pseudopotential, and the folder in which
+        EPM_name (str): the name of the pseudopotential, and the folder in which
             it is saved.
         file_names (list): a list of file name strings. The first corresponds to 
             the name of the ferme level plot; the second the total energy.
@@ -756,20 +823,20 @@ def create_convergence_plot(PP, ndivisions, degree, exact_fl, improved, symmetry
     sym_tet_te_err = []
     
     # Figures
-    fermi_fig = plt.figure()
-    fermi_axes = fermi_fig.add_subplot(1,1,1)
-    energy_fig = plt.figure()
-    energy_axes = energy_fig.add_subplot(1,1,1)
+    fermi_fig, fermi_axes = plt.subplots()
+    energy_fig, energy_axes = plt.subplots()
 
     # Offsets for the tetrahedron method.
     lat_shift = [-1./2]*3
     grid_shift = [0,0,0]
-    
-    
-    if PP_name == "Single Free Electron":
-        PP.set_degree(degree)
+
+    # Change the degree for the free electron model.
+    if degree is not None:
+        EPM.set_degree(degree)
+
+    # Make the Fermi level exact if selected.
     if exact_fl:
-        PP.fermi_level = PP.fermi_level_ans
+        EPM.fermi_level = EPM.fermi_level_ans
     
     tot_timei = time.time()
     for ndivs in ndivisions:
@@ -777,74 +844,77 @@ def create_convergence_plot(PP, ndivisions, degree, exact_fl, improved, symmetry
         t0 = time.time()
         
         # Create the grid for rectangles
-        grid_consts = [ndivs]*3
+        grid_consts = np.array(EPM.lattice.constants)*ndivs
         grid_angles = [np.pi/2]*3
         grid_centering = "prim"
         grid_vecs = make_ptvecs(grid_centering, grid_consts, grid_angles)
-        rgrid_vecs = make_rptvecs(grid_vecs)
-        offset = np.dot(inv(rgrid_vecs), -np.sum(PP.lattice.reciprocal_vectors, 1)/2) + (
+        rgrid_vecs = make_rptvecs(grid_vecs, convention)
+        offset = np.dot(inv(rgrid_vecs), -np.sum(EPM.lattice.reciprocal_vectors, 1)/2) + (
                                                  [0.5]*3)
         # Calculate the Fermi level, if applicable, and total energy for the rectangular method.
         # Calculate percent error for each.
-        grid = make_grid(PP.lattice.reciprocal_vectors, rgrid_vecs, offset)
+        grid = make_cell_points(EPM.lattice.reciprocal_vectors, rgrid_vecs, offset)
         weights = np.ones(len(grid), dtype=int)
         
         # Calculate errors using rectangle method with symmetry.
         if symmetry:
-            sym_grid, sym_weights = reduce_kpoint_list(grid, PP.lattice.reciprocal_vectors, 
-                                                        rgrid_vecs, offset)
+            sym_grid, sym_weights = find_orbits(grid, EPM.lattice.reciprocal_vectors,
+                                                rgrid_vecs, offset)
             if not exact_fl:
-                PP.fermi_level = rectangular_fermi_level(PP, sym_grid, sym_weights)
-                sym_rec_fl_err.append( abs(PP.fermi_level - 
-                                           PP.fermi_level_ans)/PP.fermi_level_ans*100)
-            PP.total_energy = rectangular_method(PP, sym_grid, sym_weights)
-            sym_rec_te_err.append( abs(PP.total_energy - 
-                                       PP.total_energy_ans)/PP.total_energy_ans*100)
+                EPM.fermi_level = rectangular_fermi_level(EPM, sym_grid, sym_weights)
+                sym_rec_fl_err.append( abs(EPM.fermi_level - 
+                                           EPM.fermi_level_ans)/EPM.fermi_level_ans*100)
+            EPM.total_energy = rectangular_method(EPM, sym_grid, list(sym_weights))
+            sym_rec_te_err.append( abs(EPM.total_energy - 
+                                       EPM.total_energy_ans)/EPM.total_energy_ans*100)
 
         # Rectangle Fermi level
         if not exact_fl:
-            PP.fermi_level = rectangular_fermi_level(PP, grid, weights)
-            print("rectangles: ", PP.fermi_level)
-            rec_fl_err.append( abs(PP.fermi_level - PP.fermi_level_ans)/PP.fermi_level_ans*100)
+            EPM.fermi_level = rectangular_fermi_level(EPM, grid, weights)
+            print("rectangles: ", EPM.fermi_level)
+            rec_fl_err.append( abs(EPM.fermi_level - EPM.fermi_level_ans)/EPM.fermi_level_ans*100)
             
         # Rectangle Total energy
-        PP.total_energy = rectangular_method(PP, grid, weights)
-        rec_te_err.append( abs(PP.total_energy - PP.total_energy_ans)/PP.total_energy_ans*100)
+        EPM.total_energy = rectangular_method(EPM, grid, weights)
+        print("rectangles te: ", EPM.total_energy)
+        # rec_te.append(EPM.total_energy)
+        rec_te_err.append( abs(EPM.total_energy - EPM.total_energy_ans)/EPM.total_energy_ans*100)
 
         # Calculate grid, tetrahedra, and weights for tetrahedron method.
-        grid, tetrahedra = grid_and_tetrahedra(PP, ndivs, lat_shift, grid_shift)
+        grid, tetrahedra = grid_and_tetrahedra(EPM, ndivs, lat_shift, grid_shift)
         weights = np.ones(len(tetrahedra), dtype=int)
-        
+
         # Calculate errors using tetrahedron method and symmetry reduction.
         if symmetry:
-            irr_tet, tet_weights = find_irreducible_tetrahedra(PP, tetrahedra, grid)
+            irr_tet, tet_weights = find_irreducible_tetrahedra(EPM, tetrahedra, grid)
             if not exact_fl:
-                PP.fermi_level = calc_fermi_level(PP, irr_tet, tet_weights, grid, tol=1e-8)
-                sym_tet_fl_err.append( abs(PP.fermi_level - PP.fermi_level_ans)/PP.fermi_level_ans*100)
+                EPM.fermi_level = calc_fermi_level(EPM, irr_tet, tet_weights, grid, tol=1e-8)
+                sym_tet_fl_err.append( abs(EPM.fermi_level - EPM.fermi_level_ans)/EPM.fermi_level_ans*100)
         
-            PP.total_energy = calc_total_energy(PP, irr_tet, tet_weights, grid)
-            sym_tet_te_err.append( abs(PP.total_energy - PP.total_energy_ans)/PP.total_energy_ans*100)
+            EPM.total_energy = calc_total_energy(EPM, irr_tet, tet_weights, grid)
+            sym_tet_te_err.append( abs(EPM.total_energy - EPM.total_energy_ans)/EPM.total_energy_ans*100)
 
         if not exact_fl:
-            PP.fermi_level = calc_fermi_level(PP, tetrahedra, weights, grid, tol=1e-8)
-            print("tetrahedra: ", PP.fermi_level)
-            tet_fl_err.append( abs(PP.fermi_level - PP.fermi_level_ans)/PP.fermi_level_ans*100)
+            EPM.fermi_level = calc_fermi_level(EPM, tetrahedra, weights, grid, tol=1e-8)
+            print("tetrahedra: ", EPM.fermi_level)
+            tet_fl_err.append( abs(EPM.fermi_level - EPM.fermi_level_ans)/EPM.fermi_level_ans*100)
 
         # Calculate the error for the tetrahedron method.
-        PP.total_energy = calc_total_energy(PP, tetrahedra, weights, grid)
-        tet_te_err.append( abs(PP.total_energy - PP.total_energy_ans)/PP.total_energy_ans*100)
+        EPM.total_energy = calc_total_energy(EPM, tetrahedra, weights, grid)
+        print("tetrahedra te ", EPM.total_energy)
+        tet_te_err.append( abs(EPM.total_energy - EPM.total_energy_ans)/EPM.total_energy_ans*100)
 
         # Calculate the error for the corrected tetrahedron method.
         if improved:
             ndiv0 = [ndivs]*3
-            extended_grid, extended_tetrahedra = get_extended_tetrahedra(PP, ndivs, lat_shift, grid_shift)
-            PP.total_energy = get_corrected_total_energy(PP, tetrahedra, extended_tetrahedra,
+            extended_grid, extended_tetrahedra = get_extended_tetrahedra(EPM, ndivs, lat_shift, grid_shift)
+            EPM.total_energy = get_corrected_total_energy(EPM, tetrahedra, extended_tetrahedra,
                                                          grid, extended_grid, ndiv0)
-            ctet_te_err.append( abs(PP.total_energy - PP.total_energy_ans)/PP.total_energy_ans*100)
+            ctet_te_err.append( abs(EPM.total_energy - EPM.total_energy_ans)/EPM.total_energy_ans*100)
         print("run time", time.time() - t0)            
     
     # Location where plots are saved.
-    loc = location + "/" + PP.name + "/"
+    loc = os.path.join(location, EPM.material)
     
     # Plot errors.
     if not exact_fl:
@@ -854,14 +924,15 @@ def create_convergence_plot(PP, ndivisions, degree, exact_fl, improved, symmetry
             fermi_axes.loglog(np.array(ndivisions)**3, sym_rec_fl_err,label="Reduced Rectangles")
             fermi_axes.loglog(np.array(ndivisions)**3, sym_tet_fl_err,label="Reduced Tetrahedra")
         
-        fermi_axes.set_title(PP_name + " Fermi Level Convergence")
+        fermi_axes.set_title(EPM.material + " Fermi Level Convergence")
         fermi_axes.set_xlabel("Number of k-points")
         fermi_axes.set_ylabel("Percent Error")
         fermi_axes.legend(loc="best")    
-        
-        fermi_fig.savefig(loc + "degree_" + "%i"%degree + "/" + file_names[0]+".pdf")
+        fermi_fig_name = os.path.join(loc, file_names[0] + ".pdf")
+        fermi_fig.savefig(fermi_fig_name)
 
-        
+    print("rectangles ", rec_te_err)
+    print("tetrahedra ", tet_te_err)
     energy_axes.loglog(np.array(ndivisions)**3, rec_te_err,label="Rectangles")
     energy_axes.loglog(np.array(ndivisions)**3, tet_te_err,label="Tetrahedra")
     
@@ -872,12 +943,12 @@ def create_convergence_plot(PP, ndivisions, degree, exact_fl, improved, symmetry
         energy_axes.loglog(np.array(ndivisions)**3, sym_rec_te_err,label="Reduced Rectangles")
         energy_axes.loglog(np.array(ndivisions)**3, sym_tet_te_err,label="Reduced Tetrahedra")
     
-    energy_axes.set_title(PP_name + " Total Energy Convergence")
+    energy_axes.set_title(EPM.material + " Total Energy Convergence")
     energy_axes.set_xlabel("Number of k-points")
     energy_axes.set_ylabel("Percent Error")
     energy_axes.legend(loc="best")
-    
-    energy_fig.savefig(loc + "degree_" + "%i"%degree + "/" + file_names[1]+".pdf")
+    energy_fig_name = os.path.join(loc, file_names[1] + ".pdf")
+    energy_fig.savefig(energy_fig_name)
     
     if (not exact_fl) and err_correlation:
         corr_fig = plt.figure()
@@ -888,25 +959,24 @@ def create_convergence_plot(PP, ndivisions, degree, exact_fl, improved, symmetry
 
         corr_axes.set_xscale("log")
         corr_axes.set_yscale("log")
-        corr_axes.set_title(PP_name + " Error Correlation")
+        corr_axes.set_title(EPM.material + " Error Correlation")
         corr_axes.set_xlabel("Percent Error Fermi Level")
         corr_axes.set_ylabel("Percent Error Total Energy")
         corr_axes.legend(loc="best")
-        
-        corr_fig.savefig(loc + "degree_" + "%i"%degree + "/" + file_names[2]+".pdf")
+        corr_fig_name = os.path.join(loc, file_names[2] + ".pdf")
+        corr_fig.savefig(corr_fig_name)
 
     tot_timef = time.time()
-
     print("total elapsed time: ", (tot_timef - tot_timei)/60, " minutes")
 
 
-def plot_states(PP, grid, tetrahedra, weights, method, energy_list, quantity, nbands, answer,
+def plot_states(EPM, grid, tetrahedra, weights, method, energy_list, quantity, nbands, answer,
                            title, xlimits, ylimits, labels, bin_size=0.1, show=True, save=False,
                            root_dir=None):
     """Plot the density of states and the correct density of states.
 
     Args:
-        PP (:py:obj:`BZI.pseudopots.EmpiricalPP`): an instance of a pseudopotential class.
+        EPM (:py:obj:`BZI.pseudopots.EmpiricalPseudopotential`): an instance of a pseudopotential class.
         grid (numpy.ndarray): a list of grid point over which the density of states is calculated.
         tetrahedra (list or numpy.ndarray): a list of tetrahedra given district labels by a quadruple
             of grid indices
@@ -928,10 +998,10 @@ def plot_states(PP, grid, tetrahedra, weights, method, energy_list, quantity, nb
     """
 
     if method == "rectangles":        
-        energies = np.sort(np.array([PP.eval(g, nbands) for g in grid]).flatten())
+        energies = np.sort(np.array([EPM.eval(g, nbands) for g in grid]).flatten())
         dE = bin_size
-        dV = PP.lattice.reciprocal_volume/len(grid)
-        V = PP.lattice.reciprocal_volume
+        dV = EPM.lattice.reciprocal_volume/len(grid)
+        V = EPM.lattice.reciprocal_volume
         Ei = 0
         Ef = 0
         dos = [] # density of states
@@ -943,8 +1013,8 @@ def plot_states(PP, grid, tetrahedra, weights, method, energy_list, quantity, nb
             dos.append( len(energies[(Ei <= energies) & (energies < Ef)])/(len(grid)*dE)*2)
             nos.append(np.sum(dos)*dE)
             Ei += dE
-        if PP.degree:
-            answer_list = [answer(en, PP.degree) for en in energy_list]
+        if EPM.degree:
+            answer_list = [answer(en, EPM.degree) for en in energy_list]
         else:
             answer_list = [answer(en) for en in energy_list]
 
@@ -970,7 +1040,7 @@ def plot_states(PP, grid, tetrahedra, weights, method, energy_list, quantity, nb
             plt.show()
 
     elif method == "tetrahedra":
-        VG = PP.lattice.reciprocal_volume
+        VG = EPM.lattice.reciprocal_volume
         VT = VG/len(weights)
         dos = np.zeros(len(energy_list))
         nos = np.zeros(len(energy_list))
@@ -980,21 +1050,21 @@ def plot_states(PP, grid, tetrahedra, weights, method, energy_list, quantity, nb
             for i,energy in enumerate(energy_list):
                 for tet in tetrahedra:
                     for band in range(nbands):
-                        tet_energies = np.sort([PP.eval(grid[j], nbands)[band] for j in tet])
+                        tet_energies = np.sort([EPM.eval(grid[j], nbands)[band] for j in tet])
                         dos[i] += density_of_states(VG, VT, tet_energies, energy)
 
         elif quantity == "nos":
             for i,energy in enumerate(energy_list):
                 for tet in tetrahedra:
                     for band in range(nbands):
-                        tet_energies = np.sort([PP.eval(grid[j], nbands)[band] for j in tet])
+                        tet_energies = np.sort([EPM.eval(grid[j], nbands)[band] for j in tet])
                         nos[i] += number_of_states(VG, VT, tet_energies, energy)
         else:
             msg = "The supported quantities are dos and nos."
             raise ValueError(msg.format(quantity))
                                 
-        if PP.degree:
-            answer_list = [answer(en, PP.degree) for en in energy_list]
+        if EPM.degree:
+            answer_list = [answer(en, EPM.degree) for en in energy_list]
         else:
             answer_list = [answer(en) for en in energy_list]
             
@@ -1219,3 +1289,174 @@ def plot_states_data(EPM, file_location, file_number, file_name, quantity, metho
     plt.ylim(ylimits[0], ylimits[1])
     plt.legend(loc="best")
     plt.savefig(file_prefix + "/" + file_name + ".pdf")
+
+
+def plot_simplex_edges(vertices, axes, color="blue"):
+    """Plot the edges of a 3-simplex.
+
+    Args:
+        vertices (numpy.ndarray): a list of simplex vertices.
+        axes (matplotlib.axes)
+    """
+
+    if len(vertices) == 3:
+        vertices = np.append(vertices, [vertices[0]], axis=0)
+    
+    for i in range(len(vertices)-1):
+        xstart = vertices[i][0]
+        xfinish = vertices[i+1][0]
+        xs = np.linspace(xstart, xfinish, 100)
+        ystart = vertices[i][1]
+        yfinish = vertices[i+1][1]
+        ys = np.linspace(ystart, yfinish, 100)
+        zstart = vertices[i][2]
+        zfinish = vertices[i+1][2]
+        zs = np.linspace(zstart, zfinish, 100)
+        axes.plot(xs, ys, zs, c=color)
+
+
+def plot_bz(bz, symmetry_points=None, remove=True, ax=None, color="blue"):
+    """Plot a Brillouin zone
+    
+    Args:
+        BZ (scipy.spatial.ConvexHull): a convex hull object.
+        symmetry_points (dict): a dictionary of symmetry points in Cartesian coordinates.
+        remove (bool): if True, plot the facets instead of the simplices that make up the
+            boundary of the Brillouin zone or irreducible Brilloun zone.
+        ax (matplotlib.axes): an axes object.
+    """
+
+    fig = plt.figure()
+    if ax == None:
+        ax = fig.gca(projection='3d')
+    ax.set_aspect('equal')
+    
+    if symmetry_points != None:
+        eps = np.average(list(symmetry_points.values()))*0.05
+        for spt in symmetry_points.keys():
+            coords = symmetry_points[spt]
+            ax.scatter(coords[0], coords[1], coords[2], c="black")
+            ax.text(coords[0] + eps, coords[1] + eps, coords[2] + eps, spt, size=14)
+
+    if remove:
+        facet_list = []
+        equations = list(deepcopy(bz.equations))
+        simplices = list(deepcopy(bz.points[bz.simplices]))
+        while len(equations) != 0:
+            equation, equations = equations[-1], equations[:-1]            
+            facet, simplices = simplices[-1], simplices[:-1]
+            indices = find_point_indices(equation, equations)
+            
+            if len(indices) > 0:
+                # Remove duplicate equations from the list of equations
+                equations_to_remove = [equations[i] for i in indices]
+                for eq in equations_to_remove:
+                    equations = remove_points(equation, equations)
+                
+                # Find all simplices that lie on the same plane to get the facet.
+                simplices_to_remove = []
+                for index in indices:
+                    facet = np.append(facet, simplices[index], axis=0)                    
+                    simplices_to_remove.append(simplices[index])
+                
+                for s in simplices_to_remove:
+                    simplices = remove_points(s, simplices)
+                
+                # Remove duplicate points on facet.
+                unique_facet = []
+                for pt in facet:
+                    if not check_contained(pt, unique_facet):
+                        unique_facet.append(pt)
+                facet_list.append(orderAngle(unique_facet))
+            else:
+                facet_list.append(orderAngle(facet))
+
+        
+        for facet in facet_list:
+            # We want to plot all the edges, so we append the last vertex to the
+            # beginning of the facet.
+            facet = np.append(facet, [facet[0]], axis=0)
+            plot_simplex_edges(facet, ax, color=color)
+    else:
+        for simplex in bz.simplices:
+            # We're going to plot lines between the vertices of the simplex.
+            # To make sure we make it all the way around, append the first element
+            # to the end of the simplex.
+            simplex = np.append(simplex, simplex[0])
+            simplex_pts = [bz.points[i] for i in simplex]
+            plot_simplex_edges(simplex_pts, ax, color=color)
+    plt.close()
+
+
+def plot_all_bz(lat_type, lat_vecs, grid=None, sympts=None, ax=None, convention="ordinary"):
+    """Plot the Brillouin zone and optionally the irreducible Brillouin zone and points
+    within the Brillouin zone.
+
+    Args:
+        lat_type (str): the lattice type, such as 'simple cubic'
+        lat_vecs (numpy.ndarray): a 3x3 array with lattice vectors as columns.
+        grid (list or numpy.ndarray): a list of list or 2D array of points to plot.
+        sympts (list or numpy.ndarray): a dictionary whose key is the Greek or Roman
+            letter representing the symmetry point. The corresponding value is the 
+            coordinate of the point in lattice coordinates.
+        ax (matplotlib.axes): an axes object.
+        convention (str): the convention for finding the reciprocal lattice vectors.
+            Options include 'ordinary' and 'angular'.
+    """
+    
+    rlat_vecs = make_rptvecs(lat_vecs, convention=convention)
+    bz = find_bz(rlat_vecs)
+    plot_bz(bz, ax=ax)    
+    
+    if sympts is not None:
+        # Get the vertices of the IBZ.
+        ibz_vertices = list(sympts.values())
+        ibz_vertices = [np.dot(rlat_vecs, v) for v in ibz_vertices]
+        
+        # Get the symmetry points in Cartesian coordinates.
+        sympts_cart = {}
+        for spt in sympts.keys():
+            sympts_cart[spt] = np.dot(rlat_vecs, sympts[spt])
+
+        ibz = ConvexHull(ibz_vertices)
+        plot_bz(ibz, sympts_cart, ax=ax, color="red")
+
+    if grid is not None:
+        plot_just_points(grid, ax)
+
+class Arrow3D(FancyArrowPatch):
+    def __init__(self, xs, ys, zs, *args, **kwargs):
+        FancyArrowPatch.__init__(self, (0,0), (0,0), *args, **kwargs)
+        self._verts3d = xs, ys, zs
+
+    def draw(self, renderer):
+        xs3d, ys3d, zs3d = self._verts3d
+        xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, renderer.M)
+        self.set_positions((xs[0],ys[0]),(xs[1],ys[1]))
+        FancyArrowPatch.draw(self, renderer)            
+
+            
+def plot_vecs(vecs, colors, labels):
+    """Plot a list of vectors."""
+
+    xmin = min([vecs[i][0] for i in range(len(vecs))])
+    xmax = max([vecs[i][0] for i in range(len(vecs))])
+    ymin = min([vecs[i][1] for i in range(len(vecs))])
+    ymax = max([vecs[i][1] for i in range(len(vecs))])
+    zmin = min([vecs[i][2] for i in range(len(vecs))])
+    zmax = max([vecs[i][2] for i in range(len(vecs))])
+    
+    fig = plt.figure(figsize=(15,15))
+    ax = fig.add_subplot(111, projection='3d')
+    for i,v in enumerate(vecs):
+        arrow = Arrow3D([0,v[0]], [0,v[1]], [0,v[2]],
+                        mutation_scale=20, lw=3,
+                        arrowstyle="-|>", color=colors[i])
+
+        ax.text(v[0], v[1], v[2], labels[i])
+        ax.add_artist(arrow)
+    ax.set_xlim(xmin,xmax)
+    ax.set_ylim(ymin,ymax)
+    ax.set_zlim(zmin,zmax)
+    plt.legend()
+    plt.show()

@@ -13,7 +13,8 @@ angstrom_to_Bohr = 1.889725989
 Ry_to_eV = 13.605698066
 isclose = np.vectorize(np.isclose)
 
-class EmpiricalPP(object):
+
+class EmpiricalPseudopotential(object):
     """Create an empirical pseudopotential.
 
     Args:
@@ -58,7 +59,7 @@ class EmpiricalPP(object):
         >>> cutoff = 4*(2*np.pi/lat_const)**2
         >>> atomic_positions = [0.,0.,0.]
         >>> Nvalence_electrons = 3
-        >>> PP = EmpiricalPP(lattice, pff, cutoff, nvalence_electrons,
+        >>> EPM = EmpiricalPseudopotential(lattice, pff, cutoff, nvalence_electrons,
         >>>                  atomic_positions)
     """
     
@@ -70,21 +71,25 @@ class EmpiricalPP(object):
         self.form_factors = form_factors
         self.energy_cutoff = energy_cutoff
         if np.shape(atomic_positions) == (3,):
-            msg = ("Please provide a list of atomic positions instead of an "
-                   "individual atomic position.")
+            msg = ("Please provide a list of atomic positions instead of a "
+                   "single atomic position.")
             raise ValueError(msg.format(atomic_positions))
         else:
             self.atomic_positions = atomic_positions
+            
         self.rlat_pts = sphere_pts(self.lattice.reciprocal_vectors,
                                    self.energy_cutoff)
         self.find_energy_shells()
+        self.energy_cutoff = self.energy_shells[len(self.form_factors)]
+        self.rlat_pts = sphere_pts(self.lattice.reciprocal_vectors,
+                                   self.energy_cutoff)
         self.nvalence_electrons = nvalence_electrons
         self.energy_shift = energy_shift or 0.
         self.fermi_level = fermi_level or 0.
-        self.total_energy = total_energy or 0.
+        self.total_energy = total_energy or 0.        
         self.init_hamiltonian = self.hamiltonian([0.]*3) - np.diag(
             np.diag(self.hamiltonian([0.]*3)))
-
+        
     def find_energy_shells(self):
         """Find the spherical shells of constant energy on which the points in
         rlat_pts reside. These are ordered from least to greatest.
@@ -99,18 +104,27 @@ class EmpiricalPP(object):
                 
         self.energy_shells = np.sort(shells)
 
-                
+    
     def eval(self, kpoint, neigvals, adjust=False):
         """Evaluate the empirical pseudopotential eigenvalues at the provided
         k-point. Only return the lowest 'neigvals' eigenvalues.
+
+        Args:
+            kpoint (numpy.ndarray): a k-point
+            neigvals (int): the number of eigenvalues to return
+            adjust (bool): if true, the Fourier expansion will be performed about
+                the k-point being considered.
         """
+        
 
         if adjust:
+            # Find all the reciprocal lattice points within a sphere surrounding the
+            # k-point being considered.
             rlat_pts = sphere_pts(self.lattice.reciprocal_vectors,
-                                  self.energy_cutoff)
+                                  self.energy_cutoff, offset=kpoint)
             # Calculate the diagonal elements of the Hamiltonian.
-            diag = np.eye(len(rlat_pts))*np.apply_along_axis(norm, 1,
-                                                             rlat_pts + kpoint)**2
+            diag = np.eye(len(rlat_pts))*list(map(lambda x: np.dot(x,x),
+                                                  rlat_pts + kpoint))
             # For some reason the lattice points need to be double nested for
             # numpy.tile to work.
             nested_rlatpts = np.array([[rlp] for rlp in rlat_pts])
@@ -133,31 +147,26 @@ class EmpiricalPP(object):
             return np.sort(np.linalg.eigvalsh(H + diag))[:neigvals]*Ry_to_eV
 
         else:
+            diag = np.eye(len(self.rlat_pts))*list(map(lambda x: np.dot(x,x),
+                                                       self.rlat_pts + kpoint))
             if np.allclose(self.atomic_positions, [[0.]*3]):
-                diag = np.eye(len(self.rlat_pts))*np.apply_along_axis(
-                    norm, 1, self.rlat_pts + kpoint)**2 
                 H = self.init_hamiltonian + diag*Ry_to_eV
             else:
-                # Calculate the diagonal elements of the Hamiltonian.
-                diag = np.eye(len(self.rlat_pts))*np.apply_along_axis(
-                    norm, 1, self.rlat_pts + kpoint)**2
                 # For some reason the lattice points need to be double nested for
                 # numpy.tile to work.
-                # nested_rlatpts = np.array([[rlp] for rlp in self.rlat_pts])
+                nested_rlatpts = np.array([[rlp] for rlp in self.rlat_pts])
                 # Create a matrix of reciprocal lattice points where the first
                 # lattice point is repeated acroass the first row, the second
                 # lattice point the second row, and so on.
-                # rlatpt_mat = np.tile(nested_rlatpts,(len(self.rlat_pts),1))
+                rlatpt_mat = np.tile(nested_rlatpts,(len(self.rlat_pts),1))
                 # Create a matrix of the differences of the lattice points. Each
                 # element is given by a_i - a_j.
-                # rlp_diff = rlatpt_mat - np.transpose(rlatpt_mat, (1,0,2))
+                rlp_diff = rlatpt_mat - np.transpose(rlatpt_mat, (1,0,2))
                 # Calculate the phase portion of the Hamiltonian matrix elements.
-                # phase_mat = np.dot(rlp_diff, np.sum(self.atomic_positions,0))
-                
-                # H = self.init_hamiltonian*np.exp(-1j*phase_mat) + diag*Ry_to_eV
-                H = self.init_hamiltonian + diag*Ry_to_eV
+                phase_mat = np.dot(rlp_diff, np.sum(self.atomic_positions,0))                
+                H = self.init_hamiltonian*np.exp(-1j*phase_mat) + diag*Ry_to_eV
             return np.sort(np.linalg.eigvalsh(H))[:neigvals]
-    
+        
     def hamiltonian(self, kpoint):
         """Evaluate the empirical pseudopotential Hamiltonian at the provided
         k-point. This function is typically used to verify the Hamiltonian is 
@@ -165,8 +174,9 @@ class EmpiricalPP(object):
         """
         
         # Calculate the diagonal elements of the Hamiltonian.
-        diag = np.eye(len(self.rlat_pts))*np.apply_along_axis(norm, 1,
-                                                              self.rlat_pts + kpoint)**2
+        diag = np.eye(len(self.rlat_pts))*list(map(lambda x: np.dot(x,x),
+                                                   self.rlat_pts + kpoint))
+        
         # For some reason the lattice points need to be double nested for
         # numpy.tile to work.
         nested_rlatpts = np.array([[rlp] for rlp in self.rlat_pts])
@@ -187,7 +197,8 @@ class EmpiricalPP(object):
                 H[np.isclose(r2_mat, self.energy_shells[i])] = self.form_factors[i]
         return (H + diag)*Ry_to_eV
 
-class CohenEmpiricalPP(object):
+
+class CohenEmpiricalPseudopotential(object):
     """Create an empirical pseudopotential after Cohen's derivation.
 
     Args:
@@ -250,6 +261,9 @@ class CohenEmpiricalPP(object):
         self.rlat_pts = sphere_pts(self.lattice.reciprocal_vectors,
                                     self.energy_cutoff)
         self.find_energy_shells()
+        self.energy_cutoff = self.energy_shells[len(self.sym_form_factors)]
+        self.rlat_pts = sphere_pts(self.lattice.reciprocal_vectors,
+                                   self.energy_cutoff)
         self.nvalence_electrons = nvalence_electrons
         self.energy_shift = energy_shift or 0.
         self.fermi_level = fermi_level or 0.
@@ -318,7 +332,7 @@ class CohenEmpiricalPP(object):
         asff *= 1j*np.sin(np.sum(rlp_diff*np.sum(self.atomic_positions, 0), 2))
 
         H = (diag + sff + asff)
-        return np.sort(np.linalg.eigvalsh(H))[:neigvals]*Ry_to_eV    
+        return np.sort(np.linalg.eigvalsh(H))[:neigvals]*Ry_to_eV
     
     def hamiltonian(self, kpoint):
         """Evaluate the empirical pseudopotential Hamiltonian at the provided
@@ -452,7 +466,7 @@ class SingleFreeElectronModel():
         degree (int): the degree of the radial dispersion relation.
         energy_shift (float): an energy shift typically used to place the Fermi
             level at the correct position.
-        fermi_level (float): the fermi level.
+        Fermi_level (float): the fermi level.
         total_enery(float): the total energy
 
     Attributes:
@@ -467,18 +481,20 @@ class SingleFreeElectronModel():
         total_enery (float): the total energy
         total_enery_ans (float): the exact, analytical value for the total
             energy.
-        name (str): the name of the pseudopotential.
+        material (str): the name of the pseudopotential.
+
     """
     
     def __init__(self, lattice, degree, energy_shift=None,
                  fermi_level=None, total_energy=None):
+        self.material = "Free electron model"
         self.lattice = lattice
         self.degree = degree
         # The free electron pseudopotential can only have one valence electron
         # because the energy dispersion relation isn't periodic and with two
         # valence electrons the Fermi surface would extend outside the unit 
         # cell.
-        self.name = "free electron model"
+        # self.name = "free electron model"
         self.nvalence_electrons = 1
         self.energy_shift = energy_shift or 0.
         self.fermi_level = fermi_level or 0.
@@ -526,16 +542,14 @@ class MultipleFreeElectronModel():
         total_enery (float): the total energy
         total_enery_ans (float): the exact, analytical value for the total
             energy.
+        material (str): the material or model name.
     """
     
     def __init__(self, lattice, degree, nvalence_electrons, energy_shift=None,
                  fermi_level=None, total_energy=None):
+        self.material = "Free electron model"
         self.lattice = lattice
         self.degree = degree
-        # The free electron pseudopotential can only have one valence electron
-        # because the energy dispersion relation isn't periodic and with two
-        # valence electrons the Fermi surface would extend outside the unit 
-        # cell.
         self.nvalence_electrons = nvalence_electrons
         self.energy_shift = energy_shift or 0.
         self.fermi_level = fermi_level or 0.        
@@ -555,6 +569,12 @@ class MultipleFreeElectronModel():
         l0 = np.linalg.norm(self.lattice.reciprocal_vectors[:,0])
         l1 = np.linalg.norm(self.lattice.reciprocal_vectors[:,1])
         l2 = np.linalg.norm(self.lattice.reciprocal_vectors[:,2])
+
+        # r = 2*np.dot(self.lattice.reciprocal_vectors[:,0],
+        #              self.lattice.reciprocal_vectors[:,0])
+        # pts = sphere_pts(multiple_free_EPM.lattice.reciprocal_vectors, r)
+
+        
         pts = np.array([[0,0,0], [-l0, 0, 0], [l0, 0, 0],
                         [0, -l1, 0], [0, l1, 0],
                         [0, 0, -l2], [0, 0, l2],
@@ -564,7 +584,7 @@ class MultipleFreeElectronModel():
                         [-l0, 0, l2], [-l0, 0, -l2],
                         [0, l1, l2], [0, l1, -l2],
                         [0, -l1, l2], [0, -l1, -l2]])
-        
+
         return [np.linalg.norm(kpoint - pt)**self.degree for pt in pts][:neigvals]
         
     def set_degree(self, degree):
@@ -593,11 +613,11 @@ def W2(spt):
     
     return[-np.cos(np.sum([np.cos(2*np.pi*pt) for pt in spt]))]
 
-#### 
+####
 # Pseudo-potential from Band Structures and Pseudopotential Form Factors for
 # Fourteen Semiconductors of the Diamond. and. Zinc-blende Structures* by
 # Cohen and Bergstresser
-#### 
+####
 
 # Define the pseudo-potential form factors taken from Cohen and Bergstesser
 # V3S stands for the symmetric form factor for reciprocal lattice vectors of
@@ -656,198 +676,230 @@ Si_lat_centering = "face"
 Si_lat_const = 5.43*angstrom_to_Bohr # the lattice constant in Bohr
 Si_lat_consts = [Si_lat_const]*3
 Si_lat_angles = [np.pi/2]*3
-Si_lattice = Lattice(Si_lat_centering, Si_lat_consts, Si_lat_angles)
+Si_lattice = Lattice(Si_lat_centering, Si_lat_consts, Si_lat_angles,
+                     convention="angular")
 
-Si_energy_cutoff = (11 + 1)*(2*np.pi/Si_lat_const)**2
+# Si_energy_cutoff = (11 + 1)*(2*np.pi/Si_lat_const)**2
+Si_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                Si_lattice.reciprocal_vectors.T)))*4
 Si_atomic_positions = [Si_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
 Si_nvalence_electrons = 4
-Si_PP = CohenEmpiricalPP(Si_lattice, Si_spff, Si_apff, Si_energy_cutoff,
-                         Si_atomic_positions, Si_nvalence_electrons,
-                         material="Si")
+Si_EPM = CohenEmpiricalPseudopotential(Si_lattice, Si_spff, Si_apff, Si_energy_cutoff,
+                                       Si_atomic_positions, Si_nvalence_electrons,
+                                       material="Si")
 
 #### Pseudopotential of Ge ####
 Ge_lat_centering = "face"
 Ge_lat_const = 5.66*angstrom_to_Bohr # the lattice constant in Bohr
 Ge_lat_consts = [Ge_lat_const]*3
 Ge_lat_angles = [np.pi/2]*3
-Ge_lattice = Lattice(Ge_lat_centering, Ge_lat_consts, Ge_lat_angles)
+Ge_lattice = Lattice(Ge_lat_centering, Ge_lat_consts, Ge_lat_angles,
+                     convention="angular")
 
-Ge_cutoff_energy = (11 + 1)*(2*np.pi/Ge_lat_const)**2
+Ge_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                Ge_lattice.reciprocal_vectors.T)))*4
 Ge_atomic_positions = [Ge_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
 Ge_nvalence_electrons = 4
-Ge_PP = CohenEmpiricalPP(Ge_lattice, Ge_spff, Ge_apff, Ge_cutoff_energy,
-                         Ge_atomic_positions, Ge_nvalence_electrons,
-                         material="Ge")
+Ge_EPM = CohenEmpiricalPseudopotential(Ge_lattice, Ge_spff, Ge_apff, Ge_energy_cutoff,
+                                       Ge_atomic_positions, Ge_nvalence_electrons,
+                                       material="Ge")
 
 #### Pseudopotential of Sn ####
 cSn_lat_centering = "face"
 cSn_lat_const = 6.49*angstrom_to_Bohr # the lattice constant in Bohr
 cSn_lat_consts = [cSn_lat_const]*3
 cSn_lat_angles = [np.pi/2]*3
-cSn_lattice = Lattice(cSn_lat_centering, cSn_lat_consts, cSn_lat_angles)
+cSn_lattice = Lattice(cSn_lat_centering, cSn_lat_consts, cSn_lat_angles,
+                      convention="angular")
 
-cSn_cutoff_energy = (11 + 1)*(2*np.pi/cSn_lat_const)**2
+cSn_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                 cSn_lattice.reciprocal_vectors.T)))*4
 cSn_atomic_positions = [cSn_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
 cSn_nvalence_electrons = 4
-cSn_PP = CohenEmpiricalPP(cSn_lattice, Sn_spff, Sn_apff, cSn_cutoff_energy,
-                          cSn_atomic_positions, cSn_nvalence_electrons,
-                          material="Sn")
+cSn_EPM = CohenEmpiricalPseudopotential(cSn_lattice, Sn_spff, Sn_apff, cSn_energy_cutoff,
+                                        cSn_atomic_positions, cSn_nvalence_electrons,
+                                        material="Sn")
 
 #### Pseudopotential of GaP ####
 GaP_lat_centering = "face"
 GaP_lat_const = 5.44*angstrom_to_Bohr # the lattice constant in Bohr
 GaP_lat_consts = [GaP_lat_const]*3
 GaP_lat_angles = [np.pi/2]*3
-GaP_lattice = Lattice(GaP_lat_centering, GaP_lat_consts, GaP_lat_angles)
+GaP_lattice = Lattice(GaP_lat_centering, GaP_lat_consts, GaP_lat_angles,
+                      convention="angular")
 
-GaP_cutoff_energy = (11 + 1)*(2*np.pi/GaP_lat_const)**2
+GaP_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                 GaP_lattice.reciprocal_vectors.T)))*4
 GaP_atomic_positions = [GaP_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
 GaP_nvalence_electrons = 8
-GaP_PP = CohenEmpiricalPP(GaP_lattice, GaP_spff, GaP_apff, GaP_cutoff_energy,
-                          GaP_atomic_positions, GaP_nvalence_electrons,
-                          material="GaP")
+GaP_EPM = CohenEmpiricalPseudopotential(GaP_lattice, GaP_spff, GaP_apff, GaP_energy_cutoff,
+                                        GaP_atomic_positions, GaP_nvalence_electrons,
+                                        material="GaP")
 
 #### Pseudopotential of GaAs ####
 GaAs_lat_centering = "face"
 GaAs_lat_const = 5.64*angstrom_to_Bohr # the lattice constant in Bohr
 GaAs_lat_consts = [GaAs_lat_const]*3
 GaAs_lat_angles = [np.pi/2]*3
-GaAs_lattice = Lattice(GaAs_lat_centering, GaAs_lat_consts, GaAs_lat_angles)
+GaAs_lattice = Lattice(GaAs_lat_centering, GaAs_lat_consts, GaAs_lat_angles,
+                       convention="angular")
 
-GaAs_cutoff_energy = (11 + 1)*(2*np.pi/GaAs_lat_const)**2
+GaAs_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                  GaAs_lattice.reciprocal_vectors.T)))*4
 GaAs_atomic_positions = [GaAs_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
 GaAs_nvalence_electrons = 8
-GaAs_PP = CohenEmpiricalPP(GaAs_lattice, GaAs_spff, GaAs_apff, GaAs_cutoff_energy,
-                           GaAs_atomic_positions, GaAs_nvalence_electrons,
-                           material="GaAs")
+GaAs_EPM = CohenEmpiricalPseudopotential(GaAs_lattice, GaAs_spff, GaAs_apff, GaAs_energy_cutoff,
+                                         GaAs_atomic_positions, GaAs_nvalence_electrons,
+                                         material="GaAs")
 
 #### Pseudopotential of AlSb ####
 AlSb_lat_centering = "face"
 AlSb_lat_const = 6.13*angstrom_to_Bohr # the lattice constant in Bohr
 AlSb_lat_consts = [AlSb_lat_const]*3
 AlSb_lat_angles = [np.pi/2]*3
-AlSb_lattice = Lattice(AlSb_lat_centering, AlSb_lat_consts, AlSb_lat_angles)
+AlSb_lattice = Lattice(AlSb_lat_centering, AlSb_lat_consts, AlSb_lat_angles,
+                       convention="angular")
 
-AlSb_cutoff_energy = (11 + 1)*(2*np.pi/AlSb_lat_const)**2
+AlSb_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                  AlSb_lattice.reciprocal_vectors.T)))*4
 AlSb_atomic_positions = [AlSb_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
 AlSb_nvalence_electrons = 8
-AlSb_PP = CohenEmpiricalPP(AlSb_lattice, AlSb_spff, AlSb_apff,
-                           AlSb_cutoff_energy, AlSb_atomic_positions,
-                           AlSb_nvalence_electrons, material="AlSb")
+AlSb_EPM = CohenEmpiricalPseudopotential(AlSb_lattice, AlSb_spff, AlSb_apff,
+                                         AlSb_energy_cutoff, AlSb_atomic_positions,
+                                         AlSb_nvalence_electrons, material="AlSb")
 
 #### Pseudopotential of InP ####
 InP_lat_centering = "face"
 InP_lat_const = 5.86*angstrom_to_Bohr # the lattice constant in Bohr
 InP_lat_consts = [InP_lat_const]*3
 InP_lat_angles = [np.pi/2]*3
-InP_lattice = Lattice(InP_lat_centering, InP_lat_consts, InP_lat_angles)
+InP_lattice = Lattice(InP_lat_centering, InP_lat_consts, InP_lat_angles,
+                      convention="angular")
 
-InP_cutoff_energy = (11 + 1)*(2*np.pi/InP_lat_const)**2
+
+InP_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                 InP_lattice.reciprocal_vectors.T)))*4
 InP_atomic_positions = [InP_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
 InP_nvalence_electrons = 8
-InP_PP = CohenEmpiricalPP(InP_lattice, InP_spff, InP_apff, InP_cutoff_energy,
-                          InP_atomic_positions, InP_nvalence_electrons,
-                          material="InP")
+InP_EPM = CohenEmpiricalPseudopotential(InP_lattice, InP_spff, InP_apff,
+                                        InP_energy_cutoff, InP_atomic_positions,
+                                        InP_nvalence_electrons, material="InP")
 
 #### Pseudopotential of GaSb ####
 GaSb_lat_centering = "face"
 GaSb_lat_const = 6.12*angstrom_to_Bohr # the lattice constant in Bohr
 GaSb_lat_consts = [GaSb_lat_const]*3
 GaSb_lat_angles = [np.pi/2]*3
-GaSb_lattice = Lattice(GaSb_lat_centering, GaSb_lat_consts, GaSb_lat_angles)
+GaSb_lattice = Lattice(GaSb_lat_centering, GaSb_lat_consts, GaSb_lat_angles,
+                       convention="angular")
 
-GaSb_cutoff_energy = (11 + 1)*(2*np.pi/GaSb_lat_const)**2
+GaSb_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                  GaSb_lattice.reciprocal_vectors.T)))*4
 GaSb_atomic_positions = [GaSb_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
 GaSb_nvalence_electrons = 8
-GaSb_PP = CohenEmpiricalPP(GaSb_lattice, GaSb_spff, GaSb_apff,
-                           GaSb_cutoff_energy, GaSb_atomic_positions,
-                           GaSb_nvalence_electrons, material="GaSb")
+GaSb_EPM = CohenEmpiricalPseudopotential(GaSb_lattice, GaSb_spff, GaSb_apff,
+                                         GaSb_energy_cutoff, GaSb_atomic_positions,
+                                         GaSb_nvalence_electrons, material="GaSb")
 
 #### Pseudopotential of InAs ####
 InAs_lat_centering = "face"
 InAs_lat_const = 6.04*angstrom_to_Bohr # the lattice constant in Bohr
 InAs_lat_consts = [InAs_lat_const]*3
 InAs_lat_angles = [np.pi/2]*3
-InAs_lattice = Lattice(InAs_lat_centering, InAs_lat_consts, InAs_lat_angles)
+InAs_lattice = Lattice(InAs_lat_centering, InAs_lat_consts, InAs_lat_angles,
+                       convention="angular")
 
-InAs_cutoff_energy = (11 + 1)*(2*np.pi/InAs_lat_const)**2
+InAs_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                  GaSb_lattice.reciprocal_vectors.T)))*5
 InAs_atomic_positions = [InAs_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
 InAs_nvalence_electrons = 8
-InAs_PP = CohenEmpiricalPP(InAs_lattice, InAs_spff, InAs_apff,
-                           InAs_cutoff_energy, InAs_atomic_positions,
-                           InAs_nvalence_electrons, material="InAs")
+InAs_EPM = CohenEmpiricalPseudopotential(InAs_lattice, InAs_spff, InAs_apff,
+                                         InAs_energy_cutoff, InAs_atomic_positions,
+                                         InAs_nvalence_electrons, material="InAs")
 
 #### Pseudopotential of InSb ####
 InSb_lat_centering = "face"
 InSb_lat_const = 6.48*angstrom_to_Bohr # the lattice constant in Bohr
 InSb_lat_consts = [InSb_lat_const]*3
 InSb_lat_angles = [np.pi/2]*3
-InSb_lattice = Lattice(InSb_lat_centering, InSb_lat_consts, InSb_lat_angles)
+InSb_lattice = Lattice(InSb_lat_centering, InSb_lat_consts, InSb_lat_angles,
+                       convention="angular")
 
-InSb_cutoff_energy = (11 + 1)*(2*np.pi/InSb_lat_const)**2
+InSb_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                  InSb_lattice.reciprocal_vectors.T)))*4
 InSb_atomic_positions = [InSb_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
 InSb_nvalence_electrons = 8
-InSb_PP = CohenEmpiricalPP(InSb_lattice, InSb_spff, InSb_apff,
-                           InSb_cutoff_energy, InSb_atomic_positions,
-                           InSb_nvalence_electrons, material="InSb")
+InSb_EPM = CohenEmpiricalPseudopotential(InSb_lattice, InSb_spff, InSb_apff,
+                                         InSb_energy_cutoff, InSb_atomic_positions,
+                                         InSb_nvalence_electrons, material="InSb")
 
 #### Pseudopotential of ZnS ####
 ZnS_lat_centering = "face"
 ZnS_lat_const = 5.41*angstrom_to_Bohr # the lattice constant in Bohr
 ZnS_lat_consts = [ZnS_lat_const]*3
 ZnS_lat_angles = [np.pi/2]*3
-ZnS_lattice = Lattice(ZnS_lat_centering, ZnS_lat_consts, ZnS_lat_angles)
+ZnS_lattice = Lattice(ZnS_lat_centering, ZnS_lat_consts, ZnS_lat_angles,
+                      convention="angular")
 
-ZnS_cutoff_energy = (11 + 1)*(2*np.pi/ZnS_lat_const)**2
+ZnS_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                 ZnS_lattice.reciprocal_vectors.T)))*4
 ZnS_atomic_positions = [ZnS_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
 ZnS_nvalence_electrons = 18
-ZnS_PP = CohenEmpiricalPP(ZnS_lattice, ZnS_spff, ZnS_apff,
-                          ZnS_cutoff_energy, ZnS_atomic_positions,
-                          ZnS_nvalence_electrons, material="ZnS")
+ZnS_EPM = CohenEmpiricalPseudopotential(ZnS_lattice, ZnS_spff, ZnS_apff,
+                                        ZnS_energy_cutoff, ZnS_atomic_positions,
+                                        ZnS_nvalence_electrons, material="ZnS")
 
 #### Pseudopotential of ZnSe ####
 ZnSe_lat_centering = "face"
 ZnSe_lat_const = 5.65*angstrom_to_Bohr # the lattice constant in Bohr
 ZnSe_lat_consts = [ZnSe_lat_const]*3
 ZnSe_lat_angles = [np.pi/2]*3
-ZnSe_lattice = Lattice(ZnSe_lat_centering, ZnSe_lat_consts, ZnSe_lat_angles)
+ZnSe_lattice = Lattice(ZnSe_lat_centering, ZnSe_lat_consts, ZnSe_lat_angles,
+                       convention="angular")
 
-ZnSe_cutoff_energy = (11 + 1)*(2*np.pi/ZnSe_lat_const)**2
+ZnSe_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                  ZnSe_lattice.reciprocal_vectors.T)))*4
 ZnSe_atomic_positions = [ZnSe_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
 ZnSe_nvalence_electrons = 18
-ZnSe_PP = CohenEmpiricalPP(ZnSe_lattice, ZnSe_spff, ZnSe_apff,
-                           ZnSe_cutoff_energy, ZnSe_atomic_positions,
-                           ZnSe_nvalence_electrons, material="ZnSe")
+ZnSe_EPM = CohenEmpiricalPseudopotential(ZnSe_lattice, ZnSe_spff, ZnSe_apff,
+                                         ZnSe_energy_cutoff, ZnSe_atomic_positions,
+                                         ZnSe_nvalence_electrons, material="ZnSe")
 
 #### Pseudopotential of ZnTe ####
 ZnTe_lat_centering = "face"
 ZnTe_lat_const = 6.07*angstrom_to_Bohr # the lattice constant in Bohr
 ZnTe_lat_consts = [ZnTe_lat_const]*3
 ZnTe_lat_angles = [np.pi/2]*3
-ZnTe_lattice = Lattice(ZnTe_lat_centering, ZnTe_lat_consts, ZnTe_lat_angles)
+ZnTe_lattice = Lattice(ZnTe_lat_centering, ZnTe_lat_consts, ZnTe_lat_angles,
+                       convention="angular")
 
-ZnTe_cutoff_energy = (11 + 1)*(2*np.pi/ZnTe_lat_const)**2
+
+ZnTe_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                  ZnTe_lattice.reciprocal_vectors.T)))*4
 ZnTe_atomic_positions = [ZnTe_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
 ZnTe_nvalence_electrons = 18
-ZnTe_PP = CohenEmpiricalPP(ZnTe_lattice, ZnTe_spff, ZnTe_apff,
-                           ZnTe_cutoff_energy, ZnTe_atomic_positions,
-                           ZnTe_nvalence_electrons, material="ZnTe")
+ZnTe_EPM = CohenEmpiricalPseudopotential(ZnTe_lattice, ZnTe_spff, ZnTe_apff,
+                                         ZnTe_energy_cutoff, ZnTe_atomic_positions,
+                                         ZnTe_nvalence_electrons, material="ZnTe")
 
 #### Pseudopotential of CdTe ####
 CdTe_lat_centering = "face"
 CdTe_lat_const = 6.07*angstrom_to_Bohr # the lattice constant in Bohr
 CdTe_lat_consts = [CdTe_lat_const]*3
 CdTe_lat_angles = [np.pi/2]*3
-CdTe_lattice = Lattice(CdTe_lat_centering, CdTe_lat_consts, CdTe_lat_angles)
+CdTe_lattice = Lattice(CdTe_lat_centering, CdTe_lat_consts, CdTe_lat_angles,
+                       convention="angular")
 
-CdTe_cutoff_energy = (11 + 1)*(2*np.pi/CdTe_lat_const)**2
+
+CdTe_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                  CdTe_lattice.reciprocal_vectors.T)))*4
 CdTe_atomic_positions = [CdTe_lat_const/8.*np.array([1,1,1])] # one atomic basis vector
 CdTe_nvalence_electrons = 18
-CdTe_PP = CohenEmpiricalPP(CdTe_lattice, CdTe_spff, CdTe_apff,
-                           CdTe_cutoff_energy, CdTe_atomic_positions,
-                           CdTe_nvalence_electrons, material="CdTe")
+CdTe_EPM = CohenEmpiricalPseudopotential(CdTe_lattice, CdTe_spff, CdTe_apff,
+                                         CdTe_energy_cutoff, CdTe_atomic_positions,
+                                         CdTe_nvalence_electrons, material="CdTe")
 
-# The end of Cohen's 14 pseudopotentials with diamond or zinc-blende structure.
+# # The end of Cohen's 14 pseudopotentials with diamond or zinc-blende structure.
 
 #### Toy Pseudopotential ####
 Toy_lat_centering = "prim"
@@ -860,37 +912,39 @@ Toy_pff = [0.0]
 Toy_energy_cutoff = 2*(2*np.pi/Toy_lat_const)**2
 Toy_atomic_positions = [[0.]*3]
 Toy_nvalence_electrons = 3
-Toy_PP = EmpiricalPP(Toy_lattice, Toy_pff, Toy_energy_cutoff, Toy_atomic_positions,
-                     Toy_nvalence_electrons, material="Toy")
+Toy_EPM = EmpiricalPseudopotential(Toy_lattice, Toy_pff, Toy_energy_cutoff, Toy_atomic_positions,
+                                   Toy_nvalence_electrons, material="Toy")
 
 #### Free electron Pseudopotential ####
 free_lat_centering = "prim"
 free_lat_const = 1.
 free_lat_consts = [free_lat_const]*3
 free_lat_angles = [np.pi/2]*3
-free_lattice = Lattice(free_lat_centering, free_lat_consts, free_lat_angles)
+free_lattice = Lattice(free_lat_centering, free_lat_consts, free_lat_angles,
+                       convention="angular")
 
 free_pff = [0.0]
 free_energy_cutoff = 2*(2*np.pi/free_lat_const)**2
 free_atomic_positions = [[0.]*3]
 free_nvalence_electrons = 1
 free_degree = 2
-free_PP = FreeElectronModel(free_lattice, free_degree)
+free_EPM = FreeElectronModel(free_lattice, free_degree)
 
-# #### Single Free electron Pseudopotential #
-# single_free_lat_centering = "prim"
-# single_free_lat_const = 1.
-# single_free_lat_consts = [single_free_lat_const]*3
-# single_free_lat_angles = [np.pi/2]*3
-# single_free_lattice = Lattice(single_free_lat_centering,
-#                               single_free_lat_consts, single_free_lat_angles)
+#### Single Free electron Pseudopotential ####
+single_free_lat_centering = "prim"
+single_free_lat_const = 1.
+single_free_lat_consts = [single_free_lat_const]*3
+single_free_lat_angles = [np.pi/2]*3
+single_free_lattice = Lattice(single_free_lat_centering,
+                              single_free_lat_consts, single_free_lat_angles,
+                              convention="angular")
 
-# single_free_pff = [0.0]
-# single_free_energy_cutoff = 2*(2*np.pi/single_free_lat_const)**2
-# single_free_atomic_positions = [[0.]*3]
-# single_free_nvalence_electrons = 1
-# single_free_degree = 2
-# single_free_PP = SingleFreeElectronModel(single_free_lattice, single_free_degree)
+single_free_pff = [0.0]
+single_free_energy_cutoff = 2*(2*np.pi/single_free_lat_const)**2
+single_free_atomic_positions = [[0.]*3]
+single_free_nvalence_electrons = 1
+single_free_degree = 2
+single_free_EPM = SingleFreeElectronModel(single_free_lattice, single_free_degree)
 
 #### Multiple Free electron Pseudopotential ####
 multiple_free_lat_centering = "prim"
@@ -898,39 +952,41 @@ multiple_free_lat_const = 1.
 multiple_free_lat_consts = [multiple_free_lat_const]*3
 multiple_free_lat_angles = [np.pi/2]*3
 multiple_free_lattice = Lattice(multiple_free_lat_centering,
-                                multiple_free_lat_consts, multiple_free_lat_angles)
+                                multiple_free_lat_consts, multiple_free_lat_angles,
+                                convention="angular")
 
 multiple_free_pff = [0.0]
 multiple_free_energy_cutoff = 2*(2*np.pi/multiple_free_lat_const)**2
 multiple_free_atomic_positions = [[0.]*3]
 multiple_free_nvalence_electrons = 2
 multiple_free_degree = 2
-multiple_free_PP = MultipleFreeElectronModel(multiple_free_lattice,
+multiple_free_EPM = MultipleFreeElectronModel(multiple_free_lattice,
                                              multiple_free_degree,
                                              multiple_free_nvalence_electrons)
 
 
-# The following pseudopotentials come from: 
-# Marvin L. Cohen and Volker Heine. "The fitting of pseudopotentials to
-# experimental data and their subsequent application." Solid state physics 24
-# (1970): 37-248. APA
+# # The following pseudopotentials come from: 
+# # Marvin L. Cohen and Volker Heine. "The fitting of pseudopotentials to
+# # experimental data and their subsequent application." Solid state physics 24
+# # (1970): 37-248. APA
 
 #### Pseudopotential of Al ####
 Al_centering_type = "face"
 Al_lat_const = 4.05*angstrom_to_Bohr
 Al_lat_consts = [Al_lat_const]*3
 Al_lat_angles = [np.pi/2]*3
-Al_lattice = Lattice(Al_centering_type, Al_lat_consts, Al_lat_angles)
+Al_lattice = Lattice(Al_centering_type, Al_lat_consts, Al_lat_angles,
+                     convention="angular")
 
 Al_pff = [0.0, 0.0179, 0.0562]
-Al_energy_cutoff = (4+1)*(2*np.pi/Al_lat_const)**2
-Al_energy_cutoff = norm(2*Al_lattice.reciprocal_vectors[:,0])**2 + (
-                            (2*np.pi/Al_lat_const)**2) + 20
-
+# Take the energy cutof as 3x the length of the longest reciprocal lattice vector squared.
+# This value isn't very important because the energy cutoff changes in the empirical pseudopotential.
+Al_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                Al_lattice.reciprocal_vectors.T)))*3
 Al_atomic_positions = [[0.,0.,0.]]
 Al_nvalence_electrons = 3
-Al_PP = EmpiricalPP(Al_lattice, Al_pff, Al_energy_cutoff, Al_atomic_positions,
-                    Al_nvalence_electrons, material="Al")
+Al_EPM = EmpiricalPseudopotential(Al_lattice, Al_pff, Al_energy_cutoff, Al_atomic_positions,
+                                  Al_nvalence_electrons, material="Al")
 
 #### Pseudopotential of Li ####
 Li_centering_type = "body"
@@ -940,15 +996,16 @@ Li_lat_angles = [np.pi/2]*3
 Li_lattice = Lattice(Li_centering_type, Li_lat_consts, Li_lat_angles)
 Li_lat_consts = [Li_lat_const]*3
 Li_lat_angles = [np.pi/2]*3
-Li_lattice = Lattice(Li_centering_type, Li_lat_consts, Li_lat_angles)
-
+Li_lattice = Lattice(Li_centering_type, Li_lat_consts, Li_lat_angles,
+                     convention="angular")
 
 Li_pff = [0.0, 0.11]
-Li_energy_cutoff = (1+2)*(2*np.pi/Li_lat_const)**2
+Li_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                Li_lattice.reciprocal_vectors.T)))*3
 Li_atomic_positions = [[0.,0.,0.]]
 Li_nvalence_electrons = 1
-Li_PP = EmpiricalPP(Li_lattice, Li_pff, Li_energy_cutoff, Li_atomic_positions,
-                    Li_nvalence_electrons, material="Li")
+Li_EPM = EmpiricalPseudopotential(Li_lattice, Li_pff, Li_energy_cutoff, Li_atomic_positions,
+                                  Li_nvalence_electrons, material="Li")
 
 #### Pseudopotential of Na ####
 Na_centering_type = "body"
@@ -956,21 +1013,24 @@ Na_centering_type = "body"
 Na_lat_const = 4.2906*angstrom_to_Bohr
 Na_lat_consts = [Na_lat_const]*3
 Na_lat_angles = [np.pi/2]*3
-Na_lattice = Lattice(Na_centering_type, Na_lat_consts, Na_lat_angles)
+Na_lattice = Lattice(Na_centering_type, Na_lat_consts, Na_lat_angles,
+                     convention="angular")
 
 Na_pff = [0.0, 0.0158, 0.0]
-Na_energy_cutoff = (1+4)*(2*np.pi/Na_lat_const)**2
+Na_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                Na_lattice.reciprocal_vectors.T)))*3
 Na_atomic_positions = [[0.]*3]
 Na_nvalence_electrons = 1
-Na_PP = EmpiricalPP(Na_lattice, Na_pff, Na_energy_cutoff, Na_atomic_positions,
-                    Na_nvalence_electrons, material="Na")
+Na_EPM = EmpiricalPseudopotential(Na_lattice, Na_pff, Na_energy_cutoff, Na_atomic_positions,
+                                  Na_nvalence_electrons, material="Na")
     
 #### Pseudopotential of K ####
 K_centering_type = "body"
 K_lat_const = 5.225*angstrom_to_Bohr
 K_lat_consts = [K_lat_const]*3
 K_lat_angles = [np.pi/2]*3
-K_lattice = Lattice(K_centering_type, K_lat_consts, K_lat_angles)
+K_lattice = Lattice(K_centering_type, K_lat_consts, K_lat_angles,
+                    convention="angular")
 
 # The pseudopotential parameters come from the paper by Lee and Falicov titled
 # The de Haas-van Alphen  effect  and the Fermi  surface  of potassium
@@ -979,18 +1039,20 @@ K_lattice = Lattice(K_centering_type, K_lat_consts, K_lat_angles)
 # pseudopotential. We thought that the three parameter was good enough for our
 # purposes.
 K_pff = [0.0, 0.22/Ry_to_eV, -0.89/Ry_to_eV, 0.55/Ry_to_eV]
-K_energy_cutoff = (1+6)*(2*np.pi/K_lat_const)**2
+K_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                               K_lattice.reciprocal_vectors.T)))*4
 K_atomic_positions = [[0.]*3]
 K_nvalence_electrons = 1
-K_PP = EmpiricalPP(K_lattice, K_pff, K_energy_cutoff, K_atomic_positions,
-                   K_nvalence_electrons, material="K")
+K_EPM = EmpiricalPseudopotential(K_lattice, K_pff, K_energy_cutoff, K_atomic_positions,
+                                 K_nvalence_electrons, material="K")
 
 #### Pseudopotential of Rb ####
 Rb_centering_type = "body"
 Rb_lat_const = 5.585*angstrom_to_Bohr # Materials Project
 Rb_lat_consts = [Rb_lat_const]*3
 Rb_lat_angles = [np.pi/2]*3
-Rb_lattice = Lattice(Rb_centering_type, Rb_lat_consts, Rb_lat_angles)
+Rb_lattice = Lattice(Rb_centering_type, Rb_lat_consts, Rb_lat_angles,
+                     convention="angular")
 
 # Again, Rb is a very rough estimate. Values are taken from the original paper
 # by Lee titled The de Haas-van Alphen effect and the Fermi surface of sodium.
@@ -1001,81 +1063,94 @@ Rb_lattice = Lattice(Rb_centering_type, Rb_lat_consts, Rb_lat_angles)
 # V200 = -0.3 is within the error bounds they gave and also made the band
 # structure look more accurate.
 Rb_pff = [0.0, 0.225/Ry_to_eV, -0.3/Ry_to_eV, 0.4/Ry_to_eV]
-Rb_energy_cutoff = (6+1)*(2*np.pi/Rb_lat_const)**2
+Rb_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                Rb_lattice.reciprocal_vectors.T)))*4
 Rb_atomic_positions = [[0.]*3]
 Rb_nvalence_electrons = 1
-Rb_PP = EmpiricalPP(Rb_lattice, Rb_pff, Rb_energy_cutoff, Rb_atomic_positions,
-                    Rb_nvalence_electrons, material="Rb")
+Rb_EPM = EmpiricalPseudopotential(Rb_lattice, Rb_pff, Rb_energy_cutoff, Rb_atomic_positions,
+                                  Rb_nvalence_electrons, material="Rb")
 
 #### Pseudopotential of Cs ####
 Cs_centering_type = "body"
 Cs_lat_const = 6.141*angstrom_to_Bohr
 Cs_lat_consts = [Cs_lat_const]*3
 Cs_lat_angles = [np.pi/2]*3
-Cs_lattice = Lattice(Cs_centering_type, Cs_lat_consts, Cs_lat_angles)
+Cs_lattice = Lattice(Cs_centering_type, Cs_lat_consts, Cs_lat_angles,
+                     convention="angular")
 
 Cs_pff = [0.0, -0.03]
-Cs_energy_cutoff = (2+1)*(2*np.pi/Cs_lat_const)**2
+Cs_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                Cs_lattice.reciprocal_vectors.T)))*4
 Cs_atomic_positions = [[0.]*3]
 Cs_nvalence_electrons = 1
-Cs_PP = EmpiricalPP(Cs_lattice, Cs_pff, Cs_energy_cutoff, Cs_atomic_positions,
-                    Cs_nvalence_electrons, material="Cs")
+Cs_EPM = EmpiricalPseudopotential(Cs_lattice, Cs_pff, Cs_energy_cutoff, Cs_atomic_positions,
+                                  Cs_nvalence_electrons, material="Cs")
     
 #### Pseudopotential of Cu ####
 Cu_centering_type = "face"
 Cu_lat_const = 3.615*angstrom_to_Bohr
 Cu_lat_consts = [Cu_lat_const]*3
 Cu_lat_angles = [np.pi/2]*3
-Cu_lattice = Lattice(Cu_centering_type, Cu_lat_consts, Cu_lat_angles)
+Cu_lattice = Lattice(Cu_centering_type, Cu_lat_consts, Cu_lat_angles,
+                     convention="angular")
 
 Cu_pff = [0.0, 0.264, 0.246]
 Cu_energy_cutoff = (4+1)*(2*np.pi/Cu_lat_const)**2
+Cu_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                Cu_lattice.reciprocal_vectors.T)))*4
 Cu_atomic_positions = [[0.]*3]
 Cu_nvalence_electrons = 11
-Cu_PP = EmpiricalPP(Cu_lattice, Cu_pff, Cu_energy_cutoff, Cu_atomic_positions,
-                    Cu_nvalence_electrons, material="Cu")
+Cu_EPM = EmpiricalPseudopotential(Cu_lattice, Cu_pff, Cu_energy_cutoff, Cu_atomic_positions,
+                                  Cu_nvalence_electrons, material="Cu")
 
 #### Pseudopotential of Ag ####
 Ag_centering_type = "face"
 Ag_lat_const = 4.0853*angstrom_to_Bohr
 Ag_lat_consts = [Ag_lat_const]*3
 Ag_lat_angles = [np.pi/2]*3
-Ag_lattice = Lattice(Ag_centering_type, Ag_lat_consts, Ag_lat_angles)
+Ag_lattice = Lattice(Ag_centering_type, Ag_lat_consts, Ag_lat_angles,
+                     convention="angular")
 
 Ag_pff = [0.0, 0.204, 0.220]
 Ag_energy_cutoff = (4+1)*(2*np.pi/Ag_lat_const)**2
+Ag_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                Ag_lattice.reciprocal_vectors.T)))*4
 Ag_atomic_positions = [[0.]*3]
 Ag_nvalence_electrons = 11
-Ag_PP = EmpiricalPP(Ag_lattice, Ag_pff, Ag_energy_cutoff, Ag_atomic_positions,
-                    Ag_nvalence_electrons, material="Ag")
+Ag_EPM = EmpiricalPseudopotential(Ag_lattice, Ag_pff, Ag_energy_cutoff, Ag_atomic_positions,
+                                  Ag_nvalence_electrons, material="Ag")
 
 #### Pseudopotential of Au ####
 Au_centering_type = "face"
 Au_lat_const = 4.0782*angstrom_to_Bohr
 Au_lat_consts = [Au_lat_const]*3
 Au_lat_angles = [np.pi/2]*3
-Au_lattice = Lattice(Au_centering_type, Au_lat_consts, Au_lat_angles)
+Au_lattice = Lattice(Au_centering_type, Au_lat_consts, Au_lat_angles,
+                     convention="angular")
 
 Au_pff = [0.0, 0.252, 0.152]
-Au_energy_cutoff = (4+1)*(2*np.pi/Au_lat_const)**2
+Au_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                Au_lattice.reciprocal_vectors.T)))*4
 Au_atomic_positions = [[0.]*3]
 Au_nvalence_electrons = 11
-Au_PP = EmpiricalPP(Au_lattice, Au_pff, Au_energy_cutoff, Au_atomic_positions,
-                    Au_nvalence_electrons, material="Au")
+Au_EPM = EmpiricalPseudopotential(Au_lattice, Au_pff, Au_energy_cutoff, Au_atomic_positions,
+                                  Au_nvalence_electrons, material="Au")
 
 #### Pseudopotential of Pb ####
 Pb_centering_type = "face"
 Pb_lat_const = 4.9508*angstrom_to_Bohr
 Pb_lat_consts = [Pb_lat_const]*3
 Pb_lat_angles = [np.pi/2]*3
-Pb_lattice = Lattice(Pb_centering_type, Pb_lat_consts, Pb_lat_angles)
+Pb_lattice = Lattice(Pb_centering_type, Pb_lat_consts, Pb_lat_angles,
+                     convention="angular")
 
 Pb_pff = [0.0, -0.084, -0.039]
-Pb_energy_cutoff = (4+1)*(2*np.pi/Pb_lat_const)**2
+Pb_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                Pb_lattice.reciprocal_vectors.T)))*4
 Pb_atomic_positions = [[0.]*3]
 Pb_nvalence_electrons = 4
-Pb_PP = EmpiricalPP(Pb_lattice, Pb_pff, Pb_energy_cutoff, Pb_atomic_positions,
-                    Pb_nvalence_electrons, material="Pb")
+Pb_EPM = EmpiricalPseudopotential(Pb_lattice, Pb_pff, Pb_energy_cutoff, Pb_atomic_positions,
+                                  Pb_nvalence_electrons, material="Pb")
 
 #### Pseudopotential of Mg ####
 Mg_centering_type = "prim"
@@ -1084,20 +1159,16 @@ Mg_lat_const_c = 5.249
 Mg_lat_consts = np.array([Mg_lat_const_a, Mg_lat_const_a,
                           Mg_lat_const_c])*angstrom_to_Bohr
 Mg_lat_angles = [np.pi/2, np.pi/2, 2*np.pi/3]
-Mg_lattice = Lattice(Mg_centering_type, Mg_lat_consts, Mg_lat_angles)
+Mg_lattice = Lattice(Mg_centering_type, Mg_lat_consts, Mg_lat_angles,
+                     convention="angular")
 
 Mg_pff = [0., 0., .026, 0., 0., 0., .014, .036, 0., 0., .058]
-Mg_cutoff_vec = (Mg_lattice.reciprocal_vectors[:,0] +
-                 Mg_lattice.reciprocal_vectors[:,1] +
-                 2*Mg_lattice.reciprocal_vectors[:,2])
-
-# Added a little to the cutoff.
-Mg_energy_cutoff = np.dot(Mg_cutoff_vec, Mg_cutoff_vec) + (
-                          (np.pi/(Mg_lat_const_c + Mg_lat_const_a))**2) + 20
+Mg_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                Mg_lattice.reciprocal_vectors.T)))*5
 Mg_atomic_positions = [[0.]*3]
 Mg_nvalence_electrons = 2
-Mg_PP = EmpiricalPP(Mg_lattice, Mg_pff, Mg_energy_cutoff, Mg_atomic_positions,
-                    Mg_nvalence_electrons, material="Mg")
+Mg_EPM = EmpiricalPseudopotential(Mg_lattice, Mg_pff, Mg_energy_cutoff, Mg_atomic_positions,
+                                  Mg_nvalence_electrons, material="Mg")
 
 #### Pseudopotential of Zn ####
 Zn_centering_type = "prim"
@@ -1106,21 +1177,16 @@ Zn_lat_const_c = 5.207
 Zn_lat_consts = np.array([Zn_lat_const_a, Zn_lat_const_a,
                           Zn_lat_const_c])*angstrom_to_Bohr
 Zn_lat_angles = [np.pi/2, np.pi/2, 2*np.pi/3]
-Zn_lattice = Lattice(Zn_centering_type, Zn_lat_consts, Zn_lat_angles)
+Zn_lattice = Lattice(Zn_centering_type, Zn_lat_consts, Zn_lat_angles,
+                     convention="angular")
 
-# Zn_pff = [0., -0.022, 0.02, 0.063, 0.0, 0.0, 0.0, 0.0, 0.0]
 Zn_pff = [0., -0.022, 0.02, 0.063, 0.0, 0.0, 0.0, 0.0, 0.0]
-# Zn_cutoff_vec = (Zn_lattice.reciprocal_vectors[:,0] +
-#                  Zn_lattice.reciprocal_vectors[:,2])
-# Zn_cutoff_vec = Zn_lattice.reciprocal_vectors[:,2]
-# Zn_energy_cutoff = np.dot(Zn_cutoff_vec, Zn_cutoff_vec) + (
-#                               (np.pi/(Zn_lat_const_c + Zn_lat_const_a))**2)
-Zn_energy_cutoff = 7
-
+Zn_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                Zn_lattice.reciprocal_vectors.T)))*4
 Zn_atomic_positions = [[0.]*3]
 Zn_nvalence_electrons = 12
-Zn_PP = EmpiricalPP(Zn_lattice, Zn_pff, Zn_energy_cutoff, Zn_atomic_positions,
-                    Zn_nvalence_electrons, material="Zn")
+Zn_EPM = EmpiricalPseudopotential(Zn_lattice, Zn_pff, Zn_energy_cutoff, Zn_atomic_positions,
+                                  Zn_nvalence_electrons, material="Zn")
 
 # See Band structure and Fermi surface of Zinc and Cadmium by Stark and
 # Falicov for Cd form factors.
@@ -1131,36 +1197,32 @@ Cd_lat_const_c = 5.5261
 Cd_lat_consts = np.array([Cd_lat_const_a, Cd_lat_const_a,
                           Cd_lat_const_c])*angstrom_to_Bohr
 Cd_lat_angles = [np.pi/2, np.pi/2, 2*np.pi/3]
-Cd_lattice = Lattice(Cd_centering_type, Cd_lat_consts, Cd_lat_angles)
+Cd_lattice = Lattice(Cd_centering_type, Cd_lat_consts, Cd_lat_angles,
+                     convention="angular")
 
 Cd_pff = [0., -0.017, 0., 0., 0., 0., 0., 0.0235, 0.029, 0., 0.03]
-Cd_cutoff_vec = (Cd_lattice.reciprocal_vectors[:,0] +
-                 Cd_lattice.reciprocal_vectors[:,1] +
-                 2*Cd_lattice.reciprocal_vectors[:,2])
-Cd_energy_cutoff = np.dot(Cd_cutoff_vec, Cd_cutoff_vec) + (
-                              (np.pi/(Cd_lat_const_c + Cd_lat_const_a))**2)
+Cd_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                Cd_lattice.reciprocal_vectors.T)))*4
 Cd_atomic_positions = [[0.]*3]
 Cd_nvalence_electrons = 12
-Cd_PP = EmpiricalPP(Cd_lattice, Cd_pff, Cd_energy_cutoff, Cd_atomic_positions,
-                    Cd_nvalence_electrons, material="Cd")
+Cd_EPM = EmpiricalPseudopotential(Cd_lattice, Cd_pff, Cd_energy_cutoff, Cd_atomic_positions,
+                                  Cd_nvalence_electrons, material="Cd")
 
 #### Pseudopotential of Hg ####
 Hg_centering_type = "prim"
 Hg_lat_const = 2.9863*angstrom_to_Bohr
 Hg_lat_consts = [Hg_lat_const]*3
 Hg_lat_angles = [70.446*np.pi/180]*3
-Hg_lattice = Lattice(Hg_centering_type, Hg_lat_consts, Hg_lat_angles)
+Hg_lattice = Lattice(Hg_centering_type, Hg_lat_consts, Hg_lat_angles,
+                     convention="angular")
 
 Hg_pff = [-0.018, 0.028, 0.028]
-Hg_cutoff_vec = (Hg_lattice.reciprocal_vectors[:, 0] +
-                 Hg_lattice.reciprocal_vectors[:, 1])
-
-Hg_energy_cutoff = np.dot(Hg_cutoff_vec, Hg_cutoff_vec) + (
-                              (2*np.pi/Hg_lat_const)**2)
+Hg_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                Hg_lattice.reciprocal_vectors.T)))*4
 Hg_atomic_positions = [[0.]*3]
 Hg_nvalence_electrons = 12
-Hg_PP = EmpiricalPP(Hg_lattice, Hg_pff, Hg_energy_cutoff, Hg_atomic_positions,
-                    Hg_nvalence_electrons, material="Hg")
+Hg_EPM = EmpiricalPseudopotential(Hg_lattice, Hg_pff, Hg_energy_cutoff, Hg_atomic_positions,
+                                  Hg_nvalence_electrons, material="Hg")
 
 #### Pseudopotential of In ####
 In_centering_type = "body"
@@ -1168,18 +1230,16 @@ In_lat_const_a = 3.2992*angstrom_to_Bohr
 In_lat_const_c = 4.9049*angstrom_to_Bohr
 In_lat_consts = [In_lat_const_a, In_lat_const_a, In_lat_const_c]
 In_lat_angles = [np.pi/2]*3
-In_lattice = Lattice(In_centering_type, In_lat_consts, In_lat_angles)
+In_lattice = Lattice(In_centering_type, In_lat_consts, In_lat_angles,
+                     convention="angular")
 
 In_pff = [0., 0., 0., 0., 0., 0., 0., -0.020, 0., 0., 0., -0.047]
-In_cutoff_vec = (In_lattice.reciprocal_vectors[:, 0] +
-                 In_lattice.reciprocal_vectors[:, 1] +
-                 In_lattice.reciprocal_vectors[:, 2])
-In_energy_cutoff = np.dot(In_cutoff_vec, In_cutoff_vec) + (
-                   (np.pi/(In_lat_const_a + In_lat_const_c))**2)
+In_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                In_lattice.reciprocal_vectors.T)))*5
 In_atomic_positions = [[0.]*3]
 In_nvalence_electrons = 3
-In_PP = EmpiricalPP(In_lattice, In_pff, In_energy_cutoff, In_atomic_positions,
-                    In_nvalence_electrons, material="In")
+In_EPM = EmpiricalPseudopotential(In_lattice, In_pff, In_energy_cutoff, In_atomic_positions,
+                                  In_nvalence_electrons, material="In")
 
 #### Pseudopotential of Sn ####
 Sn_centering_type = "body"
@@ -1187,16 +1247,13 @@ Sn_lat_const_a = 3.47*angstrom_to_Bohr
 Sn_lat_const_c = 4.87*angstrom_to_Bohr
 Sn_lat_consts = [Sn_lat_const_a, Sn_lat_const_a, Sn_lat_const_c]
 Sn_lat_angles = [np.pi/2]*3
-Sn_lattice = Lattice(Sn_centering_type, Sn_lat_consts, Sn_lat_angles)
+Sn_lattice = Lattice(Sn_centering_type, Sn_lat_consts, Sn_lat_angles,
+                     convention="angular")
 
 Sn_pff = [0.]*5 + [-0.056, 0., -0.069] + [0.]*13 + [0.033, 0., 0.051]
-Sn_cutoff_vec = (2*Sn_lattice.reciprocal_vectors[:, 0] +
-                 Sn_lattice.reciprocal_vectors[:, 1] + 
-                 Sn_lattice.reciprocal_vectors[:, 2])
-Sn_energy_cutoff = np.dot(Sn_cutoff_vec, Sn_cutoff_vec) + (
-                   (np.pi/(Sn_lat_const_a + Sn_lat_const_c))**2)
-
+Sn_energy_cutoff = max(list(map(lambda x: np.dot(x,x),
+                                Sn_lattice.reciprocal_vectors.T)))*9
 Sn_atomic_positions = [[0.]*3]
 Sn_nvalence_electrons = 4
-Sn_PP = EmpiricalPP(Sn_lattice, Sn_pff, Sn_energy_cutoff, Sn_atomic_positions,
-                    Sn_nvalence_electrons, material="Sn")
+Sn_EPM = EmpiricalPseudopotential(Sn_lattice, Sn_pff, Sn_energy_cutoff, Sn_atomic_positions,
+                                  Sn_nvalence_electrons, material="Sn")

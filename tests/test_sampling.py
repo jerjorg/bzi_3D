@@ -11,6 +11,7 @@ from BZI.symmetry import (get_minmax_indices, swap_column, swap_row,
 
 from BZI.sampling import (make_grid, make_large_grid, sphere_pts,
                           large_sphere_pts, make_cell_points)
+from BZI.utilities import check_contained
 
 
 from BZI.symmetry import make_ptvecs, make_rptvecs
@@ -81,11 +82,11 @@ def test_make_cell_points():
     """
 
     # At the moment it only tests the cubic lattices.
-    grid_center_list = ["prim", "face", "body"]
+    grid_center_list = ["prim", "face"]
     grid_constants = np.array([1./2, 1./4])*2*np.sqrt(2)
     grid_consts_list = [[m]*3 for m in grid_constants]
     grid_angles = [np.pi/2]*3
-    cell_center_list = ["prim", "face", "body"]
+    cell_center_list = ["prim", "body"]
     cell_constants = [2*np.sqrt(2)]
     cell_consts_list = [[c]*3 for c in cell_constants]
     cell_angles = [np.pi/2]*3
@@ -109,18 +110,8 @@ def test_make_cell_points():
                         
                         # Verify all the points in the cell for the large grid
                         # are contained in grid.
-                        print(grid_consts)
-                        print(grid_center)
-                        print(cell_consts)
-                        print(cell_center)
-                        print(offset)
                         for g in grid:
-                            included = False
-                            for g2 in grid2:
-                                if np.allclose(g,g2):
-                                    included = True
-                            assert included == True
-
+                            assert check_contained(g, grid2)
                             
 @pytest.mark.skipif("test_get_minmax_indices" not in tests, reason="different tests")
 def test_get_minmax_indices():
@@ -357,24 +348,20 @@ def test_make_grid2():
     grid = make_grid(cell_vecs, grid_vecs, offset, False)
     
     for g1 in grid_pts1:
-        check = False
-        for g2 in grid:
-            if np.allclose(g1,g2) == True:
-                check = True
-        assert check == True
+        assert check_contained(g1, grid)
         
-    lat_type_list = ["fcc","bcc", "sc"]
-    lat_centering_list = ["face", "body", "prim"]
-    lat_const_list = [10,10.1, 3*np.pi]
+    lat_type_list = ["fcc"]
+    lat_centering_list = ["face"]
+    lat_const_list = [3*np.pi]
     lat_consts_list = [[l]*3 for l in lat_const_list]
     lat_angles =[np.pi/2]*3
-    offset_list = [[1.3, 1.1,1.7],[11,9,8],[np.pi,np.pi,np.pi]]
-    r_list = [1, 2.3, np.pi]
+    offset_list = [[1.3, 1.1,1.7]]
+    r_list = [np.pi]
 
     for lat_centering in lat_centering_list:
         for lat_consts in lat_consts_list:
             lat_vecs = make_ptvecs(lat_centering, lat_consts, lat_angles)
-            lat_vecs = make_rptvecs(lat_vecs)
+            rlat_vecs = make_rptvecs(lat_vecs)
             for offset in offset_list:
                 offset = np.asarray(offset)
                 for r in r_list:
@@ -383,8 +370,4 @@ def test_make_grid2():
                     contained = False
                     for tg in total_grid:
                         if np.dot(tg-offset,tg-offset) <= r:
-                            contained = False
-                            for g in grid:
-                                if np.allclose(g,tg):
-                                    contained = True
-                            assert contained == True
+                            assert check_contained(tg, grid)

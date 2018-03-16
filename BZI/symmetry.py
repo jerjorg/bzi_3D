@@ -6,15 +6,15 @@ Materials Science 49.2 (2010): 299-312.
 
 import numpy as np
 from numpy.linalg import norm, inv, det
-import math
-import itertools
+import math, itertools
 from copy import deepcopy
+import itertools as it
 from itertools import islice, product
 from BZI.msg import err
 
-from phenum.symmetry import get_lattice_pointGroup
 from phenum.grouptheory import SmithNormalForm
 from phenum.vector_utils import _minkowski_reduce_basis
+from BZI.utilities import check_contained
 
 class Lattice(object):
     """Create a lattice.
@@ -30,6 +30,9 @@ class Lattice(object):
             the angles between lattice vectors in the conventional unit cell
             ordered as [alpha, beta, gamma] where alpha is the angle between bc,
             beta is the angle between ac, and gamma is the angle between ab.
+        convention (str): gives the convention of for finding the reciprocal lattice
+            vectors. Options include 'ordinary' and 'angular'. Angular include a 
+            factor of 2pi.
 
     Attributes:
         centering (str): the type of lattice point centering in the 
@@ -57,50 +60,60 @@ class Lattice(object):
             lattice vectors
         reciprocal_volume (float): the volume of the parallelepiped given by the three
             reciprocal lattice vectors
-
     """
     
-    def __init__(self, centering_type, lattice_constants, lattice_angles):
+    def __init__(self, centering_type, lattice_constants, lattice_angles,
+                 convention="ordinary"):
         self.centering = centering_type
         self.constants = lattice_constants
         self.angles = lattice_angles
         self.type = find_lattice_type(centering_type, lattice_constants,
-                                      lattice_angles)        
+                                      lattice_angles)
         self.vectors = make_lattice_vectors(self.type, lattice_constants,
                                             lattice_angles)
-        self.reciprocal_vectors = make_rptvecs(self.vectors)
-        self.symmetry_group = point_group(self.vectors)
+        self.reciprocal_vectors = make_rptvecs(self.vectors, convention)
+        self.symmetry_group = get_point_group(self.vectors)
         self.symmetry_points = get_sympts(centering_type, lattice_constants,
-                                          lattice_angles)
+                                          lattice_angles, convention=convention)
+                                          
         self.symmetry_paths = get_sympaths(centering_type, lattice_constants,
-                                           lattice_angles)
+                                           lattice_angles, convention=convention)
         self.volume = det(self.vectors)
         self.reciprocal_volume = det(self.reciprocal_vectors)
 
 # Define the symmetry points for a simple-cubic lattice in lattice coordinates.
-sc_sympts = {"G": [0. ,0., 0.],
+sc_sympts = {"$\Gamma$": [0. ,0., 0.],
               "R": [1./2, 1./2, 1./2],
               "X": [0., 1./2, 0.],
               "M": [1./2, 1./2, 0.]}
 
+
 # Define the symmetry points for a fcc lattice in lattice coordinates.
 # Coordinates are in lattice coordinates.
-fcc_sympts = {"G": [0., 0., 0.], # G is the gamma point.
+fcc_sympts = {"$\Gamma$": [0., 0., 0.], # G is the gamma point.
               "K": [3./8, 3./8, 3./4],
               "L": [1./2, 1./2, 1./2],
               "U": [5./8, 1./4, 5./8],              
               "W": [1./2, 1./4, 3./4],
-              "X": [1./2, 0., 1./2],
-              "G2":[1., 1., 1.]}              
+              "X": [1./2, 0., 1./2]}
+
+# One of the band plots needs the gamma point in the neighboring cell.
+mod_fcc_sympts = {"$\Gamma$": [0., 0., 0.], # G is the gamma point.
+                  "K": [3./8, 3./8, 3./4],
+                  "L": [1./2, 1./2, 1./2],
+                  "U": [5./8, 1./4, 5./8],              
+                  "W": [1./2, 1./4, 3./4],
+                  "X": [1./2, 0., 1./2],
+                  "G2":[1., 1., 1.]}
 
 # Define the symmetry points for a bcc lattice in lattice coordinates
-bcc_sympts = {"G": [0., 0., 0.],
-               "H": [1./2, -1./2, 1./2],
-               "P": [1./4, 1./4, 1./4],
-               "N": [0., 0., 1./2]}
+bcc_sympts = {"$\Gamma$": [0., 0., 0.],
+              "H": [1./2, -1./2, 1./2],
+              "P": [1./4, 1./4, 1./4],
+              "N": [0., 0., 1./2]}
 
 # Tetragonal high symmetry points
-tet_sympts = {"G": [0., 0., 0.],
+tet_sympts = {"$\Gamma$": [0., 0., 0.],
               "A": [1./2, 1./2, 1./2],
               "M": [1./2, 1./2, 0.],
               "R": [0., 1./2, 1./2],
@@ -113,13 +126,14 @@ def bct1_sympts(a, c):
     """
     
     eta = (1. + c**2/a**2)/4.
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "M": [-1./2, 1./2, 1./2],
             "N": [0., 1./2, 0.],
             "P": [1./4, 1./4, 1./4],
             "X": [0., 0., 1./2],
             "Z": [eta, eta, -eta],
             "Z1": [-eta, 1-eta, eta]}
+
 
 def bct2_sympts(a, c):
     """Return the body-centered tetragonal high symmetry points for a < c
@@ -128,7 +142,7 @@ def bct2_sympts(a, c):
     
     eta = (1. + a**2/c**2)/4.
     zeta = a**2/(2*c**2)
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "N": [0., 1./2, 0.],
             "P": [1./4, 1./4, 1./4],
             "S": [-eta, eta, eta], # Sigma
@@ -138,8 +152,9 @@ def bct2_sympts(a, c):
             "Y1": [1./2, 1./2, -zeta],
             "Z": [1./2, 1./2, -1./2]}
 
+
 # Orthorhombic high symmetry points
-orc_sympts = {"G": [0., 0., 0.],
+orc_sympts = {"$\Gamma$": [0., 0., 0.],
               "R": [1./2, 1./2, 1./2],
               "S": [1./2, 1./2, 0.],
               "T": [0., 1./2, 1./2],
@@ -147,6 +162,7 @@ orc_sympts = {"G": [0., 0., 0.],
               "X": [1./2, 0., 0.],
               "Y": [0., 1./2, 0.],
               "Z": [0., 0., 1./2]}
+
 
 def orcf13_sympts(a, b, c):
     """Return the face-centered orthorhombic high symmetry points for
@@ -159,7 +175,7 @@ def orcf13_sympts(a, b, c):
     zeta = (1 + (a/b)**2 - (a/c)**2)/4.
     eta = (1 + (a/b)**2 + (a/c)**2)/4.
     
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "A": [1./2, 1./2+zeta, zeta],
             "A1": [1./2, 1./2 - zeta, 1 - zeta],
             "L": [1./2, 1./2, 1./2],
@@ -168,6 +184,7 @@ def orcf13_sympts(a, b, c):
             "X1": [1., 1-eta, 1-eta],
             "Y": [1./2, 0., 1./2],
             "Z": [1./2, 1./2, 0.]}
+
 
 def orcf2_sympts(a, b, c):
     """Return the face-centered orthorhombic high symmetry points for
@@ -181,7 +198,7 @@ def orcf2_sympts(a, b, c):
     phi = (1 + c**2/b**2 - c**2/a**2)/4
     delta = (1 + b**2/a**2 - b**2/c**2)/4
     
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "C": [1./2, 1./2 - eta, 1. - eta],
             "C1": [1./2, 1./2 + eta, eta],
             "D": [1./2 - delta, 1./2, 1. - delta],
@@ -205,7 +222,7 @@ def orci_sympts(a, b, c):
     delta = (b**2 - a**2)/(4*c**2)
     mu = (a**2 + b**2)/(4*c**2)
     
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "L": [-mu, mu, 1./2 - delta],
             "L1": [mu, -mu, 1./2 + delta],
             "L2": [1./2 - delta, 1./2 + delta, -mu],
@@ -227,7 +244,7 @@ def orcc_sympts(a, b):
     b = float(b)
     zeta = (1 + a**2/b**2)/4
     
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "A": [zeta, zeta, 1./2],
             "A1": [-zeta, 1-zeta, 1./2],
             "R": [0., 1./2, 1./2],
@@ -239,7 +256,7 @@ def orcc_sympts(a, b):
             "Z": [0., 0., 1./2]}
 
 # High symmetry points for a hexagonal lattice.
-hex_sympts = {"G": [0., 0., 0.],
+hex_sympts = {"$\Gamma$": [0., 0., 0.],
               "A": [0., 0., 1./2],
               "H": [1./3, 1./3, 1./2],
               "K": [1./3, 1./3, 0.],
@@ -253,7 +270,7 @@ def rhl1_sympts(alpha):
     eta = (1 + 4*np.cos(alpha))/(2 + 4*np.cos(alpha))
     nu = 3./4 - eta/2
     
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "B": [eta, 1./2, 1-eta],
             "B1": [1./2, 1-eta, eta-1],
             "F": [1./2, 1./2, 0.],
@@ -273,7 +290,7 @@ def rhl2_sympts(alpha):
     alpha = float(alpha)
     eta = 1/(2*np.tan(alpha/2)**2)
     nu = 3./4 - eta/2
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "F": [1./2, -1./2, 0.],
             "L": [1./2, 0., 0.],
             "P": [1-nu, -nu, 1-nu],
@@ -294,7 +311,7 @@ def mcl_sympts(b, c, alpha):
     
     eta = (1 - b*np.cos(alpha)/c)/(2*np.sin(alpha)**2)
     nu = 1./2 - eta*c*np.cos(alpha)/b
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "A": [1./2, 1./2, 0.],
             "C": [0., 1./2, 1./2],
             "D": [1./2, 0., 1./2],
@@ -327,7 +344,7 @@ def mclc12_sympts(a, b, c, alpha):
     psi = 3./4 - a**2/(4*b**2*np.sin(alpha)**2)
     phi = psi + (3./4 - psi)*b*np.cos(alpha)/c
 
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "N": [1./2, 0., 0.],
             "N1": [0., -1./2, 0.],
             "F": [1-zeta, 1-zeta, 1-eta],
@@ -364,7 +381,7 @@ def mclc34_sympts(a, b, c, alpha):
     phi = 1 + zeta - 2*mu
     psi = eta - 2*delta
                 
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "F": [1-phi, 1-phi, 1-psi],
             "F1": [phi, phi-1, psi],
             "F2": [1-phi, -phi, 1-psi],
@@ -402,7 +419,7 @@ def mclc5_sympts(a, b, c, alpha):
     delta = zeta*c*np.cos(alpha)/b + omega/2 - 1./4
     rho = 1 - zeta*a**2/b**2
 
-    return {"G": [0., 0., 0.],
+    return {"$\Gamma$": [0., 0., 0.],
             "F": [nu, nu, omega],
             "F1": [1-nu, 1-nu, 1-omega],
             "F2": [nu, nu-1, omega],
@@ -422,7 +439,7 @@ def mclc5_sympts(a, b, c, alpha):
             "Y3": [mu, mu-1, delta],
             "Z": [0., 0., 1./2]}
 
-# Triclinic symmatry points with lattice parameters that satisfy
+# Triclinic symmetry points with lattice parameters that satisfy
 
 ## tri1a ##
 # k_alpha > pi/2
@@ -433,7 +450,7 @@ def mclc5_sympts(a, b, c, alpha):
 # k_alpha > pi/2
 # k_beta > pi/2
 # k_gamma = pi/2
-tri1a2a_sympts = {"G": [0., 0., 0.],
+tri1a2a_sympts = {"$\Gamma$": [0., 0., 0.],
                   "L": [1./2, 1./2, 0.],
                   "M": [0., 1./2, 1./2],
                   "N": [1./2, 0., 1./2],
@@ -453,7 +470,7 @@ tri1a2a_sympts = {"G": [0., 0., 0.],
 # k_alpha < pi/2
 # k_beta < pi/2
 # k_gamma = pi/2
-tr1b2b_sympts = {"G": [0., 0., 0.],
+tr1b2b_sympts = {"$\Gamma$": [0., 0., 0.],
                  "L": [1./2, -1./2, 0.],
                  "M": [0., 0., 1./2],
                  "N": [-1./2, -1./2, 1./2],
@@ -462,7 +479,8 @@ tr1b2b_sympts = {"G": [0., 0., 0.],
                  "Y": [1./2, 0., 0.],
                  "Z": [-1./2, 0., 1./2]}
 
-def get_sympts(centering_type, lattice_constants, lattice_angles):
+def get_sympts(centering_type, lattice_constants, lattice_angles,
+               convention="ordinary"):
     """Find the symmetry points for the provided lattice.
 
     Args:
@@ -470,6 +488,8 @@ def get_sympts(centering_type, lattice_constants, lattice_angles):
             options include 'prim', 'base', 'body', and 'face'.
         lattice_constants (list): a list of lattice constants [a, b, c].
         lattice_angles (list): a list of lattice angles [alpha, beta, gamma].
+        convention (str): indicates the convention used in defining the reciprocal
+            lattice vectors. Options include 'ordinary' and 'angular'.
 
     Returns:
         (dict): a dictionary with a string of letters as the keys and lattice 
@@ -491,7 +511,7 @@ def get_sympts(centering_type, lattice_constants, lattice_angles):
     
     lattice_vectors = make_ptvecs(centering_type, lattice_constants,
                                   lattice_angles)
-    reciprocal_lattice_vectors = make_rptvecs(lattice_vectors)
+    reciprocal_lattice_vectors = make_rptvecs(lattice_vectors, convention=convention)
     
     rlat_veca = reciprocal_lattice_vectors[:,0] # individual reciprocal lattice vectors
     rlat_vecb = reciprocal_lattice_vectors[:,1]
@@ -616,7 +636,8 @@ def get_sympts(centering_type, lattice_constants, lattice_angles):
                "3D Bravais lattice.")
         raise ValueError(msg.format())
     
-def get_sympaths(centering_type, lattice_constants, lattice_angles):
+def get_sympaths(centering_type, lattice_constants, lattice_angles,
+                 convention="ordinary"):
     """Find the symmetry paths for the provided lattice.
 
     Args:
@@ -624,17 +645,19 @@ def get_sympaths(centering_type, lattice_constants, lattice_angles):
             options include 'prim', 'base', 'body', and 'face'.
         lattice_constants (list): a list of lattice constants [a, b, c].
         lattice_angles (list): a list of lattice angles [alpha, beta, gamma].
+        convention (str): indicates the convention used in defining the reciprocal
+            lattice vectors. Options include 'ordinary' and 'angular'.
 
     Returns:
         (dict): a dictionary with a string of letters as the keys and lattice 
-            coordinates of the symmetry points ase values.
+            coordinates of the symmetry points as values.
 
     Example:
         >>> lattice_constants = [4.05]*3
         >>> lattice_angles = [numpy.pi/2]*3
         >>> symmetry_points = get_sympts(lattice_constants, lattice_angles)
     """
-    
+        
     a = float(lattice_constants[0])
     b = float(lattice_constants[1])
     c = float(lattice_constants[2])
@@ -645,7 +668,7 @@ def get_sympaths(centering_type, lattice_constants, lattice_angles):
     
     lattice_vectors = make_ptvecs(centering_type, lattice_constants,
                                   lattice_angles)
-    reciprocal_lattice_vectors = make_rptvecs(lattice_vectors)
+    reciprocal_lattice_vectors = make_rptvecs(lattice_vectors, convention=convention)
     
     rlat_veca = reciprocal_lattice_vectors[:,0] # individual reciprocal lattice vectors
     rlat_vecb = reciprocal_lattice_vectors[:,1]
@@ -667,14 +690,14 @@ def get_sympaths(centering_type, lattice_constants, lattice_angles):
         if (np.isclose(a, b) and
             np.isclose(b, c)):
             if centering_type == "prim":
-                return [["G", "X"], ["X", "M"], ["M", "G"], ["G", "R"],
+                return [["$\Gamma$", "X"], ["X", "M"], ["M", "$\Gamma$"], ["$\Gamma$", "R"],
                         ["R", "X"], ["M", "R"]]
             elif centering_type == "body":
-                return [["G", "H"], ["H", "N"], ["N", "G"], ["G", "P"],
+                return [["$\Gamma$", "H"], ["H", "N"], ["N", "$\Gamma$"], ["$\Gamma$", "P"],
                         ["P", "H"], ["P", "N"]]
             elif centering_type == "face":
-                return [["G", "X"], ["X", "W"], ["W", "K"], ["K", "G"],
-                        ["G", "L"], ["L", "U"], ["U", "W"], ["W", "L"],
+                return [["$\Gamma$", "X"], ["X", "W"], ["W", "K"], ["K", "$\Gamma$"],
+                        ["$\Gamma$", "L"], ["L", "U"], ["U", "W"], ["W", "L"],
                         ["L", "K"], ["U", "X"]]
             else:
                 msg = ("Valid lattice centerings for cubic latices include "
@@ -684,17 +707,17 @@ def get_sympaths(centering_type, lattice_constants, lattice_angles):
         # Tetragonal.
         elif (np.isclose(a,b) and not np.isclose(b,c)):
             if centering_type == "prim":
-                return [["G", "X"], ["X", "M"], ["M", "G"], ["G", "Z"],
+                return [["$\Gamma$", "X"], ["X", "M"], ["M", "$\Gamma$"], ["$\Gamma$", "Z"],
                         ["Z", "R"], ["R", "A"], ["A", "Z"], ["X", "R"],
                         ["M", "A"]]
             elif centering_type == "body":
                 if c < a:
-                    return [["G", "X"], ["X", "M"], ["M", "G"], ["G", "Z"],
+                    return [["$\Gamma$", "X"], ["X", "M"], ["M", "$\Gamma$"], ["$\Gamma$", "Z"],
                             ["Z", "P"], ["P", "N"], ["N", "Z1"], ["Z1", "M"],
                             ["X", "P"]]
                 else:
-                    return [["G", "X"], ["X", "Y"], ["Y", "S"], ["S", "G"],
-                            ["G", "Z"], ["Z", "S1"], ["S1", "N"], ["N", "P"],
+                    return [["$\Gamma$", "X"], ["X", "Y"], ["Y", "S"], ["S", "$\Gamma$"],
+                            ["$\Gamma$", "Z"], ["Z", "S1"], ["S1", "N"], ["N", "P"],
                             ["P", "Y1"], ["Y1", "Z"], ["X", "P"]]
             else:
                 msg = ("Valid lattice centerings for tetragonal lattices "
@@ -704,32 +727,32 @@ def get_sympaths(centering_type, lattice_constants, lattice_angles):
         # Last of the lattices with all angles equal to pi/2 is orthorhombic.
         else:
             if centering_type == "prim": # orc
-                return [["G", "X"], ["X", "S"], ["S", "Y"], ["Y", "G"],
-                        ["G", "Z"], ["Z", "U"], ["U", "R"], ["R", "T"],
+                return [["$\Gamma$", "X"], ["X", "S"], ["S", "Y"], ["Y", "$\Gamma$"],
+                        ["$\Gamma$", "Z"], ["Z", "U"], ["U", "R"], ["R", "T"],
                         ["T", "Z"], ["Y", "T"], ["U", "X"], ["S", "R"]]
             elif centering_type == "base": # orcc
-                return [["G", "X"], ["X", "S"], ["S", "R"], ["R", "A"],
-                        ["A", "Z"], ["Z", "G"], ["G", "Y"], ["Y", "X1"],
+                return [["$\Gamma$", "X"], ["X", "S"], ["S", "R"], ["R", "A"],
+                        ["A", "Z"], ["Z", "$\Gamma$"], ["$\Gamma$", "Y"], ["Y", "X1"],
                         ["X1", "A1"], ["A1", "T"], ["T", "Y"], ["Z", "T"]]
             elif centering_type == "body": # orci
-                return [["G", "X"], ["X", "L"], ["L", "T"], ["T", "W"],
-                        ["W", "R"], ["R", "X1"], ["X1", "Z"], ["Z", "G"],
-                        ["G", "Y"], ["Y", "S"], ["S", "W"], ["L1", "Y"],
+                return [["$\Gamma$", "X"], ["X", "L"], ["L", "T"], ["T", "W"],
+                        ["W", "R"], ["R", "X1"], ["X1", "Z"], ["Z", "$\Gamma$"],
+                        ["$\Gamma$", "Y"], ["Y", "S"], ["S", "W"], ["L1", "Y"],
                         ["Y1", "Z"]]
             elif centering_type == "face":
                 if (1/a**2 > 1/b**2 +1/c**2): # orcf1
-                    return[["G", "Y"], ["Y", "T"], ["T", "Z"], ["Z", "G"],
-                           ["G", "X"], ["X", "A1"], ["A1", "Y"], ["T", "X1"],
-                           ["X", "A"], ["A", "Z"], ["L", "G"]]
+                    return[["$\Gamma$", "Y"], ["Y", "T"], ["T", "Z"], ["Z", "$\Gamma$"],
+                           ["$\Gamma$", "X"], ["X", "A1"], ["A1", "Y"], ["T", "X1"],
+                           ["X", "A"], ["A", "Z"], ["L", "$\Gamma$"]]
                 elif np.isclose(1/a**2, 1/b**2 +1/c**2): # orcf3
-                    return [["G", "Y"], ["Y", "T"], ["T", "Z"], ["Z", "G"],
-                            ["G", "X"], ["X", "A1"], ["A1", "Y"], ["X", "A"],
-                            ["A", "Z"], ["L", "G"]]                    
+                    return [["$\Gamma$", "Y"], ["Y", "T"], ["T", "Z"], ["Z", "$\Gamma$"],
+                            ["$\Gamma$", "X"], ["X", "A1"], ["A1", "Y"], ["X", "A"],
+                            ["A", "Z"], ["L", "$\Gamma$"]]                    
                 else: #orcf2
-                    return [["G", "Y"], ["Y", "C"], ["C", "D"], ["D", "X"],
-                            ["X", "G"], ["G", "Z"], ["Z", "D1"], ["D1", "H"],
+                    return [["$\Gamma$", "Y"], ["Y", "C"], ["C", "D"], ["D", "X"],
+                            ["X", "$\Gamma$"], ["$\Gamma$", "Z"], ["Z", "D1"], ["D1", "H"],
                             ["H", "C"], ["C1", "Z"], ["X", "H1"], ["H", "Y"],
-                            ["L", "G"]]            
+                            ["L", "$\Gamma$"]]            
             else:
                 msg = ("Valid lattice centerings for orthorhombic lattices "
                        "include 'prim', 'base', 'body', and 'face'.")
@@ -739,51 +762,51 @@ def get_sympaths(centering_type, lattice_constants, lattice_angles):
     if (np.isclose(alpha, beta) and np.isclose(beta, np.pi/2) and
         np.isclose(gamma, 2*np.pi/3) and np.isclose(a, b) and not
         np.isclose(b, c)):
-        return [["G", "M"], ["M", "K"], ["K", "G"], ["G", "A"], ["A", "L"],
+        return [["$\Gamma$", "M"], ["M", "K"], ["K", "$\Gamma$"], ["$\Gamma$", "A"], ["A", "L"],
                 ["L", "H"], ["H", "A"], ["L", "M"], ["K", "H"]]
 
     # Rhombohedral has equal angles and constants.
     elif (np.isclose(alpha, beta) and np.isclose(beta, gamma) and 
           np.isclose(a, b) and np.isclose(b, c)):
             if alpha < np.pi/2: # RHL1
-                return [["G", "L"], ["L", "B1"], ["B", "Z"], ["Z", "G"],
-                        ["G", "X"], ["Q", "F"], ["F", "P1"], ["P1", "Z"],
+                return [["$\Gamma$", "L"], ["L", "B1"], ["B", "Z"], ["Z", "$\Gamma$"],
+                        ["$\Gamma$", "X"], ["Q", "F"], ["F", "P1"], ["P1", "Z"],
                         ["L", "P"]]
             else: #RHL2
-                return [["G", "P"], ["P", "Z"], ["Z", "Q"], ["Q", "G"],
-                        ["G", "F"], ["F", "P1"], ["P1", "Q1"], ["Q1", "L"],
+                return [["$\Gamma$", "P"], ["P", "Z"], ["Z", "Q"], ["Q", "$\Gamma$"],
+                        ["$\Gamma$", "F"], ["F", "P1"], ["P1", "Q1"], ["Q1", "L"],
                         ["L", "Z"]]
 
     # Monoclinic a,b <= c, alpha < pi/2, beta = gamma = pi/2, a != b != c
     elif (not (a > c or b > c) and np.isclose(beta, gamma) and
           np.isclose(beta, np.pi/2) and alpha < np.pi/2):
         if centering_type == "prim":
-            return [["G", "Y"], ["Y", "H"], ["H", "C"], ["C", "E"],
+            return [["$\Gamma$", "Y"], ["Y", "H"], ["H", "C"], ["C", "E"],
                     ["E", "M1"], ["M1", "A"], ["A", "X"], ["X", "H1"],
                     ["M", "D"], ["D", "Z"], ["Y", "D"]]
         elif centering_type == "base": # MCLC1
-            if kgamma > np.pi/2:
-                return [["G", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
-                        ["I1", "Z"], ["Z", "F1"], ["Y", "X1"], ["X", "G"],
-                        ["G", "N"], ["M", "G"]]
-            elif np.isclose(kgamma, np.pi/2): # MCLC2
-                return [["G", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
-                        ["I1", "Z"], ["Z", "F1"], ["N", "G"], ["G", "M"]]
+            if np.isclose(kgamma, np.pi/2): # MCLC2
+                return [["$\Gamma$", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
+                        ["I1", "Z"], ["Z", "F1"], ["N", "$\Gamma$"], ["$\Gamma$", "M"]]        
+            elif kgamma > np.pi/2:
+                return [["$\Gamma$", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
+                        ["I1", "Z"], ["Z", "F1"], ["Y", "X1"], ["X", "$\Gamma$"],
+                        ["$\Gamma$", "N"], ["M", "$\Gamma$"]]
             elif (kgamma < np.pi/2 # MCLC3
                   and ((b*np.cos(alpha)/c + (b*np.sin(alpha)/a)**2) < 1)):
-                return [["G", "Y"], ["Y", "F"], ["F", "H"], ["H", "Z"],
+                return [["$\Gamma$", "Y"], ["Y", "F"], ["F", "H"], ["H", "Z"],
                         ["Z", "I"], ["I", "F1"], ["H1", "Y1"], ["Y1", "X"],
-                        ["X", "G"], ["G", "N"], ["M", "G"]]
+                        ["X", "$\Gamma$"], ["$\Gamma$", "N"], ["M", "$\Gamma$"]]
             elif (kgamma < np.pi/2 and # MCLC4
                   np.isclose(b*np.cos(alpha)/c + (b*np.sin(alpha)/a)**2, 1)):
-                return [["G", "Y"], ["Y", "F"], ["F", "H"], ["H", "Z"], 
-                        ["Z", "I"], ["H1", "Y1"], ["Y1", "X"], ["X", "G"],
-                        ["G", "N"], ["M", "G"]]
+                return [["$\Gamma$", "Y"], ["Y", "F"], ["F", "H"], ["H", "Z"], 
+                        ["Z", "I"], ["H1", "Y1"], ["Y1", "X"], ["X", "$\Gamma$"],
+                        ["$\Gamma$", "N"], ["M", "$\Gamma$"]]
             elif (kgamma < np.pi/2 and # MCLC5
                   (b*np.cos(alpha)/c + (b*np.sin(alpha)/a)**2) > 1.):
-                return [["G", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
+                return [["$\Gamma$", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"],
                         ["I1", "Z"], ["Z", "H"], ["H", "F1"], ["H1", "Y1"],
-                        ["Y1", "X"], ["X", "G"], ["G", "N"], ["M", "G"]]
+                        ["Y1", "X"], ["X", "$\Gamma$"], ["$\Gamma$", "N"], ["M", "$\Gamma$"]]
             else:
                 msg = "Something is wrong with the monoclinic lattice provided."
                 raise ValueError(msg.format(reciprocal_lattice_vectors))
@@ -798,19 +821,19 @@ def get_sympaths(centering_type, lattice_constants, lattice_angles):
               np.isclose(alpha, gamma)):
         kangles = np.sort([kalpha, kbeta, kgamma])
         if kangles[0] > np.pi/2: # TRI1a
-            return [["X", "G"], ["G", "Y"], ["L", "G"], ["G", "Z"], ["N", "G"],
-                    ["G", "M"], ["R", "G"]]
+            return [["X", "$\Gamma$"], ["$\Gamma$", "Y"], ["L", "$\Gamma$"], ["$\Gamma$", "Z"], ["N", "$\Gamma$"],
+                    ["$\Gamma$", "M"], ["R", "$\Gamma$"]]
         elif kangles[2] < np.pi/2: #TRI1b
-            return [["X", "G"], ["G", "Y"], ["L", "G"], ["G", "Z"],
-                    ["N", "G"], ["G", "M"], ["R", "G"]]
+            return [["X", "$\Gamma$"], ["$\Gamma$", "Y"], ["L", "$\Gamma$"], ["$\Gamma$", "Z"],
+                    ["N", "$\Gamma$"], ["$\Gamma$", "M"], ["R", "$\Gamma$"]]
         elif (np.isclose(kangles[0], np.pi/2) and (kangles[1] > np.pi/2) and
               (kangles[2] > np.pi/2)): #TRI2a
-            return [["X", "G"], ["G", "Y"], ["L", "G"], ["G", "Z"], ["N", "G"],
-                    ["G", "M"], ["R", "G"]]
+            return [["X", "$\Gamma$"], ["$\Gamma$", "Y"], ["L", "$\Gamma$"], ["$\Gamma$", "Z"], ["N", "$\Gamma$"],
+                    ["$\Gamma$", "M"], ["R", "$\Gamma$"]]
         elif (np.isclose(kangles[2], np.pi/2) and (kangles[0] < np.pi/2) and
               (kangles[1] < np.pi/2)): #TRI2b
-            return [["X", "G"], ["G", "Y"], ["L", "G"], ["G", "Z"],
-                    ["N", "G"], ["G", "M"], ["R", "G"]]
+            return [["X", "$\Gamma$"], ["$\Gamma$", "Y"], ["L", "$\Gamma$"], ["$\Gamma$", "Z"],
+                    ["N", "$\Gamma$"], ["$\Gamma$", "M"], ["R", "$\Gamma$"]]
         else:
             msg = "Something is wrong with the triclinic lattice provided."
             raise ValueError(msg.format(reciprocal_lattice_vectors))
@@ -820,16 +843,16 @@ def get_sympaths(centering_type, lattice_constants, lattice_angles):
         raise ValueError(msg.format())
     
 def make_ptvecs(center_type, lat_consts, lat_angles):
-    """Provided the lattice type, constants, and angles, return the primitive 
+    """Provided the center type, lattice constants and angles, return the primitive
     translation vectors.
 
     Args:
         center_type (str): identifies the location of the atoms in the cell.
         lat_consts (float or int): the characteristic spacing of atoms in the
-            material with a first, b second, and c third in the list. These
+            material with 'a' first, 'b' second, and 'c' third in the list. These
             are typically ordered such that a < b < c.
         angles (list): a list of angles between the primitive translation vectors,
-            in radians, with alpha the first entry, beta the second, and gamma the 
+            in radians, with 'alpha' the first entry, 'beta' the second, and 'gamma' the
             third in the list.
 
     Returns:
@@ -961,19 +984,31 @@ def make_ptvecs(center_type, lat_consts, lat_angles):
         msg = "Please provide a valid centering type."
         raise ValueError(msg.format(center_type))
 
-def make_rptvecs(A):
+
+def make_rptvecs(A, convention="ordinary"):
     """Return the reciprocal primitive translation vectors of the provided
     vectors.
 
     Args:
         A (list or numpy.ndarray): the primitive translation vectors in real space 
             as the columns of a nested list or numpy array.
+        convention (str): gives the convention that defines the reciprocal lattice vectors.
+            This is really the difference between using ordinary frequency and angular
+            frequency, and whether the transformation between real and reciprocal space is
+            unitary.
     Return:
         B (numpy.ndarray): return the primitive translation vectors in 
             reciprocal space as the columns of a matrix.    
     """
-    return np.transpose(np.linalg.inv(A))*2*np.pi
-    
+    if convention == "ordinary":
+        return np.transpose(np.linalg.inv(A))
+    elif convention == "angular":
+        return np.transpose(np.linalg.inv(A))*2*np.pi
+    else:
+        msg = "The two allowed conventions are ordinary and angular."
+        raise ValueError(msg.format(convention))
+
+
 def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
     """Create the vectors that generate a lattice.
 
@@ -1217,11 +1252,26 @@ def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
             msg = ("No lattice angle should be equal to pi/2 radians for a "
                    "rhombohedral lattice.")
             raise ValueError(msg.format(lattice_angles))
-        
+        if (np.isclose(alpha, np.pi/3) or np.isclose(beta, np.pi/3) or
+            np.isclose(gamma, np.pi/3)):
+            msg = ("No lattice angle should be equal to pi/3 radians for a "
+                   "rhombohedral lattice.")
+            raise ValueError(msg.format(lattice_angles))
+        if (np.isclose(alpha, np.arccos(-1/3)) or np.isclose(beta, np.arccos(-1/3)) or
+            np.isclose(gamma, np.arccos(-1/3))):
+            msg = ("No lattice angle should be equal to arccos(-1/3) radians for a "
+                   "rhombohedral lattice.")
+            raise ValueError(msg.format(lattice_angles))                
+        if (alpha > 2*np.pi/3):
+            msg = ("The lattice angle should be less than 2*pi/3 radians for a "
+                   "rhombohedral lattice.")
+            raise ValueError(msg.format(lattice_angles))
+
         a1 = [a*np.cos(alpha/2), -a*np.sin(alpha/2), 0]
         a2 = [a*np.cos(alpha/2),  a*np.sin(alpha/2), 0]
-        a3 = [a*np.cos(alpha)/np.cos(alpha/2), 0,
-              a*np.sqrt(1 - np.cos(alpha)**2/np.cos(alpha/2)**2)]
+        a3x = a*np.cos(alpha)/abs(np.cos(alpha/2))
+        a3 = [a3x, 0, np.sqrt(a**2 - a3x**2)]
+        
         lattice_vectors = np.transpose(np.array([a1, a2, a3], dtype=float))
         return lattice_vectors
 
@@ -1295,7 +1345,7 @@ def make_lattice_vectors(lattice_type, lattice_constants, lattice_angles):
         msg = "Please provide a valid lattice type."
         raise ValueError(msg.format(lattice_type))
 
-def sym_path(lattice, npts):
+def sym_path(lattice, npts, cart=False):
     """Create an array of lattice coordinates along the symmetry paths of 
     the lattice.
 
@@ -1303,6 +1353,8 @@ def sym_path(lattice, npts):
         lattice (:py:obj:`BZI.symmetry.Lattice`): an instance of the Lattice
             class.
         npts (int): the number of points on each symmetry path.
+        cart (bool): if true, return the k-points in Cartesian coordinates. The 
+            reciprocal lattice vectors will be used in the conversion.
     Return:
         (numpy.array): an array of lattice coordinates along the symmetry
             paths.
@@ -1328,9 +1380,13 @@ def sym_path(lattice, npts):
         else:
             del ipath[-1]
             paths += ipath
-    return paths    
+    
+    if cart:
+        return [np.dot(lattice.reciprocal_vectors, k) for k in paths]
+    else:
+        return paths    
 
-def point_group(lat_vecs):
+def get_point_group1(lat_vecs):
     """Return the point group of a lattice.
 
     Args:
@@ -1341,7 +1397,7 @@ def point_group(lat_vecs):
     """
     # _get_lattice_pointGroup has the vectors as rows instead of columns.
     lat_vecs = np.transpose(lat_vecs)
-    return get_lattice_pointGroup(lat_vecs)
+    return get_lattice_pointGroup(lat_vecs, 1e-12)
 
 def shells(vector, lat_vecs):
     """Find the vectors that are equivalent to another vector by
@@ -1356,7 +1412,7 @@ def shells(vector, lat_vecs):
         unique_shells (list): a list of vectors expressed as numpy arrays.    
     """
 
-    pointgroup = point_group(lat_vecs)
+    pointgroup = get_point_group(lat_vecs)
     all_shells = (np.dot(pointgroup, vector)).tolist()
     unique_shells = []
     for sh in all_shells:  
@@ -1390,10 +1446,11 @@ def shells_list(vectors, lat_vecs):
     nested_shells = [shells(i, lat_vecs) for i in vectors]
     return np.array(list(itertools.chain(*nested_shells)))
             
-def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False,
+def get_orbits(grid_car, lat_vecs, coord = "cart", duplicates=False,
                   eps=10):
     """ Find the partial orbitals of the points in a grid, including only the
-    points that are in the grid.
+    points that are in the grid. This symmetry reduction routine doesn't scale
+    linearly. It is highly recommended that you use find_orbits instead.
 
     Args:
         grid_car (numpy.ndarray): a list of grid point positions in Cartesian 
@@ -1445,7 +1502,7 @@ def find_orbitals(grid_car, lat_vecs, coord = "cart", duplicates=False,
     gp_orbitals = {}
     nirr_kpts = 0
     grid_copy = list(deepcopy(grid_lat))
-    pointgroup = point_group(lat_vecs)
+    pointgroup = get_point_group(lat_vecs)
     pointgroup = np.matmul(np.matmul(inv(lat_vecs), pointgroup), lat_vecs)
 
     while len(grid_copy) != 0:
@@ -1504,7 +1561,7 @@ def find_full_orbitals(grid_car, lat_vecs, coord = "cart", unitcell=False):
     gp_orbitals = {}
     nirr_kpts = 0
     grid_copy = deepcopy(grid_lat)
-    pointgroup = point_group(lat_vecs)
+    pointgroup = get_point_group(lat_vecs)
 
     # To move an operator into lattice coordinates you have to take the product
     # L^(-1) O L where L is the lattice vectors and O is the operator.
@@ -1550,8 +1607,8 @@ def find_lattice_type(centering_type, lattice_constants, lattice_angles):
         centering_type (str): how points are centered in the conventional
             unit cell of the lattice. Options include 'prim', 'base', 'body',
             and 'face'.
-        lattice_constants (list or numpy.ndarray): the axial lengths of the
-            conventional lattice vectors.
+        lattice_constants (list or numpy.ndarray): the axial lengths
+            of the conventional lattice vectors.  
         lattice_angles (list or numpy.ndarray): the interaxial angles of the
             conventional lattice vectors.
 
@@ -1565,6 +1622,7 @@ def find_lattice_type(centering_type, lattice_constants, lattice_angles):
                                              lattice_constants,
                                              lattice_angles)
     """
+
     
     # Extract parameters.
     a = float(lattice_constants[0])
@@ -1631,7 +1689,7 @@ def find_lattice_type(centering_type, lattice_constants, lattice_angles):
                        "is 'prim'.")
                 raise ValueError(msg.format(centering_type))
         else:
-            msg = ("None of the lattice constants should have the same value "
+            msg = ("All of the lattice constants should have the same value "
                    "for a rhombohedral lattice")
             raise ValueError(msg.format(lattice_constants))
         
@@ -1790,7 +1848,7 @@ def HermiteNormalForm(S, eps=10):
         minidx, maxidx = get_minmax_indices(H[0,:])
         minm = H[0,minidx]
         # Subtract a multiple of the column containing the smallest element from
-        # the row containing the largest element.
+        # the column containing the largest element.
         multiple = int(H[0, maxidx]/minm)
         H[:, maxidx] = H[:, maxidx] - multiple*H[:, minidx]
         B[:, maxidx] = B[:, maxidx] - multiple*B[:, minidx]
@@ -2092,7 +2150,7 @@ def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
     D = np.round(np.diag(S), eps).astype(int)
     
     cOrbit = 0 # unique orbit counter
-    pointgroup = point_group(lattice_vectors) # a list of point group operators
+    pointgroup = get_point_group(lattice_vectors) # a list of point group operators
     nSymOps = len(pointgroup) # the number of symmetry operations
     nUR = len(kpoint_list) # the number of unreduced k-points
     
@@ -2139,7 +2197,8 @@ def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
 
     return reduced_kpoints, kpoint_weights
 
-def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
+
+def find_orbits(kpoint_list, rlattice_vectors, grid_vectors, shift,
                 eps=9):
     """Use the point group symmetry of the lattice vectors to reduce a list of
     k-points.
@@ -2147,7 +2206,7 @@ def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
     Args:
         kpoint_list (list or numpy.ndarray): a list of k-point positions in
             Cartesian coordinates.
-        lattice_vectors (list or numpy.ndarray): the vectors that generate the
+        rlattice_vectors (list or numpy.ndarray): the vectors that generate the
             reciprocal lattice in a 3x3 array with the vectors as columns.
         grid_vectors (list or numpy.ndarray): the vectors that generate the
             k-point grid in a 3x3 array with the vectors as columns in 
@@ -2161,18 +2220,18 @@ def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
     """
     
     try:
-        inv(lattice_vectors)
+        inv(rlattice_vectors)
     except np.linalg.linalg.LinAlgError:
         msg = "The lattice generating vectors are linearly dependent."
-        raise ValueError(msg.format(lattice_vectors))
+        raise ValueError(msg.format(rlattice_vectors))
     
     try:
         inv(grid_vectors)
     except np.linalg.linalg.LinAlgError:
         msg = "The grid generating vectors are linearly dependent."
-        raise ValueError(msg.format(lattice_vectors))
+        raise ValueError(msg.format(rlattice_vectors))
         
-    if abs(det(lattice_vectors)) < abs(det(grid_vectors)):
+    if abs(det(rlattice_vectors)) < abs(det(grid_vectors)):
         msg = """The k-point generating vectors define a grid with a unit cell 
         larger than the reciprocal lattice unit cell."""
         raise ValueError(msg.format(grid_vectors))
@@ -2181,7 +2240,7 @@ def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
     shift = np.dot(grid_vectors, shift)
 
     # Integer matrix
-    N = np.dot(inv(grid_vectors), lattice_vectors)
+    N = np.dot(inv(grid_vectors), rlattice_vectors)
     # Check that N is an integer matrix. In other words, verify that the grid
     # and lattice are commensurate.
     for i in range(len(N[:,0])):
@@ -2203,7 +2262,7 @@ def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
     D = np.round(np.diag(S), eps).astype(int)
     
     cOrbit = 0 # unique orbit counter
-    pointgroup = point_group(lattice_vectors) # a list of point group operators
+    pointgroup = get_point_group(rlattice_vectors) # a list of point group operators
     nSymOps = len(pointgroup) # the number of symmetry operations
     nUR = len(kpoint_list) # the number of unreduced k-points
     # A dictionary to keep track of the number of symmetrically-equivalent
@@ -2235,7 +2294,7 @@ def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
             # Rotate the k-point.
             rot_kpt = np.dot(pg, ur_kpt)
             # Bring it back into the first unit cell.
-            rot_kpt = bring_into_cell(rot_kpt, lattice_vectors)
+            rot_kpt = bring_into_cell(rot_kpt, rlattice_vectors)
             if not np.allclose(np.dot(invK, rot_kpt-shift),
                                np.round(np.dot(invK, rot_kpt-shift))):
                 continue
@@ -2245,7 +2304,12 @@ def find_orbits(kpoint_list, lattice_vectors, grid_vectors, shift,
                 iWt[cOrbit] += 1
 
     hashtable = dict((k, v) for k, v in hashtable.items() if v)
-    return hashtable, iFirst
+
+    kpoint_list = np.array(kpoint_list)
+    reduced_kpoints = kpoint_list[list(iFirst.values())]
+    return reduced_kpoints, iWt.values()
+    # return hashtable, iFirst
+    
 
 def minkowski_reduce_basis(basis, eps):
     """Find the Minkowski representation of a basis.
@@ -2261,7 +2325,7 @@ def minkowski_reduce_basis(basis, eps):
 
     return _minkowski_reduce_basis(basis.T, 10**(-eps)).T
 
-def brillouin_zone_mapper(grid, rlattice_vectors, grid_vectors, shift, eps=15):
+def map_to_bz(grid, rlattice_vectors, grid_vectors, shift, eps=15):
     """Map a grid into the first Brillouin zone in Minkowski space.
     
     Args:
@@ -2269,6 +2333,8 @@ def brillouin_zone_mapper(grid, rlattice_vectors, grid_vectors, shift, eps=15):
         rlattice_vectors (numpy.ndarray): a matrix whose columes are the
             reciprocal lattice generating vectors.
         grid_vectors (numpy.ndarray): the grid generating vectors.
+        shift (list or numpy.ndarray): the offset of the k-point grid in grid
+            coordinates.
         eps (int): finite precision parameter that is the integer exponent in
             10**(-eps).
     Returns:
@@ -2278,8 +2344,9 @@ def brillouin_zone_mapper(grid, rlattice_vectors, grid_vectors, shift, eps=15):
     """
 
     # Reduce the grid and move into the unit cell.
-    reduced_grid, weights = reduce_kpoint_list(grid, rlattice_vectors, grid_vectors,
-                                      shift, eps)    
+    # reduced_grid, weights = reduce_kpoint_list(grid, rlattice_vectors, grid_vectors,
+    #                                   shift, eps)
+    reduced_grid, weights = find_orbits(grid, rlattice_vectors, grid_vectors, shift)
     reduced_grid = np.array(reduced_grid)
     
     # Find the Minkowski basis.
@@ -2298,3 +2365,108 @@ def brillouin_zone_mapper(grid, rlattice_vectors, grid_vectors, shift, eps=15):
                 reduced_grid[i] = pt2
 
     return reduced_grid, weights
+
+
+def number_of_point_operators(lattice_type):
+    """Return the number of point group operators for the provided lattice type.
+
+    Args:
+        lattice_type (str): the Bravais lattice.
+
+    Returns:
+        (int): the number of point group symmetry operators for the Bravais lattice.
+    """
+
+    num_operators = [2, 4, 8, 12, 16, 24, 48]
+    lat_types = ['triclinic', 'monoclinic', 'orthorhombic', 'rhombohedral', 'tetragonal',
+             'hexagonal', 'cubic']
+    lat_dict = {i:j for i,j in zip(lat_types, num_operators)}
+
+    try:        
+        return lat_dict[lattice_type]
+    except:
+        msg = ("Please provide a Bravais lattice, excluding atom centering, such as "
+               "'cubic' or 'hexagonal'.")
+        raise ValueError(msg.format(lattice_type))
+
+
+def search_sphere(lat_vecs, eps=1e-12):
+    """Find all the lattice points within a sphere whose radius is the same
+    as the length of the longest lattice vector.
+    
+    Args:
+        lat_vecs (numpy.ndarray): the lattice vectors as columns of a 3x3 array.
+        
+    Returns:
+        sphere_points (numpy.ndarray): a 1D array of points within the sphere.
+    """
+    
+    a0 = lat_vecs[:,0]
+    a1 = lat_vecs[:,1]
+    a2 = lat_vecs[:,2]
+
+    # Let's orthogonalize the lattice vectors be removing parallel components.
+    a0_hat = a0/norm(a0)
+    a1_hat = a1/norm(a1)
+
+    a1p = a1 - np.dot(a1, a0_hat)*a0_hat
+    a1p_hat = a1p/norm(a1p)
+
+    a2p = a2 - np.dot(a2, a1p_hat)*a1p_hat - np.dot(a2, a0_hat)*a0_hat
+
+    max_norm = max(norm(lat_vecs, axis=0))
+    max_indices = [int(np.ceil(max_norm/norm(a0) + eps)), int(np.ceil(max_norm/norm(a1p) + eps)),
+                   int(np.ceil(max_norm/norm(a2p) + eps))]
+    imin = -max_indices[0]
+    imax =  max_indices[0] + 1
+    jmin = -max_indices[1]
+    jmax =  max_indices[1] + 1
+    kmin = -max_indices[2]
+    kmax =  max_indices[2] + 1
+    
+    sphere_pts = []
+    for i,j,k in it.product(range(imin, imax), range(jmin, jmax), range(kmin, kmax)):        
+        pt = np.dot(lat_vecs, [i,j,k])
+        if (np.dot(pt, pt) - eps) < max_norm**2:
+            sphere_pts.append(pt)
+
+    return np.array(sphere_pts)
+
+
+def get_point_group(lat_vecs):
+    """Get the point group of a lattice.
+
+    Args:
+        lat_vecs (numpy.ndarray): a 3x3 array with the lattice vectors as columns.
+
+    Returns:
+        point_group (numpy.ndarray): a list of rotations, reflections and improper
+            rotations.
+    """
+    
+    eps = 1e-10
+    pts = search_sphere(lat_vecs)
+    a1 = lat_vecs[:,0]
+    a2 = lat_vecs[:,1]
+    a3 = lat_vecs[:,2]
+
+    inv_lat_vecs = inv(lat_vecs)
+    point_group = []
+    for p1,p2,p3 in it.permutations(pts, 3):
+        # In a unitary transformation, the length of the vectors will be
+        # preserved.
+        if (np.isclose(np.dot(p1,p1), np.dot(a1,a1)) and
+            np.isclose(np.dot(p2,p2), np.dot(a2,a2)) and
+            np.isclose(np.dot(p3,p3), np.dot(a3,a3))):
+            new_lat_vecs = np.transpose([p1,p2,p3])
+            # The volume of a parallelepiped given by the new basis should
+            # be the same.
+            if np.isclose(abs(det(new_lat_vecs)), abs(det(lat_vecs))):
+                op = np.dot(new_lat_vecs, inv_lat_vecs)
+                # Check that the rotation, reflection, or improper rotation 
+                # is an orthogonal matrix.
+                if np.allclose(np.eye(3), np.dot(op, op.T)):
+                    # Make sure this operator is unique.
+                    if not check_contained(op, point_group):
+                        point_group.append(op)
+    return point_group

@@ -1,15 +1,13 @@
-install: travis_wait mvn install
 language: python
 cache: pip
 python:
-  - "2.7"
   - "3.6"
 # command to install dependencies
 install:
-  - pip install --upgrade setuptools
-  - pip install --upgrade -r requirements.txt
-  - pip install --upgrade .
-  - pip install --upgrade tox-travis
+  - pip3 install --upgrade setuptools
+  - pip3 install --upgrade -r requirements.txt
+  - pip3 install --upgrade .
+  - pip3 install --upgrade tox-travis
 # command to run tests
-script: tox
+script: travis_wait 60 tox
 after_success: coveralls

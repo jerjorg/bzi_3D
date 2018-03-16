@@ -6,7 +6,8 @@ from itertools import product
 from copy import deepcopy
 import math
 
-from BZI.symmetry import find_orbitals, bring_into_cell
+from BZI.symmetry import get_orbits, bring_into_cell
+
 
 def find_tetrahedra(vertices):
     """Determine how a parallelepiped should be split into tetrahedra by
@@ -63,6 +64,7 @@ def find_tetrahedra(vertices):
         raise ValueError(msg.format())
     return tetrahedra
 
+
 def number_of_states(VG, VT, energies, e):
     """Calculate the contribution of an individual tetrahedron to the total number
     of states. These weights differ from those in Blochl's paper by a factor of 2.
@@ -114,6 +116,7 @@ def number_of_states(VG, VT, energies, e):
     else:
         return 2.*(VT/VG)
 
+    
 def find_adjacent_tetrahedra(tetrahedra_list, k):
     """For each k point in the grid, this function generates a list of
     tetrahedra indices for each tetrahedron containing the k point.
@@ -171,13 +174,13 @@ def convert_tet_index(tetind, ndiv0):
         return tetind - npts
 
 
-def corrected_integration_weights(PP, grid, tetrahedra_list, tetrahedron,
+def corrected_integration_weights(EPM, grid, tetrahedra_list, tetrahedron,
                                   iband, ndiv0):
     """Determine the corrected integration weights of a single tetrahedron and 
     band.
     
     Args:
-        PP (:py:obj:`BZI.pseudopots.EmpiricalPP`): a pseudopotential object.
+        EPM (:py:obj:`BZI.pseudopots.EmpiricalPseudopotential`): a pseudopotential object.
             tetrahedra (numpy.ndarray): lists of tetrahedra vertices.
         grid (numpy.ndarray): a Monkhorst-Pack grid.
         tetrahedra_list (list): a list of tetrahedra where each tetrahedra is a
@@ -203,9 +206,9 @@ def corrected_integration_weights(PP, grid, tetrahedra_list, tetrahedron,
     npts = np.prod(ndiv0)
     ntets = npts*6
     
-    VT = PP.lattice.reciprocal_volume/ntets
-    VG = PP.lattice.reciprocal_volume
-    neigvals = int(np.ceil(PP.nvalence_electrons/2)+1)
+    VT = EPM.lattice.reciprocal_volume/ntets
+    VG = EPM.lattice.reciprocal_volume
+    neigvals = int(np.ceil(EPM.nvalence_electrons/2)+1)
 
     # Find the correction to the integration weights. This is done according to
     # Eq. 22 in Blochl's improved tetrahedron paper.
@@ -213,7 +216,7 @@ def corrected_integration_weights(PP, grid, tetrahedra_list, tetrahedron,
     # We're going to calculate the weight correction for the k-points of
     # the tetrahedron being considered.
     corrections = [0.]*4
-    energies = [PP.eval(grid[ki], iband+1)[iband] for ki in tet_grid_indices]
+    energies = [EPM.eval(grid[ki], iband+1)[iband] for ki in tet_grid_indices]
     tet_grid_indices = tet_grid_indices[np.argsort(energies)]
     tetrahedron = tetrahedron[np.argsort(energies)]
     energies = np.sort(energies)
@@ -226,15 +229,15 @@ def corrected_integration_weights(PP, grid, tetrahedra_list, tetrahedron,
             t_correction = 0
             for kj in tet:
                 kindex = convert_tet_index(kj, ndiv0)
-                enj = PP.eval(grid[kindex], neigvals)[iband]
+                enj = EPM.eval(grid[kindex], neigvals)[iband]
                 adj_tet_energies.append(enj)
                 t_correction += enj - en
             adj_tet_energies = np.sort(adj_tet_energies)
-            t_correction *= density_of_states(VG, VT, adj_tet_energies, PP.fermi_level)
+            t_correction *= density_of_states(VG, VT, adj_tet_energies, EPM.fermi_level)
             corrections[i] += t_correction
             
     corrections = np.array(corrections)/40
-    uncorrected_weights = np.array(integration_weights(VT, energies, PP.fermi_level))
+    uncorrected_weights = np.array(integration_weights(VT, energies, EPM.fermi_level))
     
     return energies, uncorrected_weights + corrections
 
@@ -310,6 +313,7 @@ def integration_weights(VT, energies, eF):
     else:
         return [VT/4.]*4
 
+    
 def density_of_states(VG, VT, energies, e):
     """Calculate the contribution to the density of states of a single tetrahedron
     and energy band. These weights differ from those in blochl's paper by a factor
@@ -356,12 +360,12 @@ def density_of_states(VG, VT, energies, e):
         return 3*(VT/VG)*(e4 - e)**2/(e41*e42*e43)*2.
 
 
-def make_extended_grid_indices(PP, ndivisions, lat_shift=[0,0,0], grid_shift=[0,0,0]):
+def make_extended_grid_indices(EPM, ndivisions, lat_shift=[0,0,0], grid_shift=[0,0,0]):
     """Find the extended grid and indices for the non-extended grid for 
     the improved tetrahedron method.
 
     Args:
-        PP (:py:obj:`BZI.pseudopots.EmpiricalPP`): a pseudopotential object
+        EPM (:py:obj:`BZI.pseudopots.EmpiricalPseudopotential`): a pseudopotential object
         ndivisions (list): a list of integers that represent the number of 
             divisions along each basis vector to take when creating the grid.
         lat_shift (list or numpy.ndarray): a vector that shifts the grid in 
@@ -378,15 +382,15 @@ def make_extended_grid_indices(PP, ndivisions, lat_shift=[0,0,0], grid_shift=[0,
         ndivisions = [ndivisions, ndivisions, ndivisions]
     ndiv0 = np.array(ndivisions)
     ndiv1 = ndiv0+1
-    offset = np.dot(PP.lattice.reciprocal_vectors, lat_shift) - (
-        np.dot(PP.lattice.reciprocal_vectors, grid_shift)/ndivisions)
+    offset = np.dot(EPM.lattice.reciprocal_vectors, lat_shift) - (
+        np.dot(EPM.lattice.reciprocal_vectors, grid_shift)/ndivisions)
     npts = np.prod(ndiv1)
     grid = np.empty(ndiv1, dtype=list)
     
     indices = np.empty(ndiv0, dtype=int)
     
     for k,j,i in product(range(ndiv1[0]), range(ndiv1[1]), range(ndiv1[2])):
-        grid[k,j,i] = np.dot(PP.lattice.reciprocal_vectors, 
+        grid[k,j,i] = np.dot(EPM.lattice.reciprocal_vectors, 
                              np.array([i,j,k], dtype=float)/ndiv0) + offset
 
     for k,j,i in product(range(ndiv0[0]), range(ndiv0[1]), range(ndiv0[2])):
@@ -404,11 +408,11 @@ def make_extended_grid_indices(PP, ndivisions, lat_shift=[0,0,0], grid_shift=[0,
     return grid, indices
     
 
-def grid_and_tetrahedra(PP, ndivisions, lat_shift=[0,0,0], grid_shift=[0,0,0]):
+def grid_and_tetrahedra(EPM, ndivisions, lat_shift=[0,0,0], grid_shift=[0,0,0]):
     """Find the grid and tetrahedra for the improved tetrahedron method.
 
     Args:
-        PP (:py:obj:`BZI.pseudopots.EmpiricalPP`): a pseudopotential object
+        EPM (:py:obj:`BZI.pseudopots.EmpiricalPseudopotential`): a pseudopotential object
         ndivisions (list): a list of integers that represent the number of 
             divisions along each basis vector to take when creating the grid.
         lat_shift (list or numpy.ndarray): a vector that shifts the grid in 
@@ -426,15 +430,15 @@ def grid_and_tetrahedra(PP, ndivisions, lat_shift=[0,0,0], grid_shift=[0,0,0]):
         ndivisions = [ndivisions, ndivisions, ndivisions]
     ndiv0 = np.array(ndivisions)
     ndiv1 = ndiv0+1
-    offset = np.dot(PP.lattice.reciprocal_vectors, lat_shift) - (
-        np.dot(PP.lattice.reciprocal_vectors, grid_shift)/ndivisions)
+    offset = np.dot(EPM.lattice.reciprocal_vectors, lat_shift) - (
+        np.dot(EPM.lattice.reciprocal_vectors, grid_shift)/ndivisions)
     npts = np.prod(ndiv1)
     grid = np.empty(ndiv1, dtype=list)
     indices = np.empty(ndiv1, dtype=int)
     
     for k,j,i in product(range(ndiv1[0]), range(ndiv1[1]), range(ndiv1[2])):
         index = int(i + ndiv1[2]*(j + ndiv1[1]*k))
-        grid[k,j,i] = np.dot(PP.lattice.reciprocal_vectors, 
+        grid[k,j,i] = np.dot(EPM.lattice.reciprocal_vectors, 
                              np.array([i,j,k], dtype=float)/ndiv0) + offset
         indices[k,j,i] = index
 
@@ -463,11 +467,11 @@ def grid_and_tetrahedra(PP, ndivisions, lat_shift=[0,0,0], grid_shift=[0,0,0]):
     return grid, tetrahedra
 
 
-def get_grid_tetrahedra(PP, ndivisions, lat_shift=[0,0,0], grid_shift=[0,0,0]):
+def get_grid_tetrahedra(EPM, ndivisions, lat_shift=[0,0,0], grid_shift=[0,0,0]):
     """Find the grid and tetrahedra for the improved tetrahedron method.
 
     Args:
-        PP (:py:obj:`BZI.pseudopots.EmpiricalPP`): a pseudopotential object
+        EPM (:py:obj:`BZI.pseudopots.EmpiricalPseudopotential`): a pseudopotential object
         ndivisions (list): a list of integers that represent the number of 
             divisions along each basis vector to take when creating the grid.
         lat_shift (list or numpy.ndarray): a vector that shifts the grid in 
@@ -485,22 +489,22 @@ def get_grid_tetrahedra(PP, ndivisions, lat_shift=[0,0,0], grid_shift=[0,0,0]):
         ndivisions = [ndivisions, ndivisions, ndivisions]
     ndiv0 = np.array(ndivisions)
     ndiv1 = ndiv0+1
-    offset = np.dot(PP.lattice.reciprocal_vectors, lat_shift) - (
-        np.dot(PP.lattice.reciprocal_vectors, grid_shift)/ndivisions)
+    offset = np.dot(EPM.lattice.reciprocal_vectors, lat_shift) - (
+        np.dot(EPM.lattice.reciprocal_vectors, grid_shift)/ndivisions)
     npts = np.prod(ndiv0)
     grid = np.empty(ndiv0, dtype=list)
     indices = np.empty(ndiv0, dtype=int)
     
     for k,j,i in product(range(ndiv0[0]), range(ndiv0[1]), range(ndiv0[2])):
         index = int(i + ndiv0[2]*(j + ndiv0[1]*k))
-        grid[k,j,i] = np.dot(PP.lattice.reciprocal_vectors, 
+        grid[k,j,i] = np.dot(EPM.lattice.reciprocal_vectors,
                              np.array([i,j,k], dtype=float)/ndiv0) + offset
         indices[k,j,i] = index
 
 
     extended_grid = np.empty(ndiv1, dtype=list)
     for k,j,i in product(range(ndiv1[0]), range(ndiv1[1]), range(ndiv1[2])):
-        extended_grid[k,j,i] = np.dot(PP.lattice.reciprocal_vectors, 
+        extended_grid[k,j,i] = np.dot(EPM.lattice.reciprocal_vectors, 
                                       np.array([i,j,k], dtype=float)/ndiv0) + offset
         
     # It goes z, y, x
@@ -508,7 +512,7 @@ def get_grid_tetrahedra(PP, ndivisions, lat_shift=[0,0,0], grid_shift=[0,0,0]):
     new_indices[0:ndiv0[0], 0:ndiv0[1], 0:ndiv0[2]] = indices
     new_indices[:,:,ndiv0[2]] = new_indices[:,:,0]
     new_indices[:,ndiv0[1],:] = new_indices[:,0,:]
-    new_indices[ndiv0[0],:,:] = new_indices[0,:,:]    
+    new_indices[ndiv0[0],:,:] = new_indices[0,:,:]
     indices = new_indices
     
     tetrahedra = np.empty(np.prod(ndiv0)*6,dtype=list)
@@ -536,11 +540,11 @@ def get_grid_tetrahedra(PP, ndivisions, lat_shift=[0,0,0], grid_shift=[0,0,0]):
     return grid, tetrahedra
 
 
-def calc_total_states(PP, tetrahedra, weights, grid, energy, nbands):
+def calc_total_states(EPM, tetrahedra, weights, grid, energy, nbands):
     """Calculate the total number of filled states.
     
     Args:
-        PP (:py:obj:`BZI.pseudopots.EmpiricalPP`): a pseudopotential object.
+        EPM (:py:obj:`BZI.pseudopots.EmpiricalPseudopotential`): a pseudopotential object.
         tetrahedra (numpy.ndarray): lists of tetrahedra vertices.
         grid (numpy.ndarray): a grid of points in 3D.
         weights (list or numpy.ndarray): a list of tetrahedron weights.
@@ -552,14 +556,14 @@ def calc_total_states(PP, tetrahedra, weights, grid, energy, nbands):
         total_states (float): the number of filled states.
     """
 
-    Vg = PP.lattice.reciprocal_volume
+    Vg = EPM.lattice.reciprocal_volume
     Vt = Vg/np.sum(weights)
     
     total_states = 0.
     for i,tet in enumerate(tetrahedra):
         energies = []
         for ind in tet:
-            energies.append(PP.eval(grid[ind], nbands))
+            energies.append(EPM.eval(grid[ind], nbands))
         # Reshape energies so that the energies of each band are grouped
         # together.
         energies = np.transpose(energies)
@@ -568,12 +572,13 @@ def calc_total_states(PP, tetrahedra, weights, grid, energy, nbands):
                              number_of_states(Vg, Vt, np.sort(eband), energy))
     return total_states
 
-def calc_fermi_level(PP, tetrahedra, weights, grid, tol=1e-6):
+
+def calc_fermi_level(EPM, tetrahedra, weights, grid, tol=1e-6):
     """Determine the Fermi level for a given pseudopotential using the 
     improved tetrahedron method.
     
     Args:
-        PP (:py:obj:`BZI.pseudopots.EmpiricalPP`): a pseudopotential object.
+        EPM (:py:obj:`BZI.pseudopots.EmpiricalPseudopotential`): a pseudopotential object.
         tetrahedra (numpy.ndarray): lists of tetrahedra vertices.
         weights (list or numpy.ndarray): a list of tetrahedron weights. These
             should all be one if the tetrahedra are not symmetry reduced.
@@ -591,7 +596,7 @@ def calc_fermi_level(PP, tetrahedra, weights, grid, tol=1e-6):
     sign = lambda x: x and (1, -1)[x<0]
 
     # number of filled states
-    nfs = PP.nvalence_electrons# /2.    
+    nfs = EPM.nvalence_electrons# /2.    
     # highest filled band
     hfb = int(np.ceil(nfs))
     
@@ -602,15 +607,15 @@ def calc_fermi_level(PP, tetrahedra, weights, grid, tol=1e-6):
     if hfb <= 2:        
         # If there is only one filled band, have the guess be the energy value
         # at the origin of the highest filled band.
-        fermi_level = PP.eval([0.]*3, nbands)[hfb-1]
+        fermi_level = EPM.eval([0.]*3, nbands)[hfb-1]
     else:
         # If there are many occupied bands, take an average of the energies
         # of the band above and the band below.
-        fermi_level = (PP.eval([0.]*3, nbands)[hfb] - 
-                             PP.eval([0.]*3, nbands)[hfb-2])/2
+        fermi_level = (EPM.eval([0.]*3, nbands)[hfb] - 
+                             EPM.eval([0.]*3, nbands)[hfb-2])/2
 
     # Calculate the number of occupied states at the estimated Fermi level.
-    total_states = calc_total_states(PP, tetrahedra, weights, grid,
+    total_states = calc_total_states(EPM, tetrahedra, weights, grid,
                                      fermi_level, nbands)
     
     # Determine whether the initial guess overestimated (+) or underestimated
@@ -628,8 +633,8 @@ def calc_fermi_level(PP, tetrahedra, weights, grid, tol=1e-6):
     # located once we go from overestimating to underestimating the Fermi level.
     while sign(total_states - nfs) == initial_sign:
         fermi_level = fermi_level + (
-                            sign(PP.nvalence_electrons - total_states))*8
-        total_states = calc_total_states(PP, tetrahedra, weights, grid,
+                            sign(EPM.nvalence_electrons - total_states))*8
+        total_states = calc_total_states(EPM, tetrahedra, weights, grid,
                                          fermi_level, nbands)
 
     # Adjust the bounds correctly. If overestimating, decrease the lower bound. If
@@ -648,7 +653,7 @@ def calc_fermi_level(PP, tetrahedra, weights, grid, tol=1e-6):
     # a binary search within this interval until the Fermi level provides the correct
     # number of occupied states to within the provided tolerance.
     while abs(total_states - nfs) > tol:
-        total_states = calc_total_states(PP, tetrahedra, weights, grid,
+        total_states = calc_total_states(EPM, tetrahedra, weights, grid,
                                          fermi_level, nbands)
         if total_states > nfs:
             upper_bound = fermi_level
@@ -663,11 +668,12 @@ def calc_fermi_level(PP, tetrahedra, weights, grid, tol=1e-6):
 
     return fermi_level
 
-def find_irreducible_tetrahedra(PP, tetrahedra, grid, duplicates=True):
+
+def find_irreducible_tetrahedra(EPM, tetrahedra, grid, duplicates=True):
     """Find the irreducible tetrahedra and their weights.
 
     Args:
-        PP (:py:obj:`BZI.pseudopots.EmpiricalPP`): a pseudopotential object.
+        EPM (:py:obj:`BZI.pseudopots.EmpiricalPseudopotential`): a pseudopotential object.
         tetrahedra (numpy.ndarray): lists of tetrahedra vertices.
         grid (numpy.ndarray): a grid of points in Cartesian coordinates.
     Returns:
@@ -676,13 +682,12 @@ def find_irreducible_tetrahedra(PP, tetrahedra, grid, duplicates=True):
     """
     
     if duplicates:
-        orbitals = find_orbitals(grid, PP.lattice.reciprocal_vectors, duplicates=True)
+        orbits = get_orbits(grid, EPM.lattice.reciprocal_vectors, duplicates=True)
     else:
-        orbitals = find_orbitals(grid, PP.lattice.reciprocal_vectors)
+        orbits = get_orbits(grid, EPM.lattice.reciprocal_vectors)
 
     # Move all grid points into the first unit cell
-
-    grid = [bring_into_cell(pt, PP.lattice.reciprocal_vectors) for pt in grid]
+    grid = [bring_into_cell(pt, EPM.lattice.reciprocal_vectors) for pt in grid]
 
     # Each point in the grid is part of an orbit. The first point in each orbit
     # represents the orbit. The dictionary new_dict is a dictionary with keys as
@@ -690,13 +695,13 @@ def find_irreducible_tetrahedra(PP, tetrahedra, grid, duplicates=True):
     # represents its orbit.
     new_dict = {}
     for i,pt in enumerate(grid):
-        # pt = bring_into_cell(pt, PP.lattice.reciprocal_vectors)
+        # pt = bring_into_cell(pt, EPM.lattice.reciprocal_vectors)
         new_dict[i] = None
-        for k in orbitals.keys():
+        for k in orbits.keys():
             # Represntative k-point
-            rpt = orbitals[k][0]
+            rpt = orbits[k][0]
             index = np.where([np.allclose(p,rpt) for p in grid])[0][0]
-            for v in orbitals[k]:
+            for v in orbits[k]:
                 if np.allclose(v,pt):
                     # index = np.where([np.allclose(p,v) for p in grid])[0][0]
                     new_dict[i] = index
@@ -726,11 +731,12 @@ def find_irreducible_tetrahedra(PP, tetrahedra, grid, duplicates=True):
             
     return irreducible_tetrahedra, weights
 
-def calc_total_energy(PP, tetrahedra, weights, grid):
+
+def calc_total_energy(EPM, tetrahedra, weights, grid):
     """Calculate the total energy.
     
     Args:
-        PP (:py:obj:`BZI.pseudopots.EmpiricalPP`): a pseudopotential object.
+        EPM (:py:obj:`BZI.pseudopots.EmpiricalPseudopotential`): a pseudopotential object.
         tetrahedra (numpy.ndarray): lists of tetrahedra vertices.
         weights (list or numpy.ndarray): a list of tetrahedron weights.
         grid (numpy.ndarray): a grid of points in 3D.
@@ -742,11 +748,11 @@ def calc_total_energy(PP, tetrahedra, weights, grid):
     """
 
     # The volume of the tetrahedra.
-    VG = PP.lattice.reciprocal_volume
-    VT = PP.lattice.reciprocal_volume/np.sum(weights)
+    VG = EPM.lattice.reciprocal_volume
+    VT = EPM.lattice.reciprocal_volume/np.sum(weights)
     
     # The number of bands included in the calculation of the total energy.
-    nbands = int(np.ceil(PP.nvalence_electrons/2))
+    nbands = int(np.ceil(EPM.nvalence_electrons/2))
     
     # Each contribution to the total energy will be stored in a list. The sum of these
     # contributions will be taken all at once to avoid numerical errors.
@@ -756,25 +762,25 @@ def calc_total_energy(PP, tetrahedra, weights, grid):
         # function can be multivalued, this is a list of lists.
         energies = []
         for ind in irr_tet:
-            energies.append(PP.eval(grid[ind], nbands))
+            energies.append(EPM.eval(grid[ind], nbands))
             
         # Transpose the energies so that the energies of each band are group together.
         energies = np.transpose(energies)
         for eband in energies:
             eband = np.sort(eband)
-            int_weights = integration_weights(VT, eband, PP.fermi_level)
+            int_weights = integration_weights(VT, eband, EPM.fermi_level)
             total_energy.append(weights[i]*np.dot(int_weights, eband))
     
     return math.fsum(total_energy)
 
 
-def get_extended_tetrahedra(PP, ndivisions, lat_shift=[0,0,0],
+def get_extended_tetrahedra(EPM, ndivisions, lat_shift=[0,0,0],
                             grid_shift=[0,0,0]):
     """Generate the grid and tetrahedra required in calculating Blochl's 
     corrections.
 
     Args:
-        PP (:py:obj:`BZI.pseudopots.EmpiricalPP`): a pseudopotential object
+        EPM (:py:obj:`BZI.pseudopots.EmpiricalPseudopotential`): a pseudopotential object
         ndivisions (list): a list of integers that represent the number of 
             divisions along each basis vector to take when creating the grid.
         lat_shift (list or numpy.ndarray): a vector that shifts the grid in 
@@ -797,14 +803,14 @@ def get_extended_tetrahedra(PP, ndivisions, lat_shift=[0,0,0],
     ndiv2 = ndiv0 + 2
     ndiv3 = ndiv0 + 3
     npts = np.prod(ndiv1)
-    offset = np.dot(PP.lattice.reciprocal_vectors, lat_shift) - (
-        np.dot(PP.lattice.reciprocal_vectors, grid_shift)/ndivisions)
+    offset = np.dot(EPM.lattice.reciprocal_vectors, lat_shift) - (
+        np.dot(EPM.lattice.reciprocal_vectors, grid_shift)/ndivisions)
     grid = np.empty(ndiv1, dtype=list)
     indices = np.empty(ndiv1, dtype=int)
 
     for k,j,i in product(range(ndiv1[0]), range(ndiv1[1]), range(ndiv1[2])):
         index = int(i + ndiv1[2]*(j + ndiv1[1]*k))
-        grid[k,j,i] = np.dot(PP.lattice.reciprocal_vectors, 
+        grid[k,j,i] = np.dot(EPM.lattice.reciprocal_vectors, 
                              np.array([i,j,k], dtype=float)/ndiv0) + offset
         indices[k,j,i] = index
 
@@ -818,12 +824,12 @@ def get_extended_tetrahedra(PP, ndivisions, lat_shift=[0,0,0],
             extended_indices[k,j,i] = i + j*ndiv3[1] + k*ndiv3[0]*ndiv3[1] + npts    
 
     grid_shift += 1
-    offset = np.dot(PP.lattice.reciprocal_vectors, lat_shift) - (
-        np.dot(PP.lattice.reciprocal_vectors, grid_shift)/ndivisions)
+    offset = np.dot(EPM.lattice.reciprocal_vectors, lat_shift) - (
+        np.dot(EPM.lattice.reciprocal_vectors, grid_shift)/ndivisions)
 
     extended_grid = np.empty(ndiv3, dtype=list)
     for k,j,i in product(range(ndiv3[0]), range(ndiv3[1]), range(ndiv3[2])):
-        extended_grid[k,j,i] = np.dot(PP.lattice.reciprocal_vectors,
+        extended_grid[k,j,i] = np.dot(EPM.lattice.reciprocal_vectors,
                                       np.array([i,j,k], dtype=float)/ndiv0) + offset            
     
     extended_tetrahedra = np.empty(np.prod(ndiv2)*6,dtype=list)
@@ -852,13 +858,14 @@ def get_extended_tetrahedra(PP, ndivisions, lat_shift=[0,0,0],
     
     return extended_grid, extended_tetrahedra
 
-def get_corrected_total_energy(PP, tetrahedra_list, extended_tetrahedra_list, grid,
+
+def get_corrected_total_energy(EPM, tetrahedra_list, extended_tetrahedra_list, grid,
                                extended_grid, ndiv0):
     """Calculate the corrected integration weights used in calculating the
     total energy.
     
     Args:
-        PP (:py:obj:`BZI.pseudopots.EmpiricalPP`): a pseudopotential object.
+        EPM (:py:obj:`BZI.pseudopots.EmpiricalPseudopotential`): a pseudopotential object.
             tetrahedra (numpy.ndarray): lists of tetrahedra vertices.
         tetrahedra (list): a list of tetrahedra where each tetrahedra is a 
             quadruple of integers.
@@ -871,17 +878,16 @@ def get_corrected_total_energy(PP, tetrahedra_list, extended_tetrahedra_list, gr
     """
 
     npts = len(grid)
-    neigvals = int(np.ceil(PP.nvalence_electrons/2.))
+    neigvals = int(np.ceil(EPM.nvalence_electrons/2.))
     total_energy = 0.    
     for iband in range(neigvals):
         for tet in tetrahedra_list:
-            energies, tweights = corrected_integration_weights(PP,
+            energies, tweights = corrected_integration_weights(EPM,
                                                 extended_grid,
                                                 extended_tetrahedra_list,
                                                 tet, iband, ndiv0)
             total_energy += np.dot(tweights, energies)
     return total_energy
-
 
 
 def tet_dos_nos(EPM, nbands, grid, energy_list, tetrahedra, weights):

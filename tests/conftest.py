@@ -16,7 +16,7 @@ def run(tests):
                  "test_convert_tet_index",
                  "test_get_grid_tetrahedra",
                  "test_find_adjacent_tetrahedra"]
-        
+
     elif tests == "improved tetrahedra":
         tests = ["test_corrections",
                  "test_adjacent_tetrahedra",
@@ -58,7 +58,7 @@ def run(tests):
         tests = ["test_make_ptvecs",
                  "test_make_lattice_vectors",
                  "test_sympts_sympaths",
-                 "test_find_orbitals",
+                 "test_get_orbits",
                  "test_reduce_simple_cubic",
                  "test_reduce_body_centered_cubic",
                  "test_reduce_face_centered_cubic",
@@ -69,11 +69,18 @@ def run(tests):
                  "test_reduce_monoclinic",
                  "test_reduce_base_centered_monoclinic",
                  "test_reduce_tetragonal",
-                 "test_reduce_body_centered_tetragonal"]
+                 "test_reduce_body_centered_tetragonal",
+                 "test_get_point_group"]
 
     # Read and write tests
     elif tests == "all read_and_write":
-        tests = ["test_read_QE", "test_read_VASP"]
+        tests = ["test_read_qe", "test_read_vasp"]
+    elif tests == "all make_IBZ":
+        tests = ["test_get_bragg_planes",
+                 "test_trim_small",
+                 "test_three_planes_intersect",
+                 "test_find_bragg_shells",
+                 "test_find_bz"]
     else:
         tests = []
     

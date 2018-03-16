@@ -3,6 +3,7 @@
 
 import pytest
 import numpy as np
+from numpy.linalg import det
 from copy import deepcopy
 from numpy.linalg import norm, inv
 from itertools import product
@@ -11,8 +12,8 @@ from itertools import combinations
 from BZI.sampling import make_cell_points
 
 from BZI.symmetry import (get_sympts, get_sympaths, make_ptvecs, make_rptvecs,
-                          make_lattice_vectors, find_orbitals,
-                          reduce_kpoint_list)
+                          make_lattice_vectors, get_orbits, reduce_kpoint_list,
+                          get_point_group, number_of_point_operators)
 from conftest import run
 
 tests = run("all symmetry")
@@ -232,8 +233,8 @@ def test_make_lattice_vectors():
 
     lat_type = "rhombohedral"
     lat_consts = [1., 1., 1.]
-    lat_angles1 = [np.pi/3]*3
-    lat_angles2 = [np.pi/3]*3
+    lat_angles1 = [.3*np.pi]*3
+    lat_angles2 = [.3*np.pi]*3
     lat_centering = "prim"
     lat_vecs1 = make_ptvecs(lat_centering, lat_consts, lat_angles1)
     lat_vecs2 = make_lattice_vectors(lat_type, lat_consts, lat_angles2)
@@ -741,9 +742,9 @@ def test_sympts_sympaths():
     a = 1./2
     b = 1./4
     c = 1./8
-
+    
     # Simple cubic
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
               "M": [a, a, z],
               "R": [a, a, a],
               "X": [z, a, z]}    
@@ -755,7 +756,7 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "X"], ["X", "M"], ["M", "G"], ["G", "R"], ["R", "X"],
+    sympath1 = [["$\Gamma$", "X"], ["X", "M"], ["M", "$\Gamma$"], ["$\Gamma$", "R"], ["R", "X"],
                 ["M", "R"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)        
@@ -763,13 +764,12 @@ def test_sympts_sympaths():
         assert p1 == p2
 
     # Face-centered cubic
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "K": [3./8, 3./8, 3./4],
                "L": [a, a, a],
                "U": [5./8, b, 5./8],
                "W": [a, b, 3./4],
-               "X": [a, z, a],
-               "G2": [1., 1., 1.]} # This point was added for the Si pseudopotential    
+               "X": [a, z, a]}
     lattice_centering = "face"
     lattice_constants = [1.3,1.3,1.3]
     lattice_angles = [np.pi/2, np.pi/2, np.pi/2]
@@ -777,7 +777,7 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "X"], ["X", "W"], ["W", "K"], ["K", "G"], ["G", "L"],
+    sympath1 = [["$\Gamma$", "X"], ["X", "W"], ["W", "K"], ["K", "$\Gamma$"], ["$\Gamma$", "L"],
                 ["L", "U"], ["U", "W"], ["W", "L"], ["L", "K"], ["U", "X"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)        
@@ -785,7 +785,7 @@ def test_sympts_sympaths():
         assert p1 == p2
     
     # Body-centered cubic
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "H": [a, -a, a],
                "P": [b, b, b],
                "N": [z, z, a]}
@@ -797,7 +797,7 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "H"], ["H", "N"], ["N", "G"], ["G", "P"], ["P", "H"],
+    sympath1 = [["$\Gamma$", "H"], ["H", "N"], ["N", "$\Gamma$"], ["$\Gamma$", "P"], ["P", "H"],
                 ["P", "N"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)        
@@ -805,7 +805,7 @@ def test_sympts_sympaths():
         assert p1 == p2
     
     # Tetragonal
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "A": [a, a, a],
                "M": [a, a, z],
                "R": [z, a, a],
@@ -819,7 +819,7 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "X"], ["X", "M"], ["M", "G"], ["G", "Z"], ["Z", "R"],
+    sympath1 = [["$\Gamma$", "X"], ["X", "M"], ["M", "$\Gamma$"], ["$\Gamma$", "Z"], ["Z", "R"],
                 ["R", "A"], ["A", "Z"], ["X", "R"], ["M", "A"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)        
@@ -827,7 +827,7 @@ def test_sympts_sympaths():
         assert p1 == p2
         
     # Body-centered tetragonal 1 (c < a)
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "M": [-a, a, a],
                "N": [z, a, z],
                "P": [b, b, b],
@@ -842,7 +842,7 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "X"], ["X", "M"], ["M", "G"], ["G", "Z"], ["Z", "P"],
+    sympath1 = [["$\Gamma$", "X"], ["X", "M"], ["M", "$\Gamma$"], ["$\Gamma$", "Z"], ["Z", "P"],
                 ["P", "N"], ["N", "Z1"], ["Z1", "M"], ["X", "P"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)        
@@ -850,7 +850,7 @@ def test_sympts_sympaths():
         assert p1 == p2        
         
     # Body-centered tetragonal 2 (a < c)
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "N": [z, a, z],
                "P": [b, b, b],
                "S": [-5./16, 5./16, 5./16],
@@ -867,7 +867,7 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "X"], ["X", "Y"], ["Y", "S"], ["S", "G"], ["G", "Z"],
+    sympath1 = [["$\Gamma$", "X"], ["X", "Y"], ["Y", "S"], ["S", "$\Gamma$"], ["$\Gamma$", "Z"],
                 ["Z", "S1"], ["S1", "N"], ["N", "P"], ["P", "Y1"],
                 ["Y1", "Z"], ["X", "P"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
@@ -876,7 +876,7 @@ def test_sympts_sympaths():
         assert p1 == p2
 
     # Orthorhombic
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "R": [a, a, a],
                "S": [a, a, z],
                "T": [z, a, a],
@@ -892,7 +892,7 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "X"], ["X", "S"], ["S", "Y"], ["Y", "G"], ["G", "Z"],
+    sympath1 = [["$\Gamma$", "X"], ["X", "S"], ["S", "Y"], ["Y", "$\Gamma$"], ["$\Gamma$", "Z"],
                 ["Z", "U"], ["U", "R"], ["R", "T"], ["T", "Z"], ["Y", "T"],
                 ["U", "X"], ["S", "R"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
@@ -903,7 +903,7 @@ def test_sympts_sympaths():
     # Face-centered orthorhombic 1
     zeta = 19./64
     eta = 21./64
-    sympts1 = {"G": [z, z, z,],
+    sympts1 = {"$\Gamma$": [z, z, z,],
                "A": [a, a+zeta, zeta],
                "A1": [a, a-zeta, 1-zeta],
                "L": [a, a, a],
@@ -920,9 +920,9 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "Y"], ["Y", "T"], ["T", "Z"], ["Z", "G"], ["G", "X"],
+    sympath1 = [["$\Gamma$", "Y"], ["Y", "T"], ["T", "Z"], ["Z", "$\Gamma$"], ["$\Gamma$", "X"],
                 ["X", "A1"], ["A1", "Y"], ["T", "X1"], ["X", "A"], ["A", "Z"],
-                ["L", "G"]]
+                ["L", "$\Gamma$"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
     for p1, p2 in zip(sympath1, sympath2):
@@ -931,7 +931,7 @@ def test_sympts_sympaths():
     # Face-centered orthorhombic 3
     zeta = 2./5
     eta = 1./2
-    sympts1 = {"G": [z, z, z,],
+    sympts1 = {"$\Gamma$": [z, z, z,],
                "A": [a, a+zeta, zeta],
                "A1": [a, a-zeta, 1-zeta],
                "L": [a, a, a],
@@ -948,8 +948,8 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "Y"], ["Y", "T"], ["T", "Z"], ["Z", "G"], ["G", "X"],
-                ["X", "A1"], ["A1", "Y"], ["X", "A"], ["A", "Z"], ["L", "G"]]
+    sympath1 = [["$\Gamma$", "Y"], ["Y", "T"], ["T", "Z"], ["Z", "$\Gamma$"], ["$\Gamma$", "X"],
+                ["X", "A1"], ["A1", "Y"], ["X", "A"], ["A", "Z"], ["L", "$\Gamma$"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
     for p1, p2 in zip(sympath1, sympath2):
@@ -959,7 +959,7 @@ def test_sympts_sympaths():
     eta = -19./36
     phi = 91./256
     delta = -19./144
-    sympts1 = {"G": [z, z, z,],
+    sympts1 = {"$\Gamma$": [z, z, z,],
                "C": [a, a-eta, 1-eta],
                "C1": [a, a+eta, eta],
                "D": [a-delta, a, 1-delta],
@@ -981,9 +981,9 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "Y"], ["Y", "C"], ["C", "D"], ["D", "X"], ["X", "G"],
-                ["G", "Z"], ["Z", "D1"], ["D1", "H"], ["H", "C"], ["C1", "Z"],
-                ["X", "H1"], ["H", "Y"], ["L", "G"]]
+    sympath1 = [["$\Gamma$", "Y"], ["Y", "C"], ["C", "D"], ["D", "X"], ["X", "$\Gamma$"],
+                ["$\Gamma$", "Z"], ["Z", "D1"], ["D1", "H"], ["H", "C"], ["C1", "Z"],
+                ["X", "H1"], ["H", "Y"], ["L", "$\Gamma$"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
     for p1, p2 in zip(sympath1, sympath2):
@@ -995,7 +995,7 @@ def test_sympts_sympaths():
     delta = 1./12
     mu = 5./36
 
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "L": [-mu, mu, a-delta],
                "L1": [mu, -mu, a+delta],
                "L2": [a-delta, a+delta, -mu],
@@ -1016,8 +1016,8 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "X"], ["X", "L"], ["L", "T"], ["T", "W"], ["W", "R"],
-                ["R", "X1"], ["X1", "Z"], ["Z", "G"], ["G", "Y"], ["Y", "S"],
+    sympath1 = [["$\Gamma$", "X"], ["X", "L"], ["L", "T"], ["T", "W"], ["W", "R"],
+                ["R", "X1"], ["X1", "Z"], ["Z", "$\Gamma$"], ["$\Gamma$", "Y"], ["Y", "S"],
                 ["S", "W"], ["L1", "Y"], ["Y1", "Z"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
@@ -1026,7 +1026,7 @@ def test_sympts_sympaths():
 
     # Base-centered orthorhombic
     zeta = 5./16
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "A": [zeta, zeta, a],
                "A1": [-zeta, 1-zeta, a],
                "R": [z, a, a],
@@ -1044,8 +1044,8 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
         
-    sympath1 = [["G", "X"], ["X", "S"], ["S", "R"], ["R", "A"], ["A", "Z"],
-                ["Z", "G"], ["G", "Y"], ["Y", "X1"], ["X1", "A1"], ["A1", "T"],
+    sympath1 = [["$\Gamma$", "X"], ["X", "S"], ["S", "R"], ["R", "A"], ["A", "Z"],
+                ["Z", "$\Gamma$"], ["$\Gamma$", "Y"], ["Y", "X1"], ["X1", "A1"], ["A1", "T"],
                 ["T", "Y"], ["Z", "T"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
@@ -1053,7 +1053,7 @@ def test_sympts_sympaths():
         assert p1 == p2                                        
         
     # Hexagonal
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "A": [z, z, a],
                "H": [1./3, 1./3, a],
                "K": [1./3, 1./3, z],
@@ -1067,7 +1067,7 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
         
-    sympath1 = [["G", "M"], ["M", "K"], ["K", "G"], ["G", "A"], ["A", "L"],
+    sympath1 = [["$\Gamma$", "M"], ["M", "K"], ["K", "$\Gamma$"], ["$\Gamma$", "A"], ["A", "L"],
                 ["L", "H"], ["H", "A"], ["L", "M"], ["K", "H"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
@@ -1077,7 +1077,7 @@ def test_sympts_sympaths():
     # Rhombohedral 1
     eta = 3./4
     nu = 3./8
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "B": [eta, a, 1-eta],
                "B1": [a, 1-eta, eta-1],
                "F": [a, a, z],
@@ -1097,7 +1097,7 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "L"], ["L", "B1"], ["B", "Z"], ["Z", "G"], ["G", "X"],
+    sympath1 = [["$\Gamma$", "L"], ["L", "B1"], ["B", "Z"], ["Z", "$\Gamma$"], ["$\Gamma$", "X"],
                 ["Q", "F"], ["F", "P1"], ["P1", "Z"], ["L", "P"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
@@ -1107,7 +1107,7 @@ def test_sympts_sympaths():
     # Rhombohedral 2
     eta = 0.263932022500210
     nu = 0.618033988749895
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "F": [a, -a, z],
                "L": [a, z, z],
                "P": [1-nu, -nu, 1-nu],
@@ -1123,7 +1123,7 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "P"], ["P", "Z"], ["Z", "Q"], ["Q", "G"], ["G", "F"], 
+    sympath1 = [["$\Gamma$", "P"], ["P", "Z"], ["Z", "Q"], ["Q", "$\Gamma$"], ["$\Gamma$", "F"], 
                 ["F", "P1"], ["P1", "Q1"], ["Q1", "L"], ["L", "Z"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
@@ -1140,7 +1140,7 @@ def test_sympts_sympaths():
     # Monoclinic
     eta = 4./9
     nu = 1./6
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "A": [a, a, z],
                "C": [z, a, a],
                "D": [a, z, a],
@@ -1164,7 +1164,7 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "Y"], ["Y", "H"], ["H", "C"], ["C", "E"], ["E", "M1"],
+    sympath1 = [["$\Gamma$", "Y"], ["Y", "H"], ["H", "C"], ["C", "E"], ["E", "M1"],
                 ["M1", "A"], ["A", "X"], ["X", "H1"], ["M", "D"], ["D", "Z"],
                 ["Y", "D"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
@@ -1178,7 +1178,7 @@ def test_sympts_sympaths():
     psi = 2./3
     phi = 25./36
 
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "N": [a, z, z],
                "N1": [0, -a, z],
                "F": [1-zeta, 1-zeta, 1-eta],
@@ -1203,8 +1203,8 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"], ["I1", "Z"],
-                ["Z", "F1"], ["Y", "X1"], ["X", "G"], ["G", "N"], ["M", "G"]]
+    sympath1 = [["$\Gamma$", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"], ["I1", "Z"],
+                ["Z", "F1"], ["Y", "X1"], ["X", "$\Gamma$"], ["$\Gamma$", "N"], ["M", "$\Gamma$"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
     for p1, p2 in zip(sympath1, sympath2):
@@ -1216,7 +1216,7 @@ def test_sympts_sympaths():
     psi = 1./2
     phi = 1./2 + 1./(4*np.sqrt(3))
 
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "N": [a, z, z],
                "N1": [0, -a, z],
                "F": [1-zeta, 1-zeta, 1-eta],
@@ -1241,12 +1241,12 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"], ["I1", "Z"],
-                ["Z", "F1"], ["N", "G"], ["G", "M"]]
+    sympath1 = [["$\Gamma$", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"], ["I1", "Z"],
+                ["Z", "F1"], ["N", "$\Gamma$"], ["$\Gamma$", "M"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
     for p1, p2 in zip(sympath1, sympath2):
-        assert p1 == p2                                                        
+        assert p1 == p2
         
     # Base-centered Monoclinic 3 (kgamma < pi/2, other condition < 1)
     mu = 5./4
@@ -1256,7 +1256,7 @@ def test_sympts_sympaths():
     phi = 0.87308484630850
     psi = 1.9192990968507
     
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "F": [1-phi, 1-phi, 1-psi],
                "F1": [phi, phi-1, psi],
                "F2": [1-phi, -phi, 1-psi],
@@ -1282,9 +1282,9 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "Y"], ["Y", "F"], ["F", "H"], ["H", "Z"], ["Z", "I"],
-                ["I", "F1"], ["H1", "Y1"], ["Y1", "X"], ["X", "G"], ["G", "N"],
-                ["M", "G"]]
+    sympath1 = [["$\Gamma$", "Y"], ["Y", "F"], ["F", "H"], ["H", "Z"], ["Z", "I"],
+                ["I", "F1"], ["H1", "Y1"], ["Y1", "X"], ["X", "$\Gamma$"], ["$\Gamma$", "N"],
+                ["M", "$\Gamma$"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
     for p1, p2 in zip(sympath1, sympath2):
@@ -1298,7 +1298,7 @@ def test_sympts_sympaths():
     phi = 1./2
     psi = 1./2
     
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "F": [1-phi, 1-phi, 1-psi],
                "F1": [phi, phi-1, psi],
                "F2": [1-phi, -phi, 1-psi],
@@ -1323,8 +1323,8 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "Y"], ["Y", "F"], ["F", "H"], ["H", "Z"], ["Z", "I"],
-                ["H1", "Y1"], ["Y1", "X"], ["X", "G"], ["G", "N"], ["M", "G"]]
+    sympath1 = [["$\Gamma$", "Y"], ["Y", "F"], ["F", "H"], ["H", "Z"], ["Z", "I"],
+                ["H1", "Y1"], ["Y1", "X"], ["X", "$\Gamma$"], ["$\Gamma$", "N"], ["M", "$\Gamma$"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
     for p1, p2 in zip(sympath1, sympath2):
@@ -1339,7 +1339,7 @@ def test_sympts_sympaths():
     omega = -1.64464
     delta = 1.22214
 
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "F": [nu, nu, omega],
                "F1": [1-nu, 1-nu, 1-omega],
                "F2": [nu, nu-1, omega],
@@ -1368,9 +1368,9 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["G", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"], ["I1", "Z"],
-                ["Z", "H"], ["H", "F1"], ["H1", "Y1"], ["Y1", "X"], ["X", "G"],
-                ["G", "N"], ["M", "G"]]
+    sympath1 = [["$\Gamma$", "Y"], ["Y", "F"], ["F", "L"], ["L", "I"], ["I1", "Z"],
+                ["Z", "H"], ["H", "F1"], ["H1", "Y1"], ["Y1", "X"], ["X", "$\Gamma$"],
+                ["$\Gamma$", "N"], ["M", "$\Gamma$"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
 
@@ -1378,7 +1378,7 @@ def test_sympts_sympaths():
         assert p1 == p2
         
     # Triclinic 1a (kalpha, kbeta, kgamma > pi/2)
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "L": [a, a, z],
                "M": [z, a, a],
                "N": [a, z, a],
@@ -1394,8 +1394,8 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["X", "G"], ["G", "Y"], ["L", "G"], ["G", "Z"], ["N", "G"],
-                ["G", "M"], ["R", "G"]]
+    sympath1 = [["X", "$\Gamma$"], ["$\Gamma$", "Y"], ["L", "$\Gamma$"], ["$\Gamma$", "Z"], ["N", "$\Gamma$"],
+                ["$\Gamma$", "M"], ["R", "$\Gamma$"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
     for p1, p2 in zip(sympath1, sympath2):
@@ -1403,7 +1403,7 @@ def test_sympts_sympaths():
 
     # Triclinic 2a (kgamma = pi/2)
     # I just make one of the angles pi/2.
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "L": [a, a, z],
                "M": [z, a, a],
                "N": [a, z, a],
@@ -1419,15 +1419,15 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["X", "G"], ["G", "Y"], ["L", "G"], ["G", "Z"], ["N", "G"],
-                ["G", "M"], ["R", "G"]]
+    sympath1 = [["X", "$\Gamma$"], ["$\Gamma$", "Y"], ["L", "$\Gamma$"], ["$\Gamma$", "Z"], ["N", "$\Gamma$"],
+                ["$\Gamma$", "M"], ["R", "$\Gamma$"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
     for p1, p2 in zip(sympath1, sympath2):
         assert p1 == p2                
 
     # Triclinic 1b (kalpha, kbeta, kgamma, < pi/2)
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "L": [a, -a, z],
                "M": [z, z, a],
                "N": [-a, -a, a],
@@ -1443,15 +1443,15 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["X", "G"], ["G", "Y"], ["L", "G"], ["G", "Z"], ["N", "G"],
-                ["G", "M"], ["R", "G"]]
+    sympath1 = [["X", "$\Gamma$"], ["$\Gamma$", "Y"], ["L", "$\Gamma$"], ["$\Gamma$", "Z"], ["N", "$\Gamma$"],
+                ["$\Gamma$", "M"], ["R", "$\Gamma$"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
     for p1, p2 in zip(sympath1, sympath2):
         assert p1 == p2                        
 
     # Triclinic 2b (kgamma = pi/2)
-    sympts1 = {"G": [z, z, z],
+    sympts1 = {"$\Gamma$": [z, z, z],
                "L": [a, -a, z],
                "M": [z, z, a],
                "N": [-a, -a, a],
@@ -1468,16 +1468,16 @@ def test_sympts_sympaths():
     for k in sympts1.keys():
         assert np.allclose(sympts1[k], sympts2[k])
 
-    sympath1 = [["X", "G"], ["G", "Y"], ["L", "G"], ["G", "Z"], ["N", "G"],
-                ["G", "M"], ["R", "G"]]
+    sympath1 = [["X", "$\Gamma$"], ["$\Gamma$", "Y"], ["L", "$\Gamma$"], ["$\Gamma$", "Z"], ["N", "$\Gamma$"],
+                ["$\Gamma$", "M"], ["R", "$\Gamma$"]]
     sympath2 = get_sympaths(lattice_centering, lattice_constants,
                             lattice_angles)
 
     for p1, p2 in zip(sympath1, sympath2):
         assert p1 == p2
 
-@pytest.mark.skipif("test_find_orbitals" not in tests, reason="different tests")     
-def test_find_orbitals():
+@pytest.mark.skipif("test_get_orbits" not in tests, reason="different tests")     
+def test_get_orbits():
 
     # Make sure duplicate points get removed from the grid.
     lat_angles = [np.pi/2]*3
@@ -1490,7 +1490,7 @@ def test_find_orbitals():
             [0,.5,-.5], [.5,-.5,0], [.5,0,-.5], 
             [0,-.5,-.5], [-.5,-.5,0], [-.5,0,-.5]]
 
-    orbitals = find_orbitals(grid, lat_vecs, duplicates=True)
+    orbitals = get_orbits(grid, lat_vecs, duplicates=True)
     
     assert len(orbitals.keys()) == 1
     assert np.allclose(orbitals[1], [0,0,0])
@@ -1504,7 +1504,7 @@ def test_find_orbitals():
             [.5,.5,-.5], [-.5,.5,-.5], [.5,-.5,-.5],
             [-.5,-.5,-.5], [0,0,0]]
 
-    orbitals = find_orbitals(grid, lat_vecs, duplicates=True)
+    orbitals = get_orbits(grid, lat_vecs, duplicates=True)
     assert len(orbitals.keys()) == 1
     assert np.allclose(orbitals[1], [0,0,0])
 
@@ -1635,7 +1635,7 @@ def test_reduce_simple_cubic():
     
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in find_orbitals(grid, rlat_vecs).values():
+    for v in get_orbits(grid, rlat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -1754,7 +1754,7 @@ def test_reduce_body_centered_cubic():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in find_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -1873,7 +1873,7 @@ def test_reduce_face_centered_cubic():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in find_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -1994,7 +1994,7 @@ def test_reduce_orthorhombic():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in find_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -2100,7 +2100,7 @@ def test_reduce_base_centered_orthorhombic():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in find_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -2204,7 +2204,7 @@ def test_reduce_body_centered_orthorhombic():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in find_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -2311,7 +2311,7 @@ def test_reduce_face_centered_orthorhombic():
 
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in find_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -2427,7 +2427,7 @@ def test_reduce_monoclinic():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in find_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -2540,7 +2540,7 @@ def test_reduce_base_centered_monoclinic():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in find_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -2640,7 +2640,7 @@ def test_reduce_tetragonal():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in find_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -2739,7 +2739,7 @@ def test_reduce_body_centered_tetragonal():
                         offset)
     irrkpts = list(range(len(weights)))
     grid_copy = deepcopy(red_grid)
-    for v in find_orbitals(grid, lat_vecs).values():
+    for v in get_orbits(grid, lat_vecs).values():
         for k1 in v:
             for k2 in red_grid:
                 if irrkpts == []:
@@ -2748,3 +2748,191 @@ def test_reduce_body_centered_tetragonal():
                 del grid_copy[ind]
                 del irrkpts[ind]
     assert irrkpts == []
+
+
+@pytest.mark.skipif("test_get_point_group" not in tests,
+                    reason="different tests")
+def test_get_point_group():
+
+    lat_type = "simple cubic"
+    lat_consts = [1]*3
+    lat_angles = [np.pi/2]*3
+    lat_centering = "prim"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)
+    point_group = get_point_group(lat_vecs)
+    assert len(point_group) == 48
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+        
+    lat_type = "body-centered cubic"
+    lat_consts = [1]*3
+    lat_angles = [np.pi/2]*3
+    lat_centering = "body"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == 48
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+
+        
+    lat_type = "face-centered cubic"
+    lat_consts = [1]*3
+    lat_angles = [np.pi/2]*3
+    lat_centering = "face"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == 48
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+    
+    lat_type = "tetragonal"
+    lat_consts = [1, 1, 2]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "prim"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+
+    lat_type = "body-centered tetragonal"
+    lat_consts = [1, 1, 2]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "body"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+
+    lat_type = "orthorhombic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "prim"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+
+    lat_type = "face-centered orthorhombic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "face"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+
+    lat_type = "body-centered orthorhombic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "body"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+
+    lat_type = "base-centered orthorhombic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/2]*3
+    lat_centering = "base"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+
+    lat_type = "hexagonal"
+    lat_consts = [1., 1., 3.]
+    lat_angles = [np.pi/2, np.pi/2, 2*np.pi/3]
+    lat_centering = "prim"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+
+    lat_type = "rhombohedral"
+    lat_consts = [1., 1., 1.]
+    lat_angles = [.55*np.pi]*3
+    lat_centering = "prim"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+
+    lat_type = "monoclinic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/3, np.pi/2, np.pi/2]
+    lat_centering = "prim"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+
+    lat_type = "base-centered monoclinic"
+    lat_consts = [1, 2, 3]
+    lat_angles = [np.pi/4, np.pi/2, np.pi/2]
+    lat_centering = "base"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))
+
+    lat_type = "triclinic"
+    lat_consts = [1.1, 2.8, 4.3]
+    lat_angles = [np.pi/6, np.pi/4, np.pi/3]
+    lat_centering = "prim"
+    lat_vecs = make_lattice_vectors(lat_type, lat_consts, lat_angles)
+    volume = det(lat_vecs)    
+    point_group = get_point_group(lat_vecs)    
+    assert len(point_group) == number_of_point_operators(lat_type.split()[-1])
+    for pg in point_group:
+        assert np.isclose(abs(det(pg)), 1)
+        assert np.isclose(abs(volume), abs(det(np.dot(pg, lat_vecs))))
+        assert np.allclose(np.dot(pg, pg.T), np.eye(3))

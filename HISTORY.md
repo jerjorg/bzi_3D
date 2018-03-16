@@ -1,5 +1,44 @@
 # Revision History
 
+## Revision 0.3.3
+- Small changes to band plot functions and unit tests.
+
+## Revision 0.3.2
+- Added a new module which contains many of the same methods
+  covered in the other modules but in 2D instead of 3D. This module,
+  `all_2D.py` will be used to test adaptive refinement on 2D models
+  that should be easier to visualize and program.
+- Added a new notebook that looks at the 2D free electron model in
+  detail.
+
+## Revision 0.3.1
+- Added `plot_all_bz` which can plot the Brillouin zone, the
+  irreducible wedge of the Brillouin zone, and a mesh. The mesh can be
+  any list of points, such as points along symmetry points, the
+  irreducible k-points, etc.
+- Added `plane3pts` to make_IBZ. It finds a plane given three points
+  in the plane.
+- Ran into trouble with variations on reciprocal lattice
+  definitions. Added arguments to `Lattice`, `get_sympts`, and
+  `get_sympaths` that allow freedom in selecting a convention.
+
+## Revision 0.3.0
+- Added new modules and notebooks:
+  - `make_ibz.py` is a module that creates the first Brillouin zone
+	and the irreducible wedge of the Brillouin zone. New method for
+	plotting these are found in `plots.py` and a notebook that plots
+	each of these is `Brillouin zone plots.ipynb`.
+  - `quaternions.py` has methods for rotating and reflecting vectors
+	using a quaternion derivation.
+  - `utilities.py` has various usefull functions such determining if a
+	vector is contained in a list of vectors.
+  - `Blochl Plots.ipynb` reproduces the plots found in Blochl's paper.
+  - `Free Electron Tetrahedron Convergence.ipynb` tests the
+	convergence of Blochl's tetrahedron method with and without weight
+	corrections to rectangular integration on a free electron model.
+  - `indexing tetrahedron grid.ipynb` is a notebook that works out how
+	the grid and tetrahedra are indexed in Blochl's method.
+
 ## Revision 0.2.15
 - Small changes to setup and run of VASP and QE jobs. Now able to
   get input parameters and run convergence tests.
