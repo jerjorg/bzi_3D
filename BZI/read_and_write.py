@@ -1,13 +1,12 @@
 import os
+import matplotlib
+matplotlib.use("Agg")
 import subprocess
 import numpy as np
 from numpy.linalg import inv, det
 import pandas as pd
 import pickle
 import itertools
-import matplotlib
-# matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import xarray as xd
 
 from BZI.symmetry import make_rptvecs
@@ -128,10 +127,14 @@ def run_QE(home_dir, system_name, parameters):
                                 filedata = file.read()                            
 
                             # Replace the target string.
-                            filedata = filedata.replace("occupation type", occupation)
-                            filedata = filedata.replace("smearing method", smearing)
                             filedata = filedata.replace("smearing value", str(smearing_value))
-                            
+                            filedata = filedata.replace("smearing method", smearing)
+                            filedata = filedata.replace("occupation type", occupation)
+
+                            # filedata = filedata.replace("smearing", occupation)
+                            # filedata = filedata.replace("gaussian", smearing)
+                            # filedata = filedata.replace("1.0d-6", str(smearing_value))
+                                                        
                             for i,kp in enumerate(kpoints):
                                 kp_name = "kpoint" + str(i + 1)
                                 filedata = filedata.replace(kp_name, str(kp))
@@ -160,19 +163,19 @@ def run_QE(home_dir, system_name, parameters):
                                 
                             if nkpoints <= 8000:    
                                 filedata = filedata.replace("12:00:00", "12:00:00")
-                                filedata = filedata.replace("4096", "8192")
+                                filedata = filedata.replace("4096", "8GB")
                                 
                             elif nkpoints > 8000 and nkpoints < 27000:                                    
                                 filedata = filedata.replace("12:00:00", "48:00:00")
-                                filedata = filedata.replace("4096", "16384")                                
+                                filedata = filedata.replace("4096", "16GB")                                
                                 
                             elif nkpoints >= 27000 and nkpoints < 64000:
                                 filedata = filedata.replace("12:00:00", "48:00:00")
-                                filedata = filedata.replace("4096", "32768")
+                                filedata = filedata.replace("4096", "32GB")
                                 
                             elif nkpoints >= 64000:
                                 filedata = filedata.replace("12:00:00", "96:00:00")
-                                filedata = filedata.replace("4096", "65536")
+                                filedata = filedata.replace("4096", "64GB")
 
                             with open("run.sh", "w") as file:
                                 file.write(filedata)
@@ -804,14 +807,14 @@ def read_vasp_input(location):
 
 def read_vasp(location, vasp6=True):
     """Read in VASP output parameters.
-
+    
     Args:
         location (str): the file path to the ouput files.
-
+    
     Returns:
         VASP_data (dict): a dictionary of parameters.
     """
-
+    
     job_finished = False
     VASP_data = read_vasp_input(location)
     natoms = len(VASP_data["atomic basis"]["atom positions"])
@@ -837,6 +840,63 @@ def read_vasp(location, vasp6=True):
                 niters += 1
 
         VASP_data["number of electronic iterations"] = niters
+<<<<<<< HEAD
+=======
+    
+    # Read the eigenvalues, number of reduced k-points, and the
+    # k-points weights from the EIGENVAL file.
+    with open(eigenval_file, "r") as file:
+        f = file.readlines()
+        kpoints = []
+        weights = []
+        nkpts = 0
+        degeneracy = []
+        for i,line in enumerate(f):
+            if line.strip() == "":
+                nkpts += 1
+                vals = [float(k) for k in f[i+1].strip().split()]
+                kpoints.append(vals[:3])
+                weights.append(vals[-1])
+                try:
+                    degeneracy.append(vals[-1]*VASP_data["number of unreduced k-points"])
+                except:
+                    continue
+        VASP_data["number of reduced k-points"] = nkpts
+        VASP_data["k-point weights"] = weights
+        VASP_data["reduced k-points"] = kpoints
+        try:
+            VASP_data["k-point degeneracy"] = degeneracy
+        except:
+            None
+        
+    energy_list = []
+    dos_list = []
+    idos_list = [] # integrated DOS
+
+    with open(doscar_file, "r") as file:
+        f = file.readlines()
+        for i, line in enumerate(f):
+            if i > 5:
+                try:
+                    energy_list.append(float(line.split()[0]))
+                except:
+                    energy_list.append(np.nan)
+                # I found that sometimes QE returns DOS that don't
+                # make sense, such as 0.7615-305.                
+                try:
+                    dos_list.append(float(line.split()[1]))
+                except:                    
+                    dos_list.append(np.nan)
+                try:
+                    idos_list.append(float(line.split()[2]))
+                except:
+                    idos_list.append(np.nan)                  
+                    
+        VASP_data["density of states data"] = dos_list
+        VASP_data["integrated density of states data"] = idos_list
+        VASP_data["density of states energies"] = energy_list
+    
+>>>>>>> c332771306f463ee3c8352827339ccd729e9e1cd
 
     with open(outcar_file, "r") as file:
         f = file.readlines()
@@ -863,8 +923,11 @@ def read_vasp(location, vasp6=True):
             # if "the Fermi energy is" in line:
             #     VASP_data["Fermi level"] = line.split()[4] + " " + line.split()[5]
             if "E-fermi" in line:
-                VASP_data["Fermi level"] = float(line.split()[2])
-                
+                try: 
+                    VASP_data["Fermi level"] = float(line.split()[2])
+                except:
+                    VASP_data["Fermi level"] = np.nan
+                    
             if " Free energy of the ion-electron system (eV)" in line:
                 alpha_line = f[i+2].split()
                 alpha_name = alpha_line[0] + " " + alpha_line[1]
@@ -904,6 +967,7 @@ def read_vasp(location, vasp6=True):
                     VASP_data[eigval_line[0]] = float(eigval_line[-1])
                 except:
                     print("Band energy isn't convergerging for this job:")
+<<<<<<< HEAD
                     print(location, "\n")
                     return None
 
@@ -967,18 +1031,42 @@ def read_vasp(location, vasp6=True):
 
                 VASP_data[free_name] = float(free_line[-2])
                                 
+=======
+                    VASP_data[eigval_line[0]] = np.nan
+                
+                atomic_line = f[i+10].split()
+                atomic_name = atomic_line[0] + " " + atomic_line[1]
+                VASP_data[atomic_name] = float(atomic_line[-1])
+                
+                free_line = f[i+12].split()
+                free_name = free_line[0] + " " + free_line[1]
+                try:
+                    VASP_data[free_name] = float(free_line[-2])
+                except:
+                    VASP_data[free_name] = np.nan
+                no_entropy_line = f[i+14].split()
+                no_entropy_name = (no_entropy_line[0] + " " + no_entropy_line[1] + " " +
+                                   no_entropy_line[2])
+>>>>>>> c332771306f463ee3c8352827339ccd729e9e1cd
                 # For some reason splitting the lines isn't always consistent, and the "=" gets
                 # attached to the value occasionally.
-                try:
-                    VASP_data[no_entropy_name] = float(no_entropy_line[4])
-                    sigma_line = no_entropy_line
-                    sigma_name = sigma_line[5]
-                    VASP_data[sigma_name] = float(sigma_line[7])                    
-                except:
-                    VASP_data[no_entropy_name] = float(no_entropy_line[3].strip("="))
-                    sigma_line = no_entropy_line
-                    sigma_name = sigma_line[4]
-                    VASP_data[sigma_name] = float(sigma_line[5].strip("="))
+
+                if (no_entropy_line[4] == '******************' or
+                    no_entropy_line[3].strip("=") == '******************'):
+                    VASP_data[no_entropy_name] = np.nan
+                    VASP_data[sigma_name] = np.nan
+                else:                
+                    try:
+                        VASP_data[no_entropy_name] = float(no_entropy_line[4])
+                        sigma_line = no_entropy_line
+                        sigma_name = sigma_line[5]
+                        VASP_data[sigma_name] = float(sigma_line[7])                    
+                    except:
+                        VASP_data[no_entropy_name] = float(no_entropy_line[3].strip("="))
+                        sigma_line = no_entropy_line
+                        sigma_name = sigma_line[4]
+                        VASP_data[sigma_name] = float(sigma_line[5].strip("="))
+
 
             if "VOLUME and BASIS-vectors are now" in line:
                 a1 = [float(a) for a in f[i+5].split()[:3]]
@@ -1558,10 +1646,10 @@ def run_VASP(home_dir, element, parameters):
                         # Replace values in the INCAR.
                         with open(incar_dir, "r") as file:
                             filedata = file.read()
-                        
-                        filedata = filedata.replace("smearing method", smearing)
-                        filedata = filedata.replace("smearing value",
-                                                    str(smearing_value))
+
+                        filedata = filedata.replace("ISMEAR = 0", "ISMEAR = " + smearing)
+                        filedata = filedata.replace("SIGMA = 1E-3",
+                                                    "SIGMA = " + str(smearing_value))
                         
                         with open(incar_dir, "w") as file:
                             file.write(filedata)
@@ -1597,25 +1685,28 @@ def run_VASP(home_dir, element, parameters):
                             subprocess.call('./getKPOINTS', shell=True)
                         
                         # Adjust time to run and memory
-                        with open("run.sh", "r") as file:
+                        with open(run_file, "r") as file:
                             filedata = file.read()
 
                         if nkpoints <= 8000:
-                            filedata = filedata.replace("12:00:00", "4:00:00")
-                            filedata = filedata.replace("4096", "8192")
+                            filedata = filedata.replace("12:00:00", "12:00:00")
+                            filedata = filedata.replace("4096", "8GB")
 
                         elif nkpoints > 8000 and nkpoints < 27000:
-                            filedata = filedata.replace("12:00:00", "6:00:00")
-                            filedata = filedata.replace("4096", "16384")                                
+                            filedata = filedata.replace("12:00:00", "36:00:00")
+                            filedata = filedata.replace("4096", "32GB")                                
 
                         elif nkpoints >= 27000 and nkpoints < 64000:
-                            filedata = filedata.replace("12:00:00", "12:00:00")
-                            filedata = filedata.replace("4096", "32768")
+                            filedata = filedata.replace("12:00:00", "48:00:00")
+                            filedata = filedata.replace("4096", "32GB")
 
                         elif nkpoints >= 64000:
-                            filedata = filedata.replace("12:00:00", "24:00:00")
-                            filedata = filedata.replace("4096", "65536")
+                            filedata = filedata.replace("12:00:00", "96:00:00")
+                            filedata = filedata.replace("4096", "64GB")
 
+                        with open(run_file, "w") as file:
+                            file.write(filedata)
+                            
                         # Setting a larger stack size should keep some jobs from segfaulting.
                         subprocess.call("ulimit -s unlimited", shell=True)
 
@@ -1684,7 +1775,7 @@ def setup_nbands_tests(location, system_name, nbands_list):
         with open(run_dir, 'r') as file:
             filedata = file.read()
         
-        job_name = system_name + " nbands " + str(band_n)
+        job_name = system_name + " nbands " + str(int(band_n))
         filedata = filedata.replace("JOB NAME", job_name)
         filedata = filedata.replace("12:00:00", "48:00:00")
         filedata = filedata.replace("4096", "16384")
@@ -2547,6 +2638,8 @@ def pickle_QE_data(home_dir, system_name, parameters):
             'occupation list', 'smearing list', 'smearing value list',
             and 'k-points list'. Their corresponding values must be lists.
     """
+
+    all_kpoints_list = []
     
     data = np.empty([len(parameters[i]) for i in parameters.keys()], dtype=float)
 
@@ -2575,30 +2668,43 @@ def pickle_QE_data(home_dir, system_name, parameters):
                     # Find the smearing value directory.
                     for m,smearing_value in enumerate(parameters["smearing value list"]):
                         smearing_value_dir = os.path.join(smearing_dir, str(smearing_value))
-
                         # Find the k-points directory.
-                        kpoint_list = os.listdir(smearing_value_dir)
-
+                        kpoint_list = [np.prod(k) for k in parameters["k-point list"]]                        
                         # Find the number of reduced and unreduced k-points.
                         nkpoints_list = []
+<<<<<<< HEAD
                         for n,kpoints in enumerate(parameters["k-point list"]):
                             # nkpoints = np.prod(kpoints)
+=======
+                        failed = False
+                        for n,kpoints in enumerate(parameters["k-point list"]):
+                            nkpoints = np.prod(kpoints)
+>>>>>>> c332771306f463ee3c8352827339ccd729e9e1cd
                             kpoint_dir = os.path.join(smearing_value_dir, str(nkpoints))
-                            qe_data = read_QE(kpoint_dir, system_name)
+                            try:
+                                qe_data = read_QE(kpoint_dir, system_name)
+                            except:
+                                failed = True
+                                data[i,j,k,l,m,n,:] = np.nan
+                                nkpoints_list.append(str([np.nan, np.nan]))                                
+                                continue
 
                             try:
                                 nkpoints_list.append(str([int(qe_data["number of unreduced k-points"]), (
                                     int(qe_data["number of reduced k-points"]))]))
                             except:
-                                nkpoints_list.append([np.nan, np.nan])
+                                nkpoints_list.append(str([np.nan, np.nan]))
                             for o,energy in enumerate(parameters["energy list"]):
                                 try:
                                     data[i,j,k,l,m,n,o] = float(qe_data[energy].split()[0])
                                 except:
                                     # If the run fails
                                     data[i,j,k,l,m,n,o] = np.nan
+                        if failed != True:
+                            all_kpoints_list = nkpoints_list
 
 
+    # nkpoints_list = [np.prod(k) for k in parameters["k-point list"]]
     # A list of quantities to include in the data frame.
     energy_list = ["total energy", "Fermi energy",
                      "one-electron contribution", "ewald contribution",
@@ -2611,18 +2717,120 @@ def pickle_QE_data(home_dir, system_name, parameters):
                    parameters["occupation list"],
                    parameters["smearing list"],
                    parameters["smearing value list"],
-                   nkpoints_list,
+                   all_kpoints_list,
                    energy_list]
 
     dimensions = ("grid", "offset", "occupation", "smearing", "smearing_value",
                   "kpoints", "energy")
-    
+
     coordinates = {i:j for i,j in zip(dimensions, coordinates)}
     data = xd.DataArray(data, coords=coordinates, dims=dimensions)
     data.name = system_name + " Quantum Espresso Data"
     output_file = os.path.join(data_file, system_name + ".p")
     pickle.dump(data, open(output_file, "wb"))
 
+
+def pickle_vasp_data(home_dir, system_name, parameters):
+    """Write a pickle file of the data from the Quantum Espresso runs of a system.
+
+    Args:
+        home_dir (str): the root directory. It must have a folder named
+            'system_name' and this folder must contain a folder named 'initial_data',
+            where the VASP input files (POTCAR, POSCAR, and KPOINTS) are located.
+        system_name (str): the name of the system being simulated.
+        parameters (dict): a dictionary of adjustable parameters. The following
+            key strings must be present: 'grid type list', 'offset list',
+            'smearing list', 'smearing value list', and 'k-points list'. Their 
+            corresponding values must be lists.
+    """
+
+
+    # a dictionary to give the folders more meaningful names
+    smearing_dict = {"-1": "Fermi-Dirac smearing", 
+                     "0": "Gaussian smearing", 
+                     "1": "1st order Methfessel-Paxton smearing",
+                     "2": "2nd order Methfessel-Paxton smearing",
+                     "3": "3rd order Methfessel-Paxton smearing",
+                     "4": "4th order Methfessel-Paxton smearing",
+                     "5": "5th order Methfessel-Paxton smearing",
+                     "-4": "Tetrahedron method without Blochl corrections",
+                     "-5": "Tetrahedron method with Blochl corrections"}
+    
+    data = np.empty([len(parameters[i]) for i in parameters.keys()], dtype=float)
+
+    # Make and move into the system directory.
+    system_dir = os.path.join(home_dir, system_name)
+    data_file = os.path.join(home_dir, "data")
+
+    # Find the grid type directory.
+    for i, grid_type in enumerate(parameters["grid type list"]):
+        grid_dir = os.path.join(system_dir, grid_type)
+
+        # Find the offset directory.
+        for j, shift in enumerate(parameters["offset list"]):
+            offset_name = str(shift).strip("[").strip("]")
+            offset_name = offset_name.replace(",", "")
+            offset_dir = os.path.join(grid_dir, offset_name)
+
+            # Find the smearing type directory.
+            for l,smearing in enumerate(parameters["smearing list"]):                
+                smearing_dir = os.path.join(offset_dir, smearing_dict[smearing])
+
+                # Find the smearing value directory.
+                for m,smearing_value in enumerate(parameters["smearing value list"]):
+                    smearing_value_dir = os.path.join(smearing_dir, str(smearing_value))
+                    # Find the k-points directory.
+                    kpoint_list = [np.prod(k) for k in parameters["k-point list"]]
+                    
+                    # Find the number of reduced and unreduced k-points.
+                    nkpoints_list = []
+                    for n,nkpoints in enumerate(kpoint_list):
+                        kpoint_dir = os.path.join(smearing_value_dir, str(nkpoints))
+                        vasp_data = read_vasp(kpoint_dir)
+                        try:
+                            nkpoints_list.append(str([int(vasp_data["number of unreduced k-points"]), (
+                                int(vasp_data["number of reduced k-points"]))]))
+                        except:
+                            nkpoints_list.append([np.nan, np.nan])
+                        for o,energy in enumerate(parameters["energy list"]):
+                            try:
+
+                                if type(vasp_data[energy]) != float:
+                                    print("energy: ", vasp_data[energy])
+                                    print("energy type: ", type(vasp_data[energy]))
+                                if type(vasp_data["atomic basis"]["number of atoms"]) != int:
+                                    print("atoms: ", vasp_data["atomic basis"]["number of atoms"])
+                                    print("atom type: ", type(vasp_data["atomic basis"]["number of atoms"]))
+                                
+                                data[i,j,l,m,n,o] = vasp_data[energy]/(
+                                    vasp_data["atomic basis"]["number of atoms"])
+                            except:
+                                data[i,j,l,m,n,o] = np.nan
+    offset_names = [str(o) for o in parameters["offset list"]]
+    kpoint_names = [str(k).strip("[]").replace(",","") for k in nkpoints_list]
+    coordinates = [parameters["grid type list"],
+                   offset_names,
+                   parameters["smearing list"],
+                   parameters["smearing value list"],
+                   nkpoints_list,
+                   parameters["energy list"]]
+
+    dimensions = ("grid", "offset", "smearing", "smearing_value", "kpoints", "energy")
+
+    coordinates = {i:j for i,j in zip(dimensions, coordinates)}
+
+    print("dimensions: ", dimensions)
+    print("dim shape: ", np.shape(dimensions))
+    print("coordinates: ", coordinates)
+    print("dim coords: ", np.shape(coordinates))
+    print("data: ", np.shape(data))
+    
+    data = xd.DataArray(data, coords=coordinates, dims=dimensions)
+    data.name = system_name + " Quantum Espresso Data"
+    output_file = os.path.join(data_file, system_name + ".p")
+    pickle.dump(data, open(output_file, "wb"))
+
+    
 def read_QE_pseudopot(pseudo_file):
     """Read relevant parameters from the pseudopotential file.
 
@@ -3207,6 +3415,7 @@ def qe_test_input_plots(location, system_name, parameters):
         fig.savefig(wfc_plot_file, bbox_extra_artists=(lgd,), bbox_inches='tight')
         plt.close(fig)
 
+<<<<<<< HEAD
 def write_kpoints_file(kpoint_list, file_dir, header, weights_list=None):
     """Write a VASP KPOINTS file with the provided k-points and optional weights.
 
@@ -3222,10 +3431,16 @@ def write_kpoints_file(kpoint_list, file_dir, header, weights_list=None):
         weights_list = np.ones(len(kpoint_list))
     
     file_name = os.path.join(file_dir, "KPOINTS")    
+=======
+        
+def write_kpoints_file(kpoint_list, file_dir, header, weights=None):
+    file_name = os.path.join(file_dir, "KPOINTS")
+>>>>>>> c332771306f463ee3c8352827339ccd729e9e1cd
     with open(file_name, "w") as file:
         file.write(header + "\n")
         file.write(str(len(kpoint_list)) + "\n")
         file.write("Fractional\n")
+<<<<<<< HEAD
         for kpt,wt in zip(kpoint_list, weights_list):
             kpt = np.round(kpt, 9)
             line = (str(kpt[0]) + " " + str(kpt[1]) + " " + str(kpt[2]) + "\t" +
@@ -3307,3 +3522,10 @@ def get_space_group_size(file_loc, coords="lat", rtol=1e-4, atol=1e-6, eps=1e-10
     
     return len(point_group)
             
+=======
+        if weights is None:            
+            for kpt in kpoint_list:
+                kpt = np.round(kpt, 9)
+                line = str(kpt[0]) + " " + str(kpt[1]) + " " + str(kpt[2]) + "\t 1.0 \n"
+                file.write(line)
+>>>>>>> c332771306f463ee3c8352827339ccd729e9e1cd

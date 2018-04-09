@@ -3246,3 +3246,25 @@ def check_commensurate(lattice, sublattice, rtol=1e-5, atol=1e-8):
         return True, N
     else:
         return False, N
+
+
+def get_space_group_size(file_loc, coords="lat", rtol=1e-4, atol=1e-6, eps=1e-10):
+    """Get the size of the point group.
+    
+    Args:
+        file_loc (str): the location of the VASP POSCAR file.
+        
+    Returns:
+        _ (int): the number of operations in the space group.
+    """
+    
+    data = read_poscar(file_loc)
+    lat_vecs = data["lattice vectors"]
+    atom_labels = data["atomic basis"]["atom labels"]
+    atom_positions = data["atomic basis"]["atom positions"]
+    translations, point_group = get_space_group(lat_vecs, atom_labels, atom_positions, coords=coords,
+                                                rtol=rtol, atol=atol, eps=eps)
+    
+    return len(point_group)
+            
+    
