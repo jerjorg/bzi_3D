@@ -38,7 +38,7 @@ def run(tests):
     elif tests == "all rectangle":
         tests = ["test_rectangular", "test_rectangular_fermi_level"]
 
-    # Pseudopotential tests
+    # pseudopotential tests
     elif tests == "all pseudopotential":
         tests = ["test_pseudopotentials"]
 
@@ -51,7 +51,7 @@ def run(tests):
                  "test_swap_rows",
                  "test_HermiteNormalForm",
                  "test_UpperHermiteNormalForm",
-                 "test_make_grid2",]
+                 "test_make_grid2"]
 
     # Symmetry tests
     elif tests == "all symmetry":
@@ -70,7 +70,13 @@ def run(tests):
                  "test_reduce_base_centered_monoclinic",
                  "test_reduce_tetragonal",
                  "test_reduce_body_centered_tetragonal",
-                 "test_get_point_group"]
+                 "test_get_point_group",
+                 "test_gaussian_reduction",
+                 "test_reduce_lattice_vector",
+                 "test_minkowski_reduce_basis",
+                 "test_get_space_group",
+                 "test_bring_into_cell",
+                 "test_check_commensurate"]
 
     # Read and write tests
     elif tests == "all read_and_write":
@@ -81,6 +87,20 @@ def run(tests):
                  "test_three_planes_intersect",
                  "test_find_bragg_shells",
                  "test_find_bz"]
+    elif tests == "all utilities":
+        tests = ["test_remove_points",
+                 "test_find_point_index",
+                 "test_find_point_indices",
+                 "test_trim_small",
+                 "test_check_contained",
+                 "test_swap_rows_columns"]
+    elif tests == "all 2D":
+        tests = ["test_make2D_lattice_basis",
+                 "test_get_2Dlattice_type",
+                 "test_HermiteNormalForm2D",
+                 "test_make_cell_points2D",
+                 "test_plot_mesh2D",
+                 "test_get_circle_pts"]
     else:
         tests = []
     

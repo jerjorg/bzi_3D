@@ -1,6 +1,7 @@
 import os
 import subprocess
 import numpy as np
+from numpy.linalg import inv, det
 import pandas as pd
 import pickle
 import itertools
@@ -8,6 +9,8 @@ import matplotlib
 # matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import xarray as xd
+
+from BZI.symmetry import make_rptvecs
 
 #######
 ####### =========================================================================
@@ -657,29 +660,6 @@ def read_vasp_input(location):
                  "EAUG list": [],
                  "ENMAX list": []}
 
-    # Get the number of unreduced k-points. This only works for one of
-    # the automatic k-mesh generation methods, where the number of k-points
-    # and offset of the k-mesh are provided.
-    with open(kpoints_file, "r") as file:
-        f = file.readlines()
-        for i, line in enumerate(f):
-            if "Gamma" in line:
-                kpt_index = i + 1
-                kpt_line = f[kpt_index].split()
-                try:
-                    total_kpoints = np.prod([int(k) for k in kpt_line])
-                except:
-                    total_kpoints = None
-                
-                VASP_data["number of unreduced k-points"] = total_kpoints
-
-                try:
-                    offset_index = i + 2
-                    offset_line = f[offset_index].split()
-                    VASP_data["offset"] = [float(off) for off in offset_line]
-                except:
-                    VASP_data["offset"] = None
-
     """
     The POSCAR should have the following format:
 
@@ -709,7 +689,7 @@ def read_vasp_input(location):
         a1 = [float(v) for v in f[2].strip().split()[:3]]
         a2 = [float(v) for v in f[3].strip().split()[:3]]
         a3 = [float(v) for v in f[4].strip().split()[:3]]
-        VASP_data["lattice vectors"] = np.transpose([a1,a2,a3])
+        VASP_data["lattice vectors"] = np.transpose([a1,a2,a3])*VASP_data["scaling factor"]
 
         atomic_basis = {}
         atomic_species = []
@@ -728,8 +708,14 @@ def read_vasp_input(location):
         for k in range(natoms):
             atom_positions.append([float(k) for k in f[7 + k].split()[:3]])
         atomic_basis["atom positions"] = atom_positions
+
+        atom_labels = []
+        for i,natoms in enumerate(atomic_species):
+            for _ in range(natoms):
+                atom_labels.append(i)
+        atomic_basis["atom labels"] = atom_labels
+        
         VASP_data["atomic basis"] = atomic_basis
-                                
         # more = True
         # while more:
         #     try:
@@ -748,6 +734,55 @@ def read_vasp_input(location):
         #         more = False
         # VASP_data["atomic bases"] = atomic_bases
 
+
+    # Get the number of unreduced k-points. This only works for one of
+    # the automatic k-mesh generation methods, where the number of k-points
+    # and offset of the k-mesh are provided.
+    grid_vectors = []    
+    with open(kpoints_file, "r") as file:
+        f = file.readlines()
+        for i, line in enumerate(f):
+            if "Gamma" in line:
+                kpt_index = i + 1
+                kpt_line = f[kpt_index].split()
+                try:
+                    total_kpoints = np.prod([int(k) for k in kpt_line])
+                except:
+                    total_kpoints = None
+                
+                VASP_data["number of unreduced k-points"] = total_kpoints
+
+                try:
+                    offset_index = i + 2
+                    offset_line = f[offset_index].split()
+                    VASP_data["offset"] = [float(off) for off in offset_line]
+                except:
+                    VASP_data["offset"] = None
+            
+        
+            if i > 2:
+                try:
+                    grid_vec = [float(g) for g in line.split()]
+                
+                    if len(grid_vectors) < 3:
+                        grid_vectors.append(grid_vec)
+                    else:
+                        offset = grid_vec
+                except:
+                    None
+
+        try:
+            grid_vectors = np.transpose(grid_vectors)/VASP_data["scaling factor"]
+            VASP_data["grid generating vectors"] = grid_vectors
+            VASP_data["grid offset"] = offset
+
+            rlat_vecs = make_rptvecs(VASP_data["lattice vectors"])
+            VASP_data["reciprocal lattice vectors"] = rlat_vecs
+            
+            VASP_data["number of unreduced k-points"] = det(np.dot(inv(grid_vectors), rlat_vecs))
+            
+        except:
+            None
          
     with open(potcar_file, "r") as file:
         f = file.readlines()
@@ -767,7 +802,7 @@ def read_vasp_input(location):
     return VASP_data
 
 
-def read_vasp(location):
+def read_vasp(location, vasp6=True):
     """Read in VASP output parameters.
 
     Args:
@@ -802,48 +837,6 @@ def read_vasp(location):
                 niters += 1
 
         VASP_data["number of electronic iterations"] = niters
-    
-    # Read the eigenvalues, number of reduced k-points, and the
-    # k-points weights from the EIGENVAL file.
-    with open(eigenval_file, "r") as file:
-        f = file.readlines()
-        kpoints = []
-        weights = []
-        nkpts = 0
-        degeneracy = []
-        for i,line in enumerate(f):
-            if line.strip() == "":
-                nkpts += 1
-                vals = [float(k) for k in f[i+1].strip().split()]
-                kpoints.append(vals[:3])
-                weights.append(vals[-1])
-                degeneracy.append(vals[-1]*VASP_data["number of unreduced k-points"])
-        VASP_data["number of reduced k-points"] = nkpts
-        VASP_data["k-point weights"] = weights
-        VASP_data["reduced k-points"] = kpoints
-        VASP_data["k-point degeneracy"] = degeneracy
-
-
-    energy_list = []
-    dos_list = []
-    idos_list = [] # integrated DOS
-
-    with open(doscar_file, "r") as file:
-        f = file.readlines()
-        for i, line in enumerate(f):
-            if i > 5:
-                try:
-                    energy_list.append(float(line.split()[0]))
-                    dos_list.append(float(line.split()[1]))
-                    idos_list.append(float(line.split()[2]))
-                except:
-                    print("Something is wrong with this DOSCAR")
-                    print(doscar_file, "\n")
-                    return None
-        VASP_data["density of states data"] = dos_list
-        VASP_data["integrated density of states data"] = idos_list
-        VASP_data["density of states energies"] = energy_list
-    
 
     with open(outcar_file, "r") as file:
         f = file.readlines()
@@ -855,7 +848,7 @@ def read_vasp(location):
                 r1 = [float(q) for q in line.split()[1:]]
                 r2 = [float(q) for q in f[i+1].split()]            
                 r3 = [float(q) for q in f[i+2].split()]            
-                op = np.array([r1, r2, r3])
+                op = np.transpose([r1, r2, r3])
                 sym_group.append(op)
 
             if "NBANDS" in line:
@@ -893,7 +886,10 @@ def read_vasp(location):
                 
                 paw_line = f[i+7].split()
                 paw_name = paw_line[0] + " " + paw_line[1] + " " + paw_line[2]
-                VASP_data[paw_name] = float(paw_line[-2])
+                try:
+                    VASP_data[paw_name] = float(paw_line[-2])
+                except:
+                    VASP_data[paw_name] = float(paw_line[-1])
                 
                 entropy_line = f[i+8].split()
                 entropy_name = entropy_line[0] + " " + entropy_line[1]
@@ -910,18 +906,67 @@ def read_vasp(location):
                     print("Band energy isn't convergerging for this job:")
                     print(location, "\n")
                     return None
-                
-                atomic_line = f[i+10].split()
-                atomic_name = atomic_line[0] + " " + atomic_line[1]
+
+                if not vasp6:
+                    # This isn't the best fix but sometimes the runs are different.
+                    try:
+                        atomic_line = f[i+10].split()
+                        atomic_name = atomic_line[0] + " " + atomic_line[1]
+
+                        free_line = f[i+12].split()
+                        free_name = free_line[0] + " " + free_line[1]
+
+                        no_entropy_line = f[i+14].split()
+                        no_entropy_name = (no_entropy_line[0] + " " + no_entropy_line[1] + " " +
+                                           no_entropy_line[2])
+
+                    except:
+                        atomic_line = f[i+9].split()
+                        atomic_name = atomic_line[0] + " " + atomic_line[1]
+                        
+                        free_line = f[i+11].split()
+                        free_name = free_line[0] + " " + free_line[1]
+
+                        no_entropy_line = f[i+13].split()
+                        no_entropy_name = (no_entropy_line[0] + " " + no_entropy_line[1] + " " +
+                                           no_entropy_line[2])
+                else:
+                    
+                    # This isn't the best fix but sometimes the runs are different.                    
+                    try:
+                        atomic_line = f[i+10].split()
+                        atomic_name = atomic_line[0] + " " + atomic_line[1]
+
+                        solvation_line = f[i+11].split()
+                        solvation_name = solvation_line[0] + " " + solvation_line[1]
+
+                        free_line = f[i+13].split()
+                        free_name = free_line[0] + " " + free_line[1]
+
+                        no_entropy_line = f[i+15].split()
+                        no_entropy_name = (no_entropy_line[0] + " " + no_entropy_line[1] + " " +
+                                           no_entropy_line[2])
+
+                    except:
+                        atomic_line = f[i+9].split()
+                        atomic_name = atomic_line[0] + " " + atomic_line[1]
+
+                        solvation_line = f[i+10].split()
+                        solvation_name = solvation_line[0] + " " + solvation_line[1]
+                                                
+                        free_line = f[i+12].split()
+                        free_name = free_line[0] + " " + free_line[1]
+
+                        no_entropy_line = f[i+14].split()
+                        no_entropy_name = (no_entropy_line[0] + " " + no_entropy_line[1] + " " +
+                                           no_entropy_line[2])
+                        
+                        VASP_data[solvation_name] = float(solvation_line[-1])
+
                 VASP_data[atomic_name] = float(atomic_line[-1])
-                
-                free_line = f[i+12].split()
-                free_name = free_line[0] + " " + free_line[1]
-                
+
                 VASP_data[free_name] = float(free_line[-2])
-                no_entropy_line = f[i+14].split()
-                no_entropy_name = (no_entropy_line[0] + " " + no_entropy_line[1] + " " +
-                                   no_entropy_line[2])
+                                
                 # For some reason splitting the lines isn't always consistent, and the "=" gets
                 # attached to the value occasionally.
                 try:
@@ -982,7 +1027,11 @@ def read_vasp(location):
                     wrapped_charge = None
                     while not too_far:
                         if direct in f[k].split():
-                            wrapped_charge = float(f[k].split()[-2])
+                            # If the charge density only has one number...
+                            try: 
+                                wrapped_charge = float(f[k].split()[-2])
+                            except:
+                                wrapped_charge = float(f[k].split()[-1])
                         elif "pseudopotential strength for first" in f[k]:
                             too_far = True
                         k += 1
@@ -1030,9 +1079,62 @@ def read_vasp(location):
 
             if "General timing and accounting informations for this job:" in line:
                 job_finished = True
-                
+
         VASP_data["number of plane waves"] = nplane_waves
         VASP_data["symmetry operators"] = sym_group
+
+
+    # Read the eigenvalues, number of reduced k-points, and the
+    # k-points weights from the EIGENVAL file.
+    with open(eigenval_file, "r") as file:
+        f = file.readlines()
+        kpoints = []
+        weights = []
+        eigenvalue_list = []
+        nkpts = 0
+        for i,line in enumerate(f):
+            if line.strip() == "":
+                nkpts += 1
+                vals = [float(k) for k in f[i+1].strip().split()]
+                kpoints.append(vals[:3])
+                weights.append(vals[-1])
+                
+                eigenvalues = []
+                for j in range(i+2, i+2+VASP_data["NBANDS"]):
+                    eigenvalues.append([float(k) for k in f[j].split()][:-1])
+                eigenvalue_list.append(eigenvalues)
+
+        try:
+            degeneracy = [w*VASP_data["number of unreduced k-points"] for w in weights]
+            VASP_data["k-point degeneracy"] = degeneracy
+        except:
+            None
+        VASP_data["number of reduced k-points"] = nkpts
+        VASP_data["k-point weights"] = weights
+        VASP_data["reduced k-points"] = np.array(kpoints)# /VASP_data["scaling factor"]
+        
+        VASP_data["k-point eigenvalues"] = eigenvalue_list
+
+    energy_list = []
+    dos_list = []
+    idos_list = [] # integrated DOS
+
+    with open(doscar_file, "r") as file:
+        f = file.readlines()
+        for i, line in enumerate(f):
+            if i > 5:
+                try:
+                    energy_list.append(float(line.split()[0]))
+                    dos_list.append(float(line.split()[1]))
+                    idos_list.append(float(line.split()[2]))
+                except:
+                    print("Something is wrong with this DOSCAR")
+                    print(doscar_file, "\n")
+                    return None
+        VASP_data["density of states data"] = dos_list
+        VASP_data["integrated density of states data"] = idos_list
+        VASP_data["density of states energies"] = energy_list
+    
         
     if job_finished == True:
         return VASP_data
@@ -2479,8 +2581,7 @@ def pickle_QE_data(home_dir, system_name, parameters):
 
                         # Find the number of reduced and unreduced k-points.
                         nkpoints_list = []
-                        for n,nkpoints in enumerate(kpoint_list):
-                        # for n,kpoints in enumerate(parameters["k-point list"]):
+                        for n,kpoints in enumerate(parameters["k-point list"]):
                             # nkpoints = np.prod(kpoints)
                             kpoint_dir = os.path.join(smearing_value_dir, str(nkpoints))
                             qe_data = read_QE(kpoint_dir, system_name)
@@ -3105,3 +3206,104 @@ def qe_test_input_plots(location, system_name, parameters):
         wfc_plot_file = os.path.join(plot_dir, en_name + "_wfc.pdf")
         fig.savefig(wfc_plot_file, bbox_extra_artists=(lgd,), bbox_inches='tight')
         plt.close(fig)
+
+def write_kpoints_file(kpoint_list, file_dir, header, weights_list=None):
+    """Write a VASP KPOINTS file with the provided k-points and optional weights.
+
+    Args:
+        kpoint_list (list or numpy.array): a list of k-points.
+        file_dir (string): the location where the file will be written.
+        header (string): the header of the KPOINTS file.
+        weights_list (list or numpy.ndarray): a list of k-point weights in the
+            same order as k-point list.
+    """
+
+    if weights_list is None:
+        weights_list = np.ones(len(kpoint_list))
+    
+    file_name = os.path.join(file_dir, "KPOINTS")    
+    with open(file_name, "w") as file:
+        file.write(header + "\n")
+        file.write(str(len(kpoint_list)) + "\n")
+        file.write("Fractional\n")
+        for kpt,wt in zip(kpoint_list, weights_list):
+            kpt = np.round(kpt, 9)
+            line = (str(kpt[0]) + " " + str(kpt[1]) + " " + str(kpt[2]) + "\t" +
+                    str(wt) + "\n")
+            file.write(line)
+            
+
+def read_poscar(poscar_loc):
+    """Read in the variable from a VASP POSCAR file.
+
+    Args:
+        poscar_loc (str): the file path to the VASP POSCAR.
+
+    Returns:
+        VASP_data (dict): a dictionary of with keys being the atomic basis,
+            lattice vectors, scaling factor and so on.
+    """
+    
+    poscar_file = os.path.join(poscar_loc, "POSCAR")
+    VASP_data = {}    
+    
+    with open(poscar_file, "r") as file:
+        f = file.readlines()
+        VASP_data["name of system"] = f[0].strip()
+
+        # If negative, the scaling factor should be interpreted as the total volume
+        # of the cell.
+        VASP_data["scaling factor"] = float(f[1].split()[0])
+        
+        a1 = [float(v) for v in f[2].strip().split()[:3]]
+        a2 = [float(v) for v in f[3].strip().split()[:3]]
+        a3 = [float(v) for v in f[4].strip().split()[:3]]
+        VASP_data["lattice vectors"] = np.transpose([a1,a2,a3])*VASP_data["scaling factor"]
+
+        atomic_basis = {}
+        atomic_species = []
+        for elem in f[5].split():
+            try:
+                elem = int(elem)
+                atomic_species.append(elem)
+            except:
+                continue
+        natoms = int(np.sum(atomic_species))
+        atomic_basis["number of atoms per atomic species"] = atomic_species
+        atomic_basis["number of atoms"] = natoms
+        atomic_basis["coordinates"] = f[6].strip()
+
+        atom_positions = []
+        for k in range(natoms):
+            atom_positions.append([float(k) for k in f[7 + k].split()[:3]])
+        atomic_basis["atom positions"] = atom_positions
+
+        atom_labels = []
+        for i,natoms in enumerate(atomic_species):
+            for _ in range(natoms):
+                atom_labels.append(i)
+        atomic_basis["atom labels"] = atom_labels
+        
+        VASP_data["atomic basis"] = atomic_basis
+    return VASP_data
+        
+        
+def get_space_group_size(file_loc, coords="lat", rtol=1e-4, atol=1e-6, eps=1e-10):
+    """Get the size of the point group.
+    
+    Args:
+        file_loc (str): the location of the VASP POSCAR file.
+        
+    Returns:
+        _ (int): the number of operations in the space group.
+    """
+    
+    data = read_poscar(file_loc)
+    lat_vecs = data["lattice vectors"]
+    atom_labels = data["atomic basis"]["atom labels"]
+    atom_positions = data["atomic basis"]["atom positions"]
+    translations, point_group = get_space_group(lat_vecs, atom_labels, atom_positions, coords=coords,
+                                                rtol=rtol, atol=atol, eps=eps)
+    
+    return len(point_group)
+            

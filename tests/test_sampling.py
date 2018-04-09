@@ -110,8 +110,7 @@ def test_make_cell_points():
                         
                         # Verify all the points in the cell for the large grid
                         # are contained in grid.
-                        for g in grid:
-                            assert check_contained(g, grid2)
+                        assert check_contained(grid, grid2)
                             
 @pytest.mark.skipif("test_get_minmax_indices" not in tests, reason="different tests")
 def test_get_minmax_indices():
@@ -345,7 +344,7 @@ def test_make_grid2():
     grid_angles = [np.pi/2]*3
     grid_vecs = make_ptvecs(grid_centering, grid_const_list, grid_angles)
     offset = np.asarray([0.,0.,0.])
-    grid = make_grid(cell_vecs, grid_vecs, offset, False)
+    grid = make_grid(cell_vecs, grid_vecs, offset, coords="lat")
     
     for g1 in grid_pts1:
         assert check_contained(g1, grid)

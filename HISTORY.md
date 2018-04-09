@@ -1,5 +1,8 @@
 # Revision History
 
+## Revision 0.3.4
+- Various fixes and additions all around.
+
 ## Revision 0.3.3
 - Small changes to band plot functions and unit tests.
 

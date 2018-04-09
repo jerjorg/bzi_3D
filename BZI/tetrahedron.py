@@ -669,7 +669,8 @@ def calc_fermi_level(EPM, tetrahedra, weights, grid, tol=1e-6):
     return fermi_level
 
 
-def find_irreducible_tetrahedra(EPM, tetrahedra, grid, duplicates=True):
+def find_irreducible_tetrahedra(EPM, tetrahedra, grid, duplicates=True, rtol=1e-5,
+                                atol=1e-8):
     """Find the irreducible tetrahedra and their weights.
 
     Args:
@@ -680,14 +681,19 @@ def find_irreducible_tetrahedra(EPM, tetrahedra, grid, duplicates=True):
         irreducible_tetrahedra (list): a list of irreducible tetrahedra vertices.
         weights (list): a list of tetrahedron weights.
     """
-    
+
     if duplicates:
-        orbits = get_orbits(grid, EPM.lattice.reciprocal_vectors, duplicates=True)
+        orbits, weights = get_orbits(grid, EPM.lattice.vectors,
+                                     EPM.lattice.reciprocal_vectors,
+                                     EPM.atom_labels, EPM.atom_positions, duplicates=True)
     else:
-        orbits = get_orbits(grid, EPM.lattice.reciprocal_vectors)
+        orbits, weights = get_orbits(grid, EPM.lattice.vectors,
+                                     EPM.lattice.reciprocal_vectors,
+                                     EPM.atom_labels, EPM.atom_positions)
 
     # Move all grid points into the first unit cell
-    grid = [bring_into_cell(pt, EPM.lattice.reciprocal_vectors) for pt in grid]
+    grid = bring_into_cell(grid, EPM.lattice.reciprocal_vectors, rtol=rtol, atol=atol)
+    # grid = [bring_into_cell(pt, EPM.lattice.reciprocal_vectors) for pt in grid]
 
     # Each point in the grid is part of an orbit. The first point in each orbit
     # represents the orbit. The dictionary new_dict is a dictionary with keys as
@@ -697,10 +703,12 @@ def find_irreducible_tetrahedra(EPM, tetrahedra, grid, duplicates=True):
     for i,pt in enumerate(grid):
         # pt = bring_into_cell(pt, EPM.lattice.reciprocal_vectors)
         new_dict[i] = None
-        for k in orbits.keys():
+        # for k in orbits.keys():
+        for k in range(len(orbits)):
             # Represntative k-point
             rpt = orbits[k][0]
-            index = np.where([np.allclose(p,rpt) for p in grid])[0][0]
+            index = np.where([np.allclose(p, rpt, rtol=rtol, atol=atol)
+                              for p in grid])[0][0]
             for v in orbits[k]:
                 if np.allclose(v,pt):
                     # index = np.where([np.allclose(p,v) for p in grid])[0][0]

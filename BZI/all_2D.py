@@ -8,8 +8,9 @@ import itertools as it
 from copy import deepcopy
 from scipy.spatial import ConvexHull
 
-from BZI.symmetry import get_minmax_indices
+from BZI.symmetry import get_minmax_indices, bring_into_cell
 from BZI.utilities import remove_points
+plt.style.use('seaborn-colorblind')
 
 def make2D_lattice_basis(lattice_constants, lattice_angle):
     """Create the basis vectors that generate a lattice in 2D.
@@ -30,7 +31,7 @@ def make2D_lattice_basis(lattice_constants, lattice_angle):
     return basis
 
 
-def get_2Dlattice_type(basis):
+def get_2Dlattice_type(basis, rtol=1e-5, atol=1e-8):
     """Find the lattice type from the lattice generating vectors in 2D.
     
     Args:
@@ -47,34 +48,36 @@ def get_2Dlattice_type(basis):
     lattice_angle = np.arccos(np.dot(v1, v2)/np.prod(lattice_constants))
     
     # If the length of the lattice vectors is the same
-    if np.isclose(lattice_constants[0], lattice_constants[1]):
+    if np.isclose(lattice_constants[0], lattice_constants[1], rtol=rtol, atol=atol):
         # If the lattice angle is pi/2
-        if np.isclose(lattice_angle, np.pi/2):
+        if np.isclose(lattice_angle, np.pi/2, rtol=rtol, atol=atol):
             return "square"
         # If the lattice angle is pi/3 or 2pi/3
-        elif (np.isclose(lattice_angle, np.pi/3) or
-              np.isclose(lattice_angle, 2*np.pi/3)):
+        elif (np.isclose(lattice_angle, np.pi/3, rtol=rtol, atol=atol) or
+              np.isclose(lattice_angle, 2*np.pi/3, rtol=rtol, atol=atol)):
             return "hexagonal"
         else:
             return "rhombic"
     # If the lattice vectors are different lengths, and the lattice
     # angle is pi/2.
-    elif np.isclose(lattice_angle, np.pi/2):
+    elif np.isclose(lattice_angle, np.pi/2, rtol=rtol, atol=atol):
         return "rectangular"
     else:
         if lattice_constants[0] < lattice_constants[1]:
-            if np.isclose(np.dot(v1, v2/lattice_constants[1]), lattice_constants[1]/2):
+            if np.isclose(np.dot(v1, v2/lattice_constants[1]), lattice_constants[1]/2,
+                          rtol=rtol, atol=atol):
                 return "centered rectangular"
             else:
                 return "oblique"
         else:
-            if np.isclose(np.dot(v2, v1/lattice_constants[0]), lattice_constants[0]/2):
+            if np.isclose(np.dot(v2, v1/lattice_constants[0]), lattice_constants[0]/2,
+                          rtol=rtol, atol=atol):
                 return "centered rectangular"
             else:
                 return "oblique"
 
         
-def HermiteNormalForm2D(S, eps=10):
+def HermiteNormalForm2D(S, rtol=1e-5, atol=1e-6):
     """Find the Hermite normal form of a 2x2 matrix as well as the unimodular
     matrix that mediates the transform.
     
@@ -88,14 +91,15 @@ def HermiteNormalForm2D(S, eps=10):
     """
         
     # Make sure the input is integer.
-    if not (np.allclose(np.max(S%1), 0) or np.allclose(np.min(S%1), 0)):
+    if not (np.allclose(np.max(S%1), 0, rtol=rtol, atol=atol) or
+            np.allclose(np.min(S%1), 0, rtol=rotl, atol=atol)):
         msg = "Please provide an integer 2x2 array."
         raise ValueError(msg.format(S))
     
     H = deepcopy(S)
     B = np.eye(2,2)
     
-    # Make the elements in the first row are positive.
+    # Make sure the elements in the first row are positive.
     if H[0,1] < 0:
         H[:,1] *= -1
         B[:,1] *= -1
@@ -113,12 +117,12 @@ def HermiteNormalForm2D(S, eps=10):
             H[:,0] -= H[:,1]
             B[:,0] -= B[:,1]
             
-    if not np.allclose(np.dot(S,B), H):
+    if not np.allclose(np.dot(S,B), H, rtol=rtol, atol=atol):
         msg = "The transformation isn't working"
         raise ValueError(msg.format(S))                    
     
     # If the zero ends up in the wrong place, swap columns.
-    if np.isclose(H[0,0], 0):
+    if np.isclose(H[0,0], 0, rtol=rtol, atol=atol):
         tmp_column = deepcopy(H[:,0])
         H[:,0] = H[:,1]
         H[:,1] = tmp_column            
@@ -127,7 +131,7 @@ def HermiteNormalForm2D(S, eps=10):
         B[:,0] = B[:,1]
         B[:,1] = tmp_column            
     
-    if not np.allclose(np.dot(S,B), H):
+    if not np.allclose(np.dot(S,B), H, rtol=rtol, atol=atol):
         msg = "The transformation isn't working"
         raise ValueError(msg.format(S))
 
@@ -143,14 +147,14 @@ def HermiteNormalForm2D(S, eps=10):
             H[:,0] = H[:,0] - H[:,1]
             B[:,0] = B[:,0] - B[:,1]
             
-    if not np.allclose(np.dot(S,B), H):
+    if not np.allclose(np.dot(S,B), H, rtol=rtol, atol=atol):
         msg = "The transformation isn't working"
         raise ValueError(msg.format(S))
         
     return H, B
         
 
-def make_cell_points2D(lat_vecs, grid_vecs, offset=[0,0], cart=True):
+def make_cell_points2D(lat_vecs, grid_vecs, offset=[0,0], cart=True, rtol=1e-5, atol=1e-8):
     """Sample within a parallelogram using any regular grid.
 
     Args:
@@ -188,32 +192,31 @@ def make_cell_points2D(lat_vecs, grid_vecs, offset=[0,0], cart=True):
     if cart == True:
         # Loop through the diagonal of the HNF matrix.
         for i,j in it.product(range(D[0]), range(D[1])):
-            # Find the point in Cartesian coordinates.
-            pt = np.dot(grid_vecs, [i,j]) # + car_offset
             
-            # Put the point in cell coordinates and move it to the 
-            # first unit cell.
-            # pt = np.round(np.dot(pt, inv(lat_vecs)),12)%1
-            pt = np.round(np.dot(inv(lat_vecs), pt),12)%1
+            # Find the point in Cartesian coordinates.
+            pt = np.dot(grid_vecs, [i,j])
 
-            # Put the point back into Cartesian coordinates.
-            pt = np.dot(lat_vecs, pt) + car_offset
+            # Bring the point into the unit cell. The offset moves the entire unit cell.
+            pt = bring_into_cell(pt, lat_vecs, rtol=rtol, atol=atol) + car_offset
+            
             grid.append(pt)
         return grid
     else:
         for i,j in it.product(range(D[0]), range(D[1])):
             # Find the point in cartesian coordinates.
             pt = np.dot(grid_vecs, [i,j])
+            grid.append(bring_into_cell(pt, lat_vecs, rtol=rtol, atol=atol))
+            
             # Put the point in cell coordinates and move it to the 
             # first unit cell.
             # pt = np.round(np.dot(inv(lat_vecs), pt),12)%1 + offset
             # pt = np.round(np.dot(inv(lat_vecs), pt) + offset, 12)%1
-            pt = np.dot(inv(lat_vecs, pt)) + lat_offset
-            grid.append(pt)
+            # pt = np.dot(inv(lat_vecs, pt)) + lat_offset
+            # grid.append(pt)
         return grid
 
 
-def plot_mesh2D(grid, lattice_basis, offset = np.array([0,0])):
+def plot_mesh2D(grid, lattice_basis, offset = np.array([0,0]), ax=None):
     """Plot points and the unit cell of a lattice in 2D.
 
     Args:
@@ -228,8 +231,10 @@ def plot_mesh2D(grid, lattice_basis, offset = np.array([0,0])):
     kylist = [grid[i][1] for i in range(ngpts)]
     kzlist = [0 for i in range(ngpts)]
 
-    ax = plt.subplot(1,1,1)#,projection="3d")
+    if ax is None:
+        ax = plt.subplot(1,1,1)
     ax.scatter(kxlist, kylist, c="red")
+    ax.set_aspect('equal')            
 
     c1 = lattice_basis[:,0] 
     c2 = lattice_basis[:,1] 
@@ -292,18 +297,20 @@ def plot_circle_mesh(mesh_points, r2, offset = np.asarray([0.,0.])):
     ax = fig.add_subplot(111)
 
     # Plot the sphere
-    u = np.linspace(0, 2 * np.pi, 100)
+    u = np.linspace(0, 2 * np.pi, 1000)
     r = np.sqrt(r2)
     x = r*np.cos(u)
     y = r*np.sin(u)
-    ax.scatter(x,y,s=0.1)
+    ax.scatter(x,y,s=0.01)
     
     # Plot the points within the sphere.
     ngpts = len(mesh_points)
     kxlist = [mesh_points[i][0] for i in range(ngpts)]
-    kylist = [mesh_points[i][1] for i in range(ngpts)]    
+    kylist = [mesh_points[i][1] for i in range(ngpts)]
+    
     ax.set_aspect('equal')
-    ax.scatter(kxlist, kylist, c="black",s=1)
+    ax.scatter(kxlist, kylist, c="black",s=10)
+    
     lim = np.sqrt(r2)*1.1
     ax.set_xlim(-lim, lim)
     ax.set_ylim(-lim, lim)
@@ -376,7 +383,8 @@ def find_2Dbz(lattice_basis):
         n = pt/(2*d)
         bragg_lines.append([n, d])
 
-    # Find the Brillouin zone. You know you have it when it the convex hull has the correct volume.
+    # Find the Brillouin zone. You know you have it when it the convex hull has
+    # the correct volume.
     volume = 0
     ind = 1
     while not np.isclose(volume, det(lattice_basis)):
@@ -402,7 +410,7 @@ def find_2Dbz(lattice_basis):
                 intersections.append(pt)
         convex_hull = ConvexHull(intersections)
         volume = convex_hull.volume
-    return convex_hull
+        return convex_hull
 
 
 def plot_all2D_bz(mesh_points, bz):
@@ -439,7 +447,7 @@ def plot_all2D_bz(mesh_points, bz):
 class FreeElectron2D():
     """This is the popular free electron model. In this model the potential is
     zero everywhere. It is useful for testing.
-
+    
     Args:
         lattice_basis (numpy.ndarray): the lattice basis vectors as columns of
             a 2x2 array.
@@ -451,7 +459,7 @@ class FreeElectron2D():
         total_energy(float): the total energy
         prefactor (float): the prefactor to the dispersion relation. It takes the
             form E(k) = Ak**n where A is the prefactor and n is the degree.
-
+    
     Attributes:
         lattice_basis (numpy.ndarray): the lattice basis vectors as columns of
             a 2x2 array.
@@ -489,15 +497,20 @@ class FreeElectron2D():
             self.fermi_level_ans/self.prefactor)**(1 + 2/self.degree)
         nfilled_states = self.nvalence_electrons/2.
         
-    def eval(self, kpoint, neigvals):
+    def eval(self, kpoint, neigvals, sigma=False):
         kpoint = np.array(kpoint)
         l0 = np.linalg.norm(self.lattice_basis[:,0])
         l1 = np.linalg.norm(self.lattice_basis[:,1])
-        
-        pts = np.array([[0,0], [-l0, 0], [l0, 0], [0, -l1], [0, l1],
-                        [l0, l1], [l0, -l1], [-l0, l1], [-l0, -l1]])
 
-        return [np.linalg.norm(kpoint - pt)**self.degree for pt in pts][:neigvals]
+        # offset = np.dot(self.lattice_basis, [0.5]*2)
+        pts = [np.dot(self.lattice_basis, [i,j]) for i,j in it.product(range(-2,3),
+                                                                       repeat=2)]
+        if sigma:
+            return np.sum(np.sort([np.linalg.norm(kpoint - pt)**self.degree
+                                   for pt in pts])[:neigvals])
+        else:
+            return np.sort([np.linalg.norm(kpoint - pt)**self.degree
+                            for pt in pts])[:neigvals]
         
     def change_potential(self, prefactor, degree):
         if degree == 3:
@@ -524,6 +537,7 @@ def plot_2Dbands(EPM, neigvals):
     
     grid_basis = EPM.lattice_basis/100
     offset = np.dot(inv(grid_basis), np.dot(EPM.lattice_basis, [-.5]*2)) + [.5]*2
+    # offset = [0, 0]
     grid = make_cell_points2D(EPM.lattice_basis, grid_basis, offset)
     
     kx = [grid[i][0] for i in range(len(grid))]
@@ -542,6 +556,33 @@ def plot_2Dbands(EPM, neigvals):
         ax.scatter(kx, ky, kz, s=0.5)
 
 
+def plot_sigma_band2D(EPM, neigvals):
+    """Plot the bands of a 2D empirical pseudopotential
+    
+    Args:
+        EPM (class): an empirical pseudopotential object.
+        neigvals (int): the number of eigenvalues to plot.
+    """
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    
+    grid_basis = EPM.lattice_basis/100
+    offset = np.dot(inv(grid_basis), np.dot(EPM.lattice_basis, [-.5]*2)) + [.5]*2
+    # offset = [0, 0]
+    
+    grid = make_cell_points2D(EPM.lattice_basis, grid_basis, offset)
+    
+    kx = [grid[i][0] for i in range(len(grid))]
+    ky = [grid[i][1] for i in range(len(grid))]        
+    ax = plt.subplot(1,1,1,projection="3d")
+    fig = plt.gca()
+    
+    all_states = [np.sum(EPM.eval(pt,neigvals)) for pt in grid]
+    
+    ax.scatter(kx, ky, all_states, s=0.5)
+        
+    
 # def plot_2Dbands(EPM, neigvals):
 #     """Plot the bands of a 2D empirical pseudopotential
     

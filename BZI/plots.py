@@ -3,27 +3,37 @@
 
 import numpy as np
 from numpy.linalg import norm, inv, det
+
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 import matplotlib.pyplot as plt
+
 from itertools import product, chain
 from scipy.spatial import ConvexHull
 from copy import deepcopy
 import time, pickle, os
 
+# import plotly.plotly as py
+# import plotly.graph_objs as go
+
+# from plotly.offline import download_plotlyjs, init_notebook_mode, plot, iplot
+# init_notebook_mode(connected=True)
+
 from BZI.symmetry import (bcc_sympts, fcc_sympts, sc_sympts, make_ptvecs,
                           make_rptvecs, sym_path, number_of_point_operators,
                           find_orbits)
+
 from BZI.sampling import make_cell_points
-# from BZI.integration import (rectangular_fermi_level, rectangular_method,
-#                              rec_dos_nos)
 from BZI.integration import rectangular_method, rec_dos_nos
+
 from BZI.tetrahedron import (grid_and_tetrahedra, calc_fermi_level,
                              calc_total_energy, get_extended_tetrahedra,
                              get_corrected_total_energy, density_of_states,
                              number_of_states, tet_dos_nos, find_irreducible_tetrahedra)
+
 from BZI.make_IBZ import find_bz, orderAngle, planar3dTo2d
+
 from BZI.utilities import remove_points, find_point_indices, check_contained
 
 def ScatterPlotMultiple(func, states, ndivisions, cutoff=None):
@@ -80,7 +90,7 @@ def ScatterPlotMultiple(func, states, ndivisions, cutoff=None):
             ax.scatter(kxlist, kylist, estates,s=.5);
     plt.show()
 
-    
+
 def scatter_plot_pp(EPM, states, nbands, ndivisions, grid_vectors,
                     plane_value, offset, cutoff=None):
     """Plot the energy states of a multivalued toy pseudo-potential using 
@@ -154,7 +164,7 @@ def scatter_plot_pp(EPM, states, nbands, ndivisions, grid_vectors,
     return grid
     
 def ScatterPlotSingle(func, ndivisions, cutoff=None):
-    """Plot the energy states of a single valued toy pseudo-potential using 
+    """Plot the energy states of a single valued toy pseudo-potential using
     matplotlib's function scatter.
     
     Args:
@@ -194,6 +204,7 @@ def ScatterPlotSingle(func, ndivisions, cutoff=None):
         ax.scatter(kxlist, kylist, estates,s=.5);
     plt.show()
 
+    
 def plot_just_points(mesh_points, ax=None):
     """Plot just the points in a mesh.
 
@@ -206,12 +217,13 @@ def plot_just_points(mesh_points, ax=None):
     kylist = [mesh_points[i][1] for i in range(ngpts)]
     kzlist = [mesh_points[i][2] for i in range(ngpts)]
     if not ax:
-        ax = plt.subplot(1,1,1,projection="3d")        
+        ax = plt.subplot(1,1,1,projection="3d")
     ax.scatter(kxlist, kylist, kzlist, c="black", s=10)
 
     
 def plot_mesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
-              indices=None, show=True, save=False, file_name=None):
+              ax=None, indices=None, show=True, save=False, file_name=None,
+              color="red"):
     """Create a 3D scatter plot of a set of mesh points inside a cell.
     
     Args:
@@ -220,6 +232,7 @@ def plot_mesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
         cell_vecs (list or numpy.ndarray): a list vectors that define a cell.
         offset (list or numpy.ndarray): the offset of the unit cell, which is
            also plotted, in Cartesian coordinates.
+        ax (matplotlib.axes): an axes object
         indices (list or numpy.ndarray): the indices of the points. If
             provided, they will be plotted with the mesh points.
         show (bool): if true, the plot will be shown.
@@ -235,8 +248,9 @@ def plot_mesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
     kylist = [mesh_points[i][1] for i in range(ngpts)]
     kzlist = [mesh_points[i][2] for i in range(ngpts)]
 
-    ax = plt.subplot(1,1,1,projection="3d")
-    ax.scatter(kxlist, kylist, kzlist, c="red")
+    if ax is None:
+        ax = plt.subplot(1,1,1,projection="3d")
+    ax.scatter(kxlist, kylist, kzlist, c=color)
 
     # Give the points labels if provided.
     if (type(indices) == list or type(indices) == np.ndarray):
@@ -274,13 +288,18 @@ def plot_mesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
             plt.savefig("mesh.pdf")
     return None
 
-def plot_bz_mesh(mesh_points, lat_vecs):
+
+def plot_bz_mesh(mesh_points, rlat_vecs, ax=None, BZ=None, color="red"):
     """Plot the irreducible k-points inside the Wigner-Seitz construction of the first
     Brillouin zone.
 
     Args:
         mesh_points (numpy.ndarray): an 2D array of mesh points.
-        lat_vecs (numpy.ndarray): an array of lattice vectors as columns of a 3x3 array.
+        rlat_vecs (numpy.ndarray): an array of reciprocal lattice vectors as columns of a 
+            3x3 array.
+        ax (matplotlib.pyplot.axes): a matplotlib axes object.
+        BZ (scipy.spatial.ConvexHull): the Brillouin zone.
+        color (float): the color of the mesh points.
     """
 
     ngpts = len(mesh_points)
@@ -288,17 +307,24 @@ def plot_bz_mesh(mesh_points, lat_vecs):
     kylist = [mesh_points[i][1] for i in range(ngpts)]
     kzlist = [mesh_points[i][2] for i in range(ngpts)]
 
-    ax = plt.subplot(1,1,1,projection="3d")
-    ax.scatter(kxlist, kylist, kzlist, c="red")
+    if ax is None:
+        ax = plt.subplot(1,1,1,projection="3d")
+        
+    ax.set_aspect('equal')
 
-    BZ = find_bz(lat_vecs)
-    for simplex in BZ.simplices:
-        # We're going to plot lines between the vertices of the simplex.
-        # To make sure we make it all the way around, append the first element
-        # to the end of the simplex.
-        simplex = np.append(simplex, simplex[0])
-        simplex_pts = [BZ.points[i] for i in simplex]
-        plot_simplex_edges(simplex_pts, ax)
+    ax.auto_scale_xyz([-.2, .2], [-.2, .2], [-.2, .2])    
+    ax.scatter(kxlist, kylist, kzlist, c=color)
+
+    if BZ is None:
+        BZ = find_bz(rlat_vecs)
+    plot_bz(BZ, ax=ax)
+    # for simplex in BZ.simplices:
+    #     # We're going to plot lines between the vertices of the simplex.
+    #     # To make sure we make it all the way around, append the first element
+    #     # to the end of the simplex.
+    #     simplex = np.append(simplex, simplex[0])
+    #     simplex_pts = [BZ.points[i] for i in simplex]
+    #     plot_simplex_edges(simplex_pts, ax)
 
 
 def PlotMeshes(mesh_points_list, cell_vecs, atoms, offset = np.asarray([0.,0.,0.])):
@@ -1325,9 +1351,9 @@ def plot_bz(bz, symmetry_points=None, remove=True, ax=None, color="blue"):
             boundary of the Brillouin zone or irreducible Brilloun zone.
         ax (matplotlib.axes): an axes object.
     """
-
+    
     fig = plt.figure()
-    if ax == None:
+    if ax is None:
         ax = fig.gca(projection='3d')
     ax.set_aspect('equal')
     
@@ -1336,8 +1362,8 @@ def plot_bz(bz, symmetry_points=None, remove=True, ax=None, color="blue"):
         for spt in symmetry_points.keys():
             coords = symmetry_points[spt]
             ax.scatter(coords[0], coords[1], coords[2], c="black")
-            ax.text(coords[0] + eps, coords[1] + eps, coords[2] + eps, spt, size=14)
-
+            ax.text(coords[0] + eps, coords[1] + eps, coords[2] + eps, spt, size=10)
+    
     if remove:
         facet_list = []
         equations = list(deepcopy(bz.equations))
@@ -1345,27 +1371,26 @@ def plot_bz(bz, symmetry_points=None, remove=True, ax=None, color="blue"):
         while len(equations) != 0:
             equation, equations = equations[-1], equations[:-1]            
             facet, simplices = simplices[-1], simplices[:-1]
-            indices = find_point_indices(equation, equations)
-            
+            indices = find_point_indices([equation], equations)
             if len(indices) > 0:
                 # Remove duplicate equations from the list of equations
                 equations_to_remove = [equations[i] for i in indices]
                 for eq in equations_to_remove:
-                    equations = remove_points(equation, equations)
+                    equations = remove_points([equation], equations)
                 
                 # Find all simplices that lie on the same plane to get the facet.
                 simplices_to_remove = []
                 for index in indices:
-                    facet = np.append(facet, simplices[index], axis=0)                    
+                    facet = np.append(facet, simplices[index], axis=0)
                     simplices_to_remove.append(simplices[index])
                 
                 for s in simplices_to_remove:
-                    simplices = remove_points(s, simplices)
+                    simplices = remove_points([s], simplices)
                 
                 # Remove duplicate points on facet.
                 unique_facet = []
                 for pt in facet:
-                    if not check_contained(pt, unique_facet):
+                    if not check_contained([pt], unique_facet):
                         unique_facet.append(pt)
                 facet_list.append(orderAngle(unique_facet))
             else:
@@ -1385,15 +1410,14 @@ def plot_bz(bz, symmetry_points=None, remove=True, ax=None, color="blue"):
             simplex = np.append(simplex, simplex[0])
             simplex_pts = [bz.points[i] for i in simplex]
             plot_simplex_edges(simplex_pts, ax, color=color)
-    plt.close()
+    # plt.close()
 
 
-def plot_all_bz(lat_type, lat_vecs, grid=None, sympts=None, ax=None, convention="ordinary"):
+def plot_all_bz(lat_vecs, grid=None, sympts=None, ax=None, convention="ordinary"):
     """Plot the Brillouin zone and optionally the irreducible Brillouin zone and points
     within the Brillouin zone.
 
     Args:
-        lat_type (str): the lattice type, such as 'simple cubic'
         lat_vecs (numpy.ndarray): a 3x3 array with lattice vectors as columns.
         grid (list or numpy.ndarray): a list of list or 2D array of points to plot.
         sympts (list or numpy.ndarray): a dictionary whose key is the Greek or Roman
@@ -1405,8 +1429,15 @@ def plot_all_bz(lat_type, lat_vecs, grid=None, sympts=None, ax=None, convention=
     """
     
     rlat_vecs = make_rptvecs(lat_vecs, convention=convention)
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+            
     bz = find_bz(rlat_vecs)
-    plot_bz(bz, ax=ax)    
+    plot_bz(bz, ax=ax)
+
+    if grid is not None:
+        plot_just_points(grid, ax=ax)    
     
     if sympts is not None:
         # Get the vertices of the IBZ.
@@ -1421,9 +1452,7 @@ def plot_all_bz(lat_type, lat_vecs, grid=None, sympts=None, ax=None, convention=
         ibz = ConvexHull(ibz_vertices)
         plot_bz(ibz, sympts_cart, ax=ax, color="red")
 
-    if grid is not None:
-        plot_just_points(grid, ax)
-
+        
 class Arrow3D(FancyArrowPatch):
     def __init__(self, xs, ys, zs, *args, **kwargs):
         FancyArrowPatch.__init__(self, (0,0), (0,0), *args, **kwargs)
@@ -1436,7 +1465,7 @@ class Arrow3D(FancyArrowPatch):
         FancyArrowPatch.draw(self, renderer)            
 
             
-def plot_vecs(vecs, colors, labels):
+def plot_vecs(vecs, colors, labels, ax=None):
     """Plot a list of vectors."""
 
     xmin = min([vecs[i][0] for i in range(len(vecs))])
@@ -1445,12 +1474,14 @@ def plot_vecs(vecs, colors, labels):
     ymax = max([vecs[i][1] for i in range(len(vecs))])
     zmin = min([vecs[i][2] for i in range(len(vecs))])
     zmax = max([vecs[i][2] for i in range(len(vecs))])
-    
-    fig = plt.figure(figsize=(15,15))
-    ax = fig.add_subplot(111, projection='3d')
+
+    if ax is None:
+        fig = plt.figure(figsize=(15,15))
+        ax = fig.add_subplot(111, projection='3d')
+        
     for i,v in enumerate(vecs):
         arrow = Arrow3D([0,v[0]], [0,v[1]], [0,v[2]],
-                        mutation_scale=20, lw=3,
+                        mutation_scale=20, lw=1.5,
                         arrowstyle="-|>", color=colors[i])
 
         ax.text(v[0], v[1], v[2], labels[i])
@@ -1458,5 +1489,81 @@ def plot_vecs(vecs, colors, labels):
     ax.set_xlim(xmin,xmax)
     ax.set_ylim(ymin,ymax)
     ax.set_zlim(zmin,zmax)
-    plt.legend()
-    plt.show()
+
+def plot_fermi_surface(EPM, bz_grid, all_energies, eigvals, eps,
+                       marker_sizes, marker_colors, marker_opacities):
+    """Plot the Fermi surface of an empirical pseudopotential.
+    
+    Args:
+        EPM (object): an empirical pseudopotential object.
+        grid (list): a list of points within the Brillouin zone.
+        all_energies (list): a list of eigenvalue energies evaluated at
+        each point in grid.    
+        eigvals (list): the eigenvalues for which the Fermi surface is plotted.
+        eps (float): the tolerance within which an energy eigenvalue must be 
+            within in order to be consider as part of the Fermi surface.
+        marker_size (float): the size of the marker.
+        marker_color (float): the color of the marker.
+        marker_opacity (float): the opacity of the marker.
+    """
+    
+    colors = ["g", "b", "r", "c", "m", "k", "y"]
+    
+    bz_grid = np.array(bz_grid)
+    all_energies = np.array(all_energies)
+    data = []
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # ax.axis('off')
+
+    for i in eigvals:
+        
+        energies = all_energies[:,i]
+        indices = np.where(abs(energies - EPM.fermi_level) < eps)
+
+        if np.shape((indices)) == (1,0):
+            print("Band #{} had no eigenvalues near the Fermi level.".format(i))
+            continue
+            
+
+        plot_pts = bz_grid[indices]
+        x,y,z=zip(*plot_pts)
+
+        # ax.scatter(x, y, z, c=marker_colors[i], s=marker_sizes[i], alpha=marker_opacities[i])
+        # ax.set_aspect('equal')
+        data.append(go.Scatter3d(x=x,y=y,z=z, mode='markers',
+                             marker=dict(size=marker_sizes.pop(0), color=marker_colors.pop(0)),
+                                 opacity=marker_opacities.pop(0)))
+
+        layout = go.Layout(scene=dict(
+            xaxis=dict(
+                title="",
+                autorange=True,
+                showgrid=False,
+                zeroline=False,
+                showline=False,
+                ticks='',
+                showticklabels=False
+            ),
+            yaxis=dict(
+                title="",            
+                autorange=True,
+                showgrid=False,
+                zeroline=False,
+                showline=False,
+                ticks='',
+                showticklabels=False
+            ),
+            zaxis=dict(
+                title="",            
+                autorange=True,
+                showgrid=False,
+                zeroline=False,
+                showline=False,
+                ticks='',
+                showticklabels=False
+            )        
+        )
+        )
+    fig = go.Figure(data=data, layout=layout)
+    plot(fig, show_link = False)    
