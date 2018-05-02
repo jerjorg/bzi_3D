@@ -83,8 +83,7 @@ def remove_points(points, point_list, rtol=1e-5, atol=1e-8):
 
     # Find the indices of elements to remove.
     remove_indices = find_point_indices(points, point_list,
-                                                   rtol=rtol, atol=atol)
-
+                                        rtol=rtol, atol=atol)
 
     # Find the indices of elements to keep.
     keep_indices = list(set(indices).symmetric_difference(set(remove_indices)))
@@ -215,3 +214,57 @@ def print_fortran_grid(lat_vecs, rlat_vecs, atom_labels, atom_positions, grid_ve
 
     # Print the shift.
     print("shift = (/ " + "_dp, ".join(map(str, np.round(offset, 4))) + "_dp" + " /)")
+
+
+def make_unique(array, rtol=1e-5, atol=1e-8):
+    """Find the unique points from an array.
+    
+    Args:
+        array (list or numpy.ndarray): a list of arrays.
+        
+    Returns:
+        unique_array (np.ndarray): the unique elements from the array.
+    """
+    
+    # Copy the array.
+    array_copy = deepcopy(array)
+
+    # Initialize the unique array.
+    unique_array = []
+
+    while len(array_copy) > 0:
+        # Grap and remove a point from the grid array.
+        pt = array_copy[-1]
+        array_copy = array_copy[:-1]
+
+        if not check_contained([pt], unique_array, atol=atol, rtol=rtol):
+            unique_array.append(pt)        
+    
+    return unique_array    
+
+def rprint(label, arg, dec=5):
+    print(label + "\n", np.round(arg, dec))
+
+
+def check_inside(t, lb=0, ub=1, rtol=1e-8, atol=1e-5):
+    """Check that a real number is within or lies on the boundary of 
+    a given range.
+    
+    Args:
+        t (float): the number to test.
+        lb (float): the lower bound.
+        up (float): the upper bound.
+        rtol (float): the relative tolerance used to check if the lower
+            or upper bound is equivalent to the provided number.
+        atol (float): the absolute tolerance used to check if the lower
+            or upper bound is equivalent to the provided number.
+    Returns:
+        _ (float): if the number lies in the given range, return the number. 
+            Otherwise, return "None".
+    """
+    if (np.isclose(t, lb, rtol=rtol, atol=atol) or 
+        np.isclose(t, ub, rtol=rtol, atol=atol) or 
+        (lb < t and t < ub)):
+        return t
+    else:
+        return None

@@ -1,5 +1,11 @@
 # Revision History
 
+## Revision 0.3.5
+- Added methods for adative refinement using bilinear
+  interpolation. These include submethods that calculate the
+  intersection of a isocontour of a bilinear with a parallelogram, and
+  the density of states along with a few minor submethods.  
+
 ## Revision 0.3.4
 - Various fixes and additions all around.
 

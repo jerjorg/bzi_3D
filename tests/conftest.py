@@ -93,14 +93,27 @@ def run(tests):
                  "test_find_point_indices",
                  "test_trim_small",
                  "test_check_contained",
-                 "test_swap_rows_columns"]
+                 "test_swap_rows_columns",
+                 "test_inside"]
     elif tests == "all 2D":
         tests = ["test_make2D_lattice_basis",
                  "test_get_2Dlattice_type",
                  "test_HermiteNormalForm2D",
                  "test_make_cell_points2D",
                  "test_plot_mesh2D",
-                 "test_get_circle_pts"]
+                 "test_get_circle_pts",
+                 "test_get_perpendicular_vector2D",
+                 "test_get_line_equation2D",
+                 "test_square_tesselation",
+                 "test_refine_square",
+                 "test_get_bilin_coeffs",
+                 "test_eval_bilin",
+                 "test_integrate_bilinear",
+                 "test_integrate_bilinear",
+                 "test_find_param_intersect",
+                 "test_eval_bilin",
+                 "test_group_by_quad",
+                 "test_bilin_density_of_states"]
     else:
         tests = []
     

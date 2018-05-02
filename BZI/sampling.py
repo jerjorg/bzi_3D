@@ -341,5 +341,3 @@ def get_EPM_grid_energies(EPM, ndivs, neigvals, save_dir=None):
             pickle.dump(data, file)
     
     return bz_grid, all_energies
-
-    

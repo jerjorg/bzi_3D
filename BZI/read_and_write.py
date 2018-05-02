@@ -3415,7 +3415,7 @@ def qe_test_input_plots(location, system_name, parameters):
         fig.savefig(wfc_plot_file, bbox_extra_artists=(lgd,), bbox_inches='tight')
         plt.close(fig)
 
-<<<<<<< HEAD
+
 def write_kpoints_file(kpoint_list, file_dir, header, weights_list=None):
     """Write a VASP KPOINTS file with the provided k-points and optional weights.
 
@@ -3431,21 +3431,16 @@ def write_kpoints_file(kpoint_list, file_dir, header, weights_list=None):
         weights_list = np.ones(len(kpoint_list))
     
     file_name = os.path.join(file_dir, "KPOINTS")    
-=======
         
-def write_kpoints_file(kpoint_list, file_dir, header, weights=None):
-    file_name = os.path.join(file_dir, "KPOINTS")
->>>>>>> c332771306f463ee3c8352827339ccd729e9e1cd
     with open(file_name, "w") as file:
         file.write(header + "\n")
         file.write(str(len(kpoint_list)) + "\n")
         file.write("Fractional\n")
-<<<<<<< HEAD
         for kpt,wt in zip(kpoint_list, weights_list):
             kpt = np.round(kpt, 9)
             line = (str(kpt[0]) + " " + str(kpt[1]) + " " + str(kpt[2]) + "\t" +
                     str(wt) + "\n")
-            file.write(line)
+            file.write(line)            
             
 
 def read_poscar(poscar_loc):
@@ -3502,30 +3497,3 @@ def read_poscar(poscar_loc):
         VASP_data["atomic basis"] = atomic_basis
     return VASP_data
         
-        
-def get_space_group_size(file_loc, coords="lat", rtol=1e-4, atol=1e-6, eps=1e-10):
-    """Get the size of the point group.
-    
-    Args:
-        file_loc (str): the location of the VASP POSCAR file.
-        
-    Returns:
-        _ (int): the number of operations in the space group.
-    """
-    
-    data = read_poscar(file_loc)
-    lat_vecs = data["lattice vectors"]
-    atom_labels = data["atomic basis"]["atom labels"]
-    atom_positions = data["atomic basis"]["atom positions"]
-    translations, point_group = get_space_group(lat_vecs, atom_labels, atom_positions, coords=coords,
-                                                rtol=rtol, atol=atol, eps=eps)
-    
-    return len(point_group)
-            
-=======
-        if weights is None:            
-            for kpt in kpoint_list:
-                kpt = np.round(kpt, 9)
-                line = str(kpt[0]) + " " + str(kpt[1]) + " " + str(kpt[2]) + "\t 1.0 \n"
-                file.write(line)
->>>>>>> c332771306f463ee3c8352827339ccd729e9e1cd
