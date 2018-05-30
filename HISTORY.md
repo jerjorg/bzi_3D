@@ -1,10 +1,15 @@
 # Revision History
 
+## Revision 0.3.6
+- Removed density of states for bilinear functions and tests.
+- Started methods that will area within a biliean isocontour as 
+  an alternative method of calculating the Fermi level.
+
 ## Revision 0.3.5
-- Added methods for adative refinement using bilinear
+- Added methods for adaptive refinement using bilinear
   interpolation. These include submethods that calculate the
   intersection of a isocontour of a bilinear with a parallelogram, and
-  the density of states along with a few minor submethods.  
+  the density of states along with a few minor submethods.
 
 ## Revision 0.3.4
 - Various fixes and additions all around.

@@ -8,7 +8,7 @@ import itertools as it
 from copy import deepcopy, copy
 from scipy.spatial import ConvexHull
 
-from BZI.symmetry import get_minmax_indices, bring_into_cell
+from BZI.symmetry import get_minmax_indices, bring_into_cell, make_rptvecs
 from BZI.utilities import remove_points, rprint, check_inside, check_contained
 plt.style.use('seaborn-colorblind')
 
@@ -37,6 +37,8 @@ def get_2Dlattice_type(basis, rtol=1e-5, atol=1e-8):
     Args:
         basis (numpy.ndarray): the lattice generating vectors as columns of a
             2D array.
+        rtol (float): relative tolerance
+        atol (float): absolute tolerance
     Returns
         (str): the lattice type
     """
@@ -84,6 +86,8 @@ def HermiteNormalForm2D(S, rtol=1e-5, atol=1e-6):
     Args:
         S (numpy.ndarray): a 2x2 array of integers
         eps (int): finite precision parameter
+        rtol (float): relative tolerance
+        atol (float): absolute tolerance
         
     Returns:
         B (numpy.ndarray): the unimodular transformation matrix
@@ -168,6 +172,9 @@ def make_cell_points2D(lat_vecs, grid_vecs, offset=[0,0], coords="Cart",
             Options include "Cart" for Cartesian and "lat" for lattice coordinates.
         grid_type (str): if "closed" the grid will include points along both 
             boundaries. If open, only points on one boundary are included.       
+        rtol (float): relative tolerance
+        atol (float): absolute tolerance
+
 
     Returns:
         grid (list): an array of sampling-point coordinates.
@@ -330,6 +337,8 @@ def get_perpendicular_vector2D(vector, atol=1e-8, rtol=1e-5):
     
     Args:
         vector (list or numpy.ndarray): a vector in 2D.
+        rtol (float): relative tolerance
+        atol (float): absolute tolerance        
         
     Returns:
         perp_vector (numpy.ndarray): a vector perpendicular to the input
@@ -391,6 +400,8 @@ def point_line_location(point, line, rtol=1e-5, atol=1e-8):
         line (numpy.ndarray): an array with two elements. The first provides
             a vector normal to the line. The second element is the distance of the
             line from the origin in the direction of the vector normal to the line.
+        rtol (float): relative tolerance
+        atol (float): absolute tolerance
 
     Returns:
         (str): a string that indicates where the point is located. Options include
@@ -409,11 +420,11 @@ def point_line_location(point, line, rtol=1e-5, atol=1e-8):
         return "inside"    
 
 
-def find_2Dbz(lattice_basis):
+def find_2Dbz(reciprocal_lattice_basis):
     """Find the Brillouin zone of a 2D lattice
 
     Args:
-        lattice_basis (numpy.ndarray): the lattice generating vectors as
+        reciprocal_lattice_basis (numpy.ndarray): the lattice generating vectors as
             columns of a 2x2 array.
 
     Returns:
@@ -422,8 +433,8 @@ def find_2Dbz(lattice_basis):
     
     # Find all the lattice points near the origin within a circle of 
     # radius of two times the longest lattice vector.
-    r2 = (2*np.max(norm(lattice_basis, axis=0)))**2
-    circle_pts = get_circle_pts(lattice_basis, r2)
+    r2 = (2*np.max(norm(reciprocal_lattice_basis, axis=0)))**2
+    circle_pts = get_circle_pts(reciprocal_lattice_basis, r2)
     
     # Sort these points by distance from the origin.
     indices = np.argsort(norm(circle_pts, axis=1))
@@ -452,7 +463,7 @@ def find_2Dbz(lattice_basis):
     # the correct volume.
     volume = 0
     ind = 1
-    while not np.isclose(volume, det(lattice_basis)):
+    while not np.isclose(volume, det(reciprocal_lattice_basis)):
         intersections = []
         lines = bragg_lines[:indices[ind]]
         for line1, line2 in it.product(lines, repeat=2):
@@ -546,10 +557,25 @@ class FreeElectron2D():
     """
     
     def __init__(self, lattice_basis, degree, nvalence_electrons, energy_shift=None,
-                 fermi_level=None, band_energy=None, prefactor=1, nsheets=3):
+                 fermi_level=None, band_energy=None, prefactor=None, nsheets=None,
+                 convention="ordinary", rtol=None, atol=None):
+        
         self.material = "2D free electron model"
         self.lattice_basis = lattice_basis
-        self.prefactor = prefactor
+        
+        if convention is None:
+            self.convention = "ordinary"
+        else:
+            self.convention = convention
+        
+        self.reciprocal_lattice_basis = make_rptvecs(lattice_basis,
+                                                     convention=self.convention)
+        
+        if prefactor is None:
+            self.prefactor = 1
+        else:
+            self.prefactor = prefactor
+        
         if degree == 3:
             msg = "In 2D, the dispersion relation cannot be of degree three."
             raise ValueError(msg.format(degree))
@@ -557,33 +583,48 @@ class FreeElectron2D():
         self.nvalence_electrons = nvalence_electrons
         self.energy_shift = energy_shift or 0.
         self.fermi_level = fermi_level or 0.
-        self.fermi_level_ans = self.prefactor*(self.nvalence_electrons*det(self.lattice_basis)/
+        self.fermi_level_ans = self.prefactor*(self.nvalence_electrons*
+                                               det(self.reciprocal_lattice_basis)/
                                                (2*np.pi))**(self.degree/2)        
         self.band_energy = band_energy or 0.
         self.band_energy_ans = 2*np.pi*self.prefactor/(self.degree + 2)*(
             self.fermi_level_ans/self.prefactor)**(1 + 2/self.degree)
-        nfilled_states = self.nvalence_electrons/2.
-        self.nsheets = nsheets        
+        self.nfilled_states = self.nvalence_electrons/2.
+        
+        if nsheets is None:
+            self.nsheets = 3
+        else:
+            self.nsheets = nsheets
+        
+        if rtol is None:
+            self.rtol = rtol
+        else:
+            self.rtol = rtol
+        
+        if atol is None:
+            self.atol = atol
+        else:
+            self.atol = atol
+            
         
     def eval(self, kpoint, nsheets=None, sigma=False, refine=False):
+        """Evaluate the free electron model at a point in k-space.
+        """
 
         if nsheets is None:
-            nsheets = self.nsheets        
+            nsheets = self.nsheets
         
         kpoint = np.array(kpoint)
         
-        # offset = np.dot(self.lattice_basis, [0.5]*2)
-        pts = [np.dot(self.lattice_basis, [i,j]) for i,j in it.product(range(-2,3),
+        # offset = np.dot(self.reciprocal_lattice_basis, [0.5]*2)
+        pts = [np.dot(self.reciprocal_lattice_basis, [i,j]) for i,j in it.product(range(-2,3),
                                                                        repeat=2)]
-        if sigma:                        
-            # return np.sum(np.sort([np.linalg.norm(kpoint - pt)**self.degree
-            #                        for pt in pts])[:nsheets])
+        # Return the sum of the bands
+        if sigma:
+            
             values = np.array([np.linalg.norm(kpoint - pt)**self.degree for pt in pts])
             return np.sum(values[values < self.fermi_level])
-            
-        elif refine:
-            return np.sum(np.sort([np.linalg.norm(kpoint - pt)**self.degree
-                                   for pt in pts])[:nsheets])
+        
         else:
             return np.sort([np.linalg.norm(kpoint - pt)**self.degree
                             for pt in pts])[:nsheets]
@@ -594,10 +635,29 @@ class FreeElectron2D():
             raise ValueError(msg.format(degree))
         self.degree = degree
         self.prefactor = prefactor
-        self.fermi_level_ans = self.prefactor*(self.nvalence_electrons*det(self.lattice_basis)/
+        self.fermi_level_ans = self.prefactor*(self.nvalence_electrons*
+                                               det(self.reciprocal_lattice_basis)/
                                                2*np.pi)**(self.degree/2)
         self.band_energy_ans = 2*np.pi*self.prefactor*self.degree*(
             (self.fermi_level_ans/self.prefactor)**(1-1/self.degree))
+
+    def eval_dos(self, energy, rtol=1e-5, atol=1e-8):
+        """Calculate the exact density of states at a given energy.
+        """
+        if energy > 0 or np.isclose(0, energy, rtol=rtol, atol=atol):
+            
+            return (2*np.pi/(self.degree*self.prefactor)*
+                    (energy/self.prefactor)**(2/self.degree - 1))*2
+        else:
+            return 0
+
+    def eval_nos(self, energy, rtol=1e-5, atol=1e-8):
+        """Calculate the exact number of states at a given energy.
+        """
+        if energy > 0 or np.isclose(0, energy, rtol=rtol, atol=atol):            
+            return np.pi*(energy/self.prefactor)**(2/self.degree)*2
+        else:            
+            return 0
         
         
 def plot_2Dbands(EPM, sigma=False):
@@ -609,11 +669,13 @@ def plot_2Dbands(EPM, sigma=False):
     
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
+    ax.set_aspect("equal")
     
-    grid_basis = EPM.lattice_basis/100
-    offset = np.dot(inv(grid_basis), np.dot(EPM.lattice_basis, [-.5]*2)) # + [.5]*2
+    grid_basis = EPM.reciprocal_lattice_basis/100
+    offset = np.dot(inv(grid_basis), np.dot(EPM.reciprocal_lattice_basis, [-.5]*2)) # + [.5]*2
     # offset = [0, 0]
-    grid = make_cell_points2D(EPM.lattice_basis, grid_basis, offset, grid_type="closed")
+    grid = make_cell_points2D(EPM.reciprocal_lattice_basis, grid_basis, offset,
+                              grid_type="closed")
     
     kx = [grid[i][0] for i in range(len(grid))]
     ky = [grid[i][1] for i in range(len(grid))]        
@@ -649,12 +711,14 @@ def plot_sigma_band2D(EPM, neigvals):
     
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
+    ax.set_aspect("equal")
     
-    grid_basis = EPM.lattice_basis/100
-    offset = np.dot(inv(grid_basis), np.dot(EPM.lattice_basis, [-.5]*2)) + [.5]*2
+    grid_basis = EPM.reciprocal_lattice_basis/100
+    offset = np.dot(inv(grid_basis),
+                    np.dot(EPM.reciprocal_lattice_basis, [-.5]*2)) + [.5]*2
     # offset = [0, 0]
     
-    grid = make_cell_points2D(EPM.lattice_basis, grid_basis, offset)
+    grid = make_cell_points2D(EPM.reciprocal_lattice_basis, grid_basis, offset)
     
     kx = [grid[i][0] for i in range(len(grid))]
     ky = [grid[i][1] for i in range(len(grid))]        
@@ -664,38 +728,7 @@ def plot_sigma_band2D(EPM, neigvals):
     all_states = [np.sum(EPM.eval(pt,neigvals)) for pt in grid]
     
     ax.scatter(kx, ky, all_states, s=0.5)
-        
-    
-# def plot_2Dbands(EPM, neigvals):
-#     """Plot the bands of a 2D empirical pseudopotential
-    
-#     Args:
-#         EPM (class): an empirical pseudopotential object.
-#         neigvals (int): the number of eigenvalues to plot.
-#     """
-    
-#     fig = plt.figure()
-#     ax = fig.add_subplot(111, projection='3d')
-    
-#     grid_basis = EPM.lattice_basis/100
-#     offset = np.dot(inv(grid_basis), np.dot(EPM.lattice_basis, [-.5]*2)) + [.5]*2
-#     grid = make_cell_points2D(EPM.lattice_basis, grid_basis, offset)
-    
-#     kx = [grid[i][0] for i in range(len(grid))]
-#     ky = [grid[i][1] for i in range(len(grid))]        
-#     ax = plt.subplot(1,1,1,projection="3d")
-#     fig = plt.gca()
-    
-#     all_states = np.full((len(grid), neigvals), np.nan)
-    
-#     for i,pt in enumerate(grid):
-#         all_states[i,:] = EPM.eval(pt, neigvals)
-    
-#     for n in range(neigvals):
-#         kz = all_states[:,n]
-#         kz[np.where(kz > EPM.fermi_level)] = np.nan
-#         ax.scatter(kx, ky, kz, s=0.5)
-        
+                
         
 def plot_2Dfermi_curve(EPM, neigvals, ndivs, atol=1e-2, ax=None):
     """Plot the bands of a 2D empirical pseudopotential
@@ -709,10 +742,12 @@ def plot_2Dfermi_curve(EPM, neigvals, ndivs, atol=1e-2, ax=None):
 
     if ax is None:
         fig,ax = plt.subplots()
+
+    ax.set_aspect("equal")        
         
-    grid_basis = EPM.lattice_basis/ndivs
-    offset = np.dot(inv(grid_basis), np.dot(EPM.lattice_basis, [-.5]*2)) + [.5]*2
-    grid = make_cell_points2D(EPM.lattice_basis, grid_basis, offset)
+    grid_basis = EPM.reciprocal_lattice_basis/ndivs
+    offset = np.dot(inv(grid_basis), np.dot(EPM.reciprocal_lattice_basis, [-.5]*2)) + [.5]*2
+    grid = make_cell_points2D(EPM.reciprocal_lattice_basis, grid_basis, offset)
 
     kx = np.array([grid[i][0] for i in range(len(grid))])
     ky = np.array([grid[i][1] for i in range(len(grid))])
@@ -731,9 +766,9 @@ def plot_2Dfermi_curve(EPM, neigvals, ndivs, atol=1e-2, ax=None):
         
     ax.scatter(fermi_levelx, fermi_levely, s=0.5, c="black")
 
-    offset = np.dot(EPM.lattice_basis, [-.5]*2)
-    c1 = EPM.lattice_basis[:,0]
-    c2 = EPM.lattice_basis[:,1] 
+    offset = np.dot(EPM.reciprocal_lattice_basis, [-.5]*2)
+    c1 = EPM.reciprocal_lattice_basis[:,0]
+    c2 = EPM.reciprocal_lattice_basis[:,1] 
     O = np.asarray([0.,0.])
 
     l1 = zip(O + offset, c1 + offset)
@@ -756,7 +791,7 @@ def rectangular_integration2D(EPM, grid, weights, areas=None):
             grid. These weights are the result of symmetry reducing the grid.
         areas (list or numpy.ndarray): the subgrid areas. This is only used when the
             grid isn't uniform.        
-
+    
     Returns:
         fermi_level (float): the energy of the highest occupied state
         band_energy (float): the band energy
@@ -773,7 +808,7 @@ def rectangular_integration2D(EPM, grid, weights, areas=None):
                                    int(np.round(weights[i]))))        
     energies = np.sort(energies)[:C]
     fermi_level = energies[-1]
-    band_energy = np.sum(energies)*np.linalg.det(EPM.lattice_basis)/(
+    band_energy = np.sum(energies)*np.linalg.det(EPM.reciprocal_lattice_basis)/(
         np.sum(weights))
     
     return fermi_level, band_energy
@@ -784,6 +819,8 @@ def square_tesselation(grid, atol=1e-5, rtol=1e-8):
     
     Args:
         grid (list or numpy.ndarray): a list of points in 2D.
+        rtol (float): relative tolerance
+        atol (float): absolute tolerance
 
     Returns:
         tesselation (numpy.ndarray): the grid grouped with points grouped in subsquares.
@@ -1104,7 +1141,7 @@ def integrate_tess(EPM, tesselation, areas_list):
     return integral
 
 def find_param_intersect(square_pts, coeffs, isovalue, atol=1e-8, rtol=1e-5):
-    """Calculate the two values of the parameter where the constant energy curve 
+    """Calculate the values of the parameter where the constant energy curve 
     of a bilinear interpolation intersects the boundaries of the parallelogram.
     
     Args:
@@ -1119,46 +1156,45 @@ def find_param_intersect(square_pts, coeffs, isovalue, atol=1e-8, rtol=1e-5):
             on the boundaries of the parallelogram.
         unique_param_isocurve (list): a list of parameter values for the isocurve 
             parametric equation.
-        unique_intersecting_edges (list): a list of edges intersected by the iscurve.
+        unique_edge_indices (list): a list of edge indices where the isocurve intersects
+            the edges of the parallelogram.
+        unique_intersecting_edges (list): a list of edges intersected by the isocurve.
         unique_xy (list): the xy-coordinates where the isocurve intersects the boundary of
             the paralellogram.
     """
     
+    # Initialize parameters associated with the intersections.
     param_edge = []
     param_isocurve = []
     intersecting_edges = []
     edge_list = [[square_pts[i], square_pts[ (i+1)%4 ]] for i in range(4)]
-    
-    c0, c1, c2, c3 = coeffs[0], coeffs[1], coeffs[2], coeffs[3]
+
+    edge_indices = []
+
+    # Initialize unique parameters associated with the intersections.
+    unique_param_edge = []
+    unique_param_isocurve = []
+    unique_edge_indices = []    
+    unique_intersecting_edges = []
+    unique_xy = []
+        
+    # c0, c1, c2, c3 = coeffs[0], coeffs[1], coeffs[2], coeffs[3]
+    c0, c1, c2, c3 = coeffs
     Ec = isovalue
-    
-    for edge in edge_list:
-        # print("\n")
-        # rprint("edge", edge)
+
+    if (np.isclose(c1, 0, rtol=rtol, atol=atol) and
+        np.isclose(c2, 0, rtol=rtol, atol=atol) and
+        np.isclose(c3, 0, rtol=rtol, atol=atol)):
+        
+        return (unique_param_edge, unique_param_isocurve,
+                unique_intersecting_edges, unique_edge_indices, unique_xy)
+
+    for i,edge in enumerate(edge_list):
         
         x0, x1, y0, y1 = edge[0][0], edge[1][0], edge[0][1], edge[1][1]
-        
-        # Have to consider c1 == c2 == c3 == 0 as a separate case.
-        if (np.isclose(c1, 0, rtol=rtol, atol=atol) and
-            np.isclose(c2, 0, rtol=rtol, atol=atol) and
-            np.isclose(c3, 0, rtol=rtol, atol=atol)):
-        
-            # When the bilinear is a constant, the curve of constant energy becomes a
-            # sheet of constant energy. This sheet could intersect every point along the
-            # boundary and the interior or not intersect at all. Hopefully this is a
-            # pathological case. Since it intersects everywhere, we can prtovide any path
-            # through the parallelogram. Technically this isn't correct but it's work for
-            # our purposes.
-            if np.isclose(c0, Ec, rtol=rtol, atol=atol):
-                unique_param_edge = [0, 1]
-                unique_param_isocurve = [x0, x1]
-                unique_intersecting_edges = [edge, edge]
-                return unique_param_edge, unique_param_isocurve, unique_intersecting_edges
-            else:
-                continue
-        
+                                    
         # Have to consider c2 == c3 == 0 as a separate case.
-        elif (np.isclose(c2, 0, rtol=rtol, atol=atol) and
+        if (np.isclose(c2, 0, rtol=rtol, atol=atol) and
               np.isclose(c3, 0, rtol=rtol, atol=atol)):
             
             # If the x-coordinates are the same.
@@ -1168,9 +1204,11 @@ def find_param_intersect(square_pts, coeffs, isovalue, atol=1e-8, rtol=1e-5):
                     
                     unique_param_edge = [0, 1]
                     unique_param_isocurve = [y0, y1]
+                    unique_edge_indices = [i, i]
                     unique_intersecting_edges = [edge, edge]
+                    unique_xy = [[x0, y0], [x0, y1]]
                     return (unique_param_edge, unique_param_isocurve,
-                            unique_intersecting_edges)                
+                            unique_edeg_indices, unique_intersecting_edges, unique_xy)
                 else:
                     continue
                 
@@ -1178,10 +1216,11 @@ def find_param_intersect(square_pts, coeffs, isovalue, atol=1e-8, rtol=1e-5):
             elif np.isclose(y0, y1, rtol=rtol, atol=atol):
                 te = check_inside((c0 - Ec + c1*x0)/(c1*x0 - c1*x1), rtol=rtol, atol=atol)
 
-                if te is not None:                    
+                if te is not None:                 
                     param_edge.append(te)
                     param_isocurve.append(y0)
-                    intersecting_edges.append(edge)
+                    edge_indices.append(i)
+                    intersecting_edges.append(edge)                    
 
             # If both the x- and y-coordinates are different.
             else:
@@ -1190,6 +1229,7 @@ def find_param_intersect(square_pts, coeffs, isovalue, atol=1e-8, rtol=1e-5):
                     x,tc = get_param_xy(te, edge)
                     param_edge.append(te)
                     param_isocurve.append(tc)
+                    edge_indices.append(i)
                     intersecting_edges.append(edge)                    
                 else:
                     continue
@@ -1200,116 +1240,127 @@ def find_param_intersect(square_pts, coeffs, isovalue, atol=1e-8, rtol=1e-5):
             
             # If the y-coordinates are the same.
             if np.isclose(y0, y1, rtol=rtol, atol=atol):
-
+                
                 if np.isclose(y0, (Ec-c0)/c2, rtol=rtol, atol=atol):
                     
-                    param_edge = [0, 1]
-                    param_isocurve = [x0, x1]
-                    intersecting_edges = [edge, edge]
-                    return param_edge, param_isocurve, intersecting_edges
+                    unique_param_edge = [0, 1]
+                    unique_param_isocurve = [x0, x1]
+                    unique_edge_indices = [i, i]
+                    unique_intersecting_edges = [edge, edge]
+                    unique_intersecting_pts = [[x0, y0],[x1, y0]]
+                    return (unique_param_edge, unique_param_isocurve,
+                            unique_edge_indices, unique_intersecting_edges, intersecting_pts)
                 
                 else:
                     continue
-                
+            
             # If the x-coordinates are the same.
             elif np.isclose(x0, x1, rtol=rtol, atol=atol):
                 te = check_inside((c0 - Ec + c2*y0)/(c2*y0 - c2*y1), rtol=rtol, atol=atol)
                 
-                if te is not None:                    
+                if te is not None:
                     param_edge.append(te)
                     param_isocurve.append(x0)
+                    edge_indices.append(i)
                     intersecting_edges.append(edge)
-
+            
             # If both the x- and y-coordinates are different.
             else:
                 te = check_inside((c0 - Ec + c2*y0)/(c2*y0 - c2*y1), rtol=rtol, atol=atol)
-
+                
                 if te is not None:
                     tc,y = get_param_xy(te, edge)
                     param_edge.append(te)
                     param_isocurve.append(tc)
+                    edge_indices.append(i)
                     intersecting_edges.append(edge)
-                    
+                
                 else:
                     continue
-
+        
         # General case with x0 == x1 and y0 != y1
         elif np.isclose(x0, x1, atol=atol, rtol=rtol):
-            # print("x0 == x1")
-
-
+                        
             te = (c0 - Ec + c1*x0 + c2*y0 + c3*x0*y0)/((c2 + c3*x0)*(y0 - y1))
-            # print("te: ", te)
-            te = check_inside(te, rtol=rtol, atol=atol)
-            # print("te: ", te)            
+            te = check_inside(te, rtol=rtol, atol=atol)            
             tc =  x0
-            # print("tc: ", tc)
+
             if te is not None:
-                # print("appended")
                 param_edge.append(te)
                 param_isocurve.append(tc)
+                edge_indices.append(i)                
                 intersecting_edges.append(edge)
             else:
                 continue
-
+        
         # General case with x0 != x1 and y0 == y1
         elif np.isclose(y0, y1, atol=atol, rtol=rtol):
             
-            # print("y0 == y1")
             te = (c0 - Ec + c1*x0 + c2*y0 + c3*x0*y0)/((x0 - x1)*(c1 + c3*y0))
-            # print("te: ", te)
             te = check_inside(te, rtol=rtol, atol=atol)
-            # print("te: ", te)
             tc = -((c0 - Ec + c2*y0)/(c1 + c3*y0))
-            # print("tc: ", tc)
             
             if te is not None:
+                print("i2?: ", i)
                 param_edge.append(te)
                 param_isocurve.append(tc)
+                edge_indices.append(i)
                 intersecting_edges.append(edge)
             else:
-                continue                
+                continue
         
         # General case with x0 != x1 and y0 != y1
         else:
 
-            te1 = -(1/(
-                2*c3*(x0 - x1)*(y0 - y1)))*(-c1*x0 + c1*x1 - c2*y0 - 2*c3*x0*y0 + 
-                c3*x1*y0 + c2*y1 + c3*x0*y1 + np.sqrt(-4*c3*(x0 - x1)*(c0 - Ec +
-                c1*x0 + c2*y0 + c3*x0*y0)*(y0 - y1) + (c1*(-x0 + x1) + c2*(-y0 + y1) +
-                                                       c3 (-2*x0*y0 + x1*y0 + x0*y1))**2))
+            with np.errstate(invalid='raise'):
+                try:
+                    te1 = -(-(c1*x0) + c1*x1 - c2*y0 - 2*c3*x0*y0 + c3*x1*y0 + c2*y1 +
+                            c3*x0*y1 + np.sqrt(-4*c3*(x0 - x1)*(c0 - Ec + c1*x0 + c2*y0 +
+                            c3*x0*y0)*(y0 - y1) + (-(c1*x0) + c1*x1 - c2*y0 - 2*c3*x0*y0 +
+                            c3*x1*y0 + c2*y1 + c3*x0*y1)**2))/(2.*c3*(x0 - x1)*(y0 - y1))
+                except:
+                    te1 = np.nan            
 
-            tc1 =  (1/(
-                2*c3*(y0 - y1)))*(-c1*x0 + c1*x1 - c2*y0 + c3*x1*y0 + c2*y1 - 
-                c3*x0*y1 + np.sqrt(-4*c3*(x0 - x1)*(c0 - Ec + c1*x0 + c2*y0 + c3*x0*y0)*(y0 -
-                y1) + (c1*(-x0 + x1) + c2*(-y0 + y1) + c3*(-2*x0*y0 + x1*y0 + x0*y1))**2))
+                try:
+                    tc1 = (-(c1*x0) + c1*x1 - c2*y0 + c3*x1*y0 + c2*y1 - c3*x0*y1 +
+                           np.sqrt(-4*c3*(x0 - x1)*(c0 - Ec + c1*x0 + c2*y0 +
+                           c3*x0*y0)*(y0 - y1)+ (-(c1*x0) + c1*x1 - c2*y0 - 2*c3*x0*y0 +
+                                  c3*x1*y0 + c2*y1 + c3*x0*y1)**2))/(2.*c3*(y0 - y1))
+                except:
+                    tc1 = np.nan
 
+                try:
+                    te2 = (c1*x0 - c1*x1 + c2*y0 + 2*c3*x0*y0 - c3*x1*y0 - c2*y1 -
+                           c3*x0*y1 + np.sqrt(-4*c3*(x0 - x1)*(c0 - Ec + c1*x0 + c2*y0 +
+                           c3*x0*y0)*(y0 - y1) + (-(c1*x0) + c1*x1 - c2*y0 - 2*c3*x0*y0 +
+                           c3*x1*y0 + c2*y1 + c3*x0*y1)**2))/(2.*c3*(x0 - x1)*(y0 - y1))
 
-            te2 = (1/(
-                2*c3*(x0 - x1)*(y0 - y1)))*(c1*x0 - c1*x1 + c2*y0 + 2*c3*x0*y0 -
-                c3*x1*y0 - c2*y1 - c3*x0*y1 + np.sqrt(-4*c3*(x0 - x1)*(c0 -
-                Ec + c1*x0 + c2*y0 + c3*x0*y0)*(y0 -
-                y1) + (c1*(-x0 + x1) + c2*(-y0 + y1) + c3*(-2*x0*y0 + x1*y0 + x0*y1))**2))
- 
-            tc2 = -(1/(
-                2*c3 (y0 - y1)))*(c1*x0 - c1*x1 + c2*y0 - c3*x1*y0 - c2*y1 + c3*x0*y1 + 
-                np.sqrt(-4*c3*(x0 - x1)*(c0 - Ec + c1*x0 + c2*y0 + c3*x0*y0) (y0 - 
-                y1) + (c1*(-x0 + x1) + c2*(-y0 + y1) + 
-                c3*(-2*x0*y0 + x1*y0 + x0*y1))**2))
-            
+                except:
+                    te2 = np.nan
+                                    
+                try:
+                    tc2 = -(c1*x0 - c1*x1 + c2*y0 - c3*x1*y0 - c2*y1 + c3*x0*y1 +
+                            np.sqrt(-4*c3*(x0 - x1)*(c0 - Ec + c1*x0 + c2*y0 +
+                                    c3*x0*y0)*(y0 - y1) + (-(c1*x0) + c1*x1 - c2*y0 - 2*c3*x0*y0 +
+                                    c3*x1*y0 + c2*y1 + c3*x0*y1)**2))/(2.*c3*(y0 - y1))
+                    
+                except:
+                    tc2 = np.nan
+                                
             te1 = check_inside(te1, rtol=rtol, atol=atol)
             te2 = check_inside(te2, rtol=rtol, atol=atol)
             
             if te1 is not None:
                 param_edge.append(te1)
                 param_isocurve.append(tc1)
+                edge_indices.append(i)                
                 intersecting_edges.append(edge)
-            elif te2 is not None:
+            
+            if te2 is not None:
                 param_edge.append(te2)
                 param_isocurve.append(tc2)
+                edge_indices.append(i)                
                 intersecting_edges.append(edge)
-            else:
-                continue
 
     # When the intersection occurs at a corner, there may be duplicate intersections.
     # Let's remove duplicate points
@@ -1319,13 +1370,6 @@ def find_param_intersect(square_pts, coeffs, isovalue, atol=1e-8, rtol=1e-5):
     for p,e in zip(param_edge, intersecting_edges):
         xy.append(get_param_xy(p, e))
 
-    # print("xy", xy)
-
-    unique_xy = []
-    unique_param_edge = []
-    unique_param_isocurve = []
-    unique_intersecting_edges = []
-
     # Only keep the unique intersections.
     for i in range(len(xy)):
         if not check_contained([xy[i]], unique_xy, rtol=rtol, atol=atol):
@@ -1333,10 +1377,10 @@ def find_param_intersect(square_pts, coeffs, isovalue, atol=1e-8, rtol=1e-5):
             unique_param_edge.append(param_edge[i])
             unique_param_isocurve.append(param_isocurve[i])
             unique_intersecting_edges.append(intersecting_edges[i])
+            unique_edge_indices.append(edge_indices[i])
 
-    # print("unique: ", unique_xy)
-                    
-    return unique_param_edge, unique_param_isocurve, unique_intersecting_edges, unique_xy
+    return (unique_param_edge, unique_param_isocurve, unique_edge_indices,
+            unique_intersecting_edges, unique_xy)
 
 
 def get_param_xy(param, edge):
@@ -1358,173 +1402,19 @@ def get_param_xy(param, edge):
     
     return [x, y]
 
-def bilin_density_of_states(square_pts, coeffs, isovalue, atol=1e-8, rtol=1e-5, eps=1e-9):
-    """Calculate the density of states of a bilinear interpolation
-    within a parallelogram.
-    
-    Args:
-        square_pts (list): A list of coordinates of the corners of the parallelogram.
-            This list should start with the lower left point and traverse the 
-            parallelogram in counterclockwise order.
-        coeffs (list or numpy.ndarray): the coefficients of the bilinear
-            interpolation.
-        isovalue (float): the energy at which to calculate the density of states.
-        atol (float): the absolute tolerance used in "find_param_intersect".
-        rtol (float): the relative tolerance used in "find_param_intersect".
-        eps (float): the analytic solution to the density of states for a bilinear 
-            interpolation is proportional to a log function and divergencs if the 
-            integration domain covers any interval including 0. This value is an 
-            approximation of zero when the integration domains includes 0.
-            
-    Returns:
-        dos (float): the density of states
-    """
 
-    # rprint("square_pts", square_pts)
-    # rprint("coeffs", coeffs)
-    # rprint("isovalue", isovalue)
-                                                
-    (edge_params, isocurve_params,
-     edges, intersect_pts) = find_param_intersect(square_pts, coeffs, isovalue, atol=atol,
-                                                 rtol=rtol)
-    
-    if len(isocurve_params) < 2:
-        return 0
-
-    # rprint("edge_params", edge_params)
-    # rprint("isocurve_params", isocurve_params)
-    # rprint("edges", edges)
-    
-
-    # Find the locations where the isocurve intersects the parallelogram boundaries.
-    # intersect_pts = []
-    # for p,e in zip(edge_params, edges):
-    #     intersect_pts.append(get_param_xy(p, e))    
-
-    # Get the coefficients.
-    c0, c1, c2, c3 = coeffs[0], coeffs[1], coeffs[2], coeffs[3]
-    
-    # Initialize the density of states.
-    dos = 0
-    
-    grouped_intersect_pts, grouped_edge_params, grouped_isocurve_params, grouped_edges = (
-        group_by_quad(intersect_pts, edge_params, isocurve_params, edges))
-
-    for i in range(len(grouped_intersect_pts)):
-        # print("dos", dos)
-        edge_params = grouped_edge_params[i]
-        isocurve_params = grouped_isocurve_params[i]
-        edges = grouped_edges[i]
-            
-        # rprint("loop edge_params", edge_params)
-        # rprint("loop isocurve_params", isocurve_params)
-        # rprint("loop edges", edges)        
-        
-        # Get the limits of the integration parametric variable and the
-        # coefficients in the bilinear expansion.
-        ti, tf = isocurve_params[0], isocurve_params[1]
-        
-        # Sort the bounds from least to greatest (this is the similar
-        # to taking the absolute value.
-        if ti > tf:
-            ti, tf = tf, copy(ti)
-        
-        # print("ti: ", ti)
-        # print("tf: ", tf)
-        
-        # Take care of the case when c1 == c2 == c3 == 0.
-        if (np.isclose(c1, 0, rtol=rtol, atol=atol) and
-            np.isclose(c2, 0, rtol=rtol, atol=atol) and
-            np.isclose(c3, 0, rtol=rtol, atol=atol)):
-            
-            if np.isclose(c0, isovalue, rtol=rtol, atol=atol):
-                print("singular1")
-                dos += 1/eps
-                continue
-            else:
-                dos += 0.
-                continue
-            
-        # Take care of the case when c2 == c3 == 0.
-        if (np.isclose(c2 ,0, rtol=rtol, atol=atol) and
-            np.isclose(c3, 0, rtol=rtol, atol=atol)):
-            dos += 1/abs(c1)*abs(tf - ti)
-            continue
-        
-        # Take care of the case when c3 == 0.
-        # (this is only a special case because of the change of integration variables)
-        if np.isclose(c3, 0, rtol=rtol, atol=atol):
-            dos += 1/abs(c2)*abs(tf - ti)
-            continue
-        
-        # Change of variables.
-        ti_p = c2 + c3*ti
-        tf_p = c2 + c3*tf    
-        
-        # Sort the bounds from least to greatest (this is the similar
-        # to taking the absolute value.
-        if ti_p > tf_p:
-            ti_p, tf_p = tf_p, copy(ti_p)
-
-        # print("ti_p: ", ti_p)
-        # print("tf_p: ", tf_p)
-        
-        # If both bounds are greater than zero.
-        if (0 < ti_p) and (0 < tf_p):
-
-            dos += 1/abs(c3)*np.log(tf_p/ti_p)
-            continue
-        
-        # If both bounds are less than zero.
-        elif (ti_p < 0) and (tf_p < 0):
-            dos += -1/abs(c3)*np.log(tf_p/ti_p)
-            continue
-        
-        # If the lower bound is zero.
-        elif np.isclose(ti_p, 0, rtol=rtol, atol=atol):
-            print("singular2")                        
-            dos += -1/abs(c3)*np.log(tf_p/eps)
-            continue
-        
-        # If the upper bound is zero.
-        elif np.isclose(tf_p, 0, rtol=rtol, atol=atol):
-            print("singular3")                        
-            # rprint("2", -1/c3*np.log(-eps/ti_p))
-            dos += -1/abs(c3)*np.log(-eps/ti_p)
-            continue
-        
-        # If the boundaries straddle zero.
-        elif (ti_p < 0) and (0 < tf_p ):
-            # print("singular4")            
-            dos += -1/abs(c3)*np.log(-eps/ti_p) + 1/abs(c3)*np.log(tf_p/eps)
-            continue
-        
-    return dos
-
-
-def group_by_quad(pts, param_edge, param_isocurve, intersecting_edges):
-    """Group a list of points by quadrant, starting with the first and ending with the 
-    fourth. Group the other arguments in the same manner.
+def group_by_quad(pts):
+    """Group a list of points by quadrant, starting with the
+    first and ending with the fourth.
     
     Args:
         pts (list): a list of points in 2D Cartesian space.
-        param_edge (list): a list of parametric variables.
-        param_isocurve (list): a list of parametric variables.
-        intersecting_edges (list): a list of edges given by two points at the ends of the
-            edge.
         
     Returns:
         grouped_pts (list): a list of groups of points.
-        grouped_param_edge (list): a list of grouped edge parameters.
-        grouped_param_isocurve (list): a list of grouped curve parameters.
-        grouped_intersecting_edges (list): a list of grouped edges that intersect the
-            the isocurve
     """
     
     pts = np.array(pts)
-    param_edge = np.array(param_edge)
-    param_isocurve = np.array(param_isocurve)
-    intersecting_edges = np.array(intersecting_edges)
     
     # Get the x- and y-coordinates.
     xs = pts[:,0]
@@ -1546,12 +1436,273 @@ def group_by_quad(pts, param_edge, param_isocurve, intersecting_edges):
     grouped_pts = np.array([q1, q2, q3, q4])
     
     # Remove quadrants that don't contain any points.    
+    grouped_pts = grouped_pts[[len(g) > 1 for g in grouped_pts]]    
+    
+    return grouped_pts
+
+def get_integration_case(edges):
+    """Determine the integration case given the edges intersected by the
+    bilinear isocurve.
+    
+    Args:
+        edges (list): a list of two edge indices.
+    
+    Returns:
+        _ (int): the integration case.
+    """
+
+    # Determine what case this integral falls under. The cases
+    # are ordered by the number of unique integration limits.
+    # Case 0 has no unique integration limits on v with the limits being [0, 1]. It
+    # is also the case where the isocurve intersects opposite sides.
+    # Case 1 has one unique integration limit on v with limits [0 v_upper]. It is also the
+    # case where the isocurve intersects adjacent sides.
+    # Case 2 has two unique integration limits on v with limits [v_lower, v_upper]. It is
+    # also the case where the isocurve intersects the same edge twice.
+    
+    # Sorting the indices will reduce the number of cases.
+    edges = np.sort(edges)
+
+    if all(edges == [0, 2]) or all(edges == [1, 3]):
+        return 0
+    elif (all(edges == [0, 1]) or all(edges == [1, 2]) or
+          all(edges == [2, 3]) or all(edges == [0, 3])):
+        return 1
+    elif (edges[0] == edges[1]) and (edges[0] < 4):
+        return 2
+    else:
+        msg = "This isn't a valid integration case"
+        raise ValueError(msg)
+
+
+def get_integration_cases(square_pts, coeffs, isovalue,
+                          atol=1e-8, rtol=1e-5, eps=1e-3):
+    """Find the integration case and subcase for a bilinear in a parallelogram.
+    
+    Args:
+        square_pts (list): A list of coordinates of the corners of the parallelogram.
+        coeffs (list): a list of coefficients for the bilinear interpolation.
+        isovalue (float): the value of the function on the isocontour. 
+        atol (float): the absolute tolerance used when comparing the parameter to 0 and 1.
+        rtol (float): the relative tolerance used when comparing the parameter to 0 and 1.
+        eps (float): a finite precision parameter that is used in calculating the subcase
+            for integration case 0. This value is added and subtracted from the edge
+            parameter, the xy-coordinates are calculated, and then the bilinear 
+            is evaluated at these points to determine the subcase.        
+            
+    Returns:
+        integration_case_list (list): a list of integration cases.
+        integration_subcase_list (list): a list of integration subcases.
+    """
+    
+    (edge_params, isocurve_params, edge_indices,
+     edges, intersect_pts) = find_param_intersect(square_pts, coeffs, isovalue)
+
+    (grouped_pts, grouped_edge_params, grouped_isocurve_params,
+     grouped_edge_indices, grouped_intersecting_edges) = (
+         group_bilinear_intersections(coeffs, intersect_pts, edge_params, isocurve_params,
+                      edge_indices, edges))    
+
+    integration_case_list = []
+    integration_subcase_list = []
+    
+    for (intersect_pts, edge_params, isocurve_params,
+         edge_indices, edges) in zip(grouped_pts, grouped_edge_params,
+                                     grouped_isocurve_params, grouped_edge_indices,
+                                     grouped_intersecting_edges):
+        
+        # Find the integration case for this set of intersections.
+        integration_case = get_integration_case(edge_indices)
+        integration_case_list.append(integration_case)
+
+        if integration_case == 2:
+
+            # Find the value of the edge parameter between the isocurve intersections.
+            middle_param = np.mean(edge_params)
+
+            # Calculate the xy-coordinates of the point between the isocurve intersections
+            # with the parallelogram.
+
+            middle_xy = get_param_xy(middle_param, edges[0])
+
+            # Evaluate the bilinear at point between intersections.
+            val = eval_bilin(coeffs, middle_xy)
+
+            # If the value is less then the isovalue, the desired area is inside the isocurve.
+            if val < isovalue:
+                integration_subcase = "inside"
+            else:
+                integration_subcase = "outside"
+
+        elif integration_case == 1:
+
+            # We sort the edge indices in ascending order and use the edge with the
+            # lower index to calculate the value of the edge parameter. The edge and 
+            # edge index will be used to evaluate the bilinear. The area around the corner
+            # that is separated from the others by the isocurve is considered "inside".
+
+            # Sort the edges where the isocurve intersectios the parallelogram.
+            sorted_edge_indices = np.sort(edge_indices)
+
+            print("sorted edge indices: ", sorted_edge_indices)
+
+            # Calculate the value of the edge parameter that lies inside the isocurve.
+            if all(sorted_edge_indices == [0,3]):
+                corner_param = 0
+            elif all(sorted_edge_indices == [0,1]):
+                corner_param = 1
+            elif all(sorted_edge_indices == [1,2]):
+                corner_param = 1
+            elif all(sorted_edge_indices == [2,3]):
+                corner_param = 1
+            else:
+                msg = "Invalid edge indices"
+                raise ValueError(msg)
+
+            print("corner param: ", corner_param)
+
+            # We used the edge index with the lower value. Here we find the
+            # edge that corresponds to that index.
+            corner_edge = np.array(edges)[np.argsort(edge_indices)][0]
+
+            print("corner edge: ", corner_edge)
+            
+            # Calculate the xy-coordinates of the corner inside the isocurve.
+            corner_xy = get_param_xy(corner_param, corner_edge)
+
+            print("corner xy: ", corner_xy)
+            
+            # Evaluate the bilinear at the corner point.
+            val = eval_bilin(coeffs, corner_xy)
+
+            print("val: ", val)
+            
+            # If the value is less then the isovalue, the desired area is inside the isocurve.
+            if val < isovalue:
+                integration_subcase = "inside"
+            else:
+                integration_subcase = "outside"
+        
+        elif integration_case == 0:
+            
+            # This case is different because the isocurve splits the parallelogram and it isn't
+            # very clear what is considered inside or outside the isocurve. If the isocurve
+            # splits the parallelogram vertically (horizontally), what is considered "inside"
+            # the isocurve will be the area to the left (below) the isocurve.
+            
+            # Sort the edges where the isocurve intersects the parallelogram to guarantee
+            # we select the correct edge.
+            sorted_ind = np.argsort(edge_indices)
+
+            sorted_edge_indices = np.array(edge_indices)[sorted_ind]
+            sorted_edges = np.array(edges)[sorted_ind]
+            sorted_edge_params = np.array(edge_params)[sorted_ind]
+            
+            iedge = sorted_edges[0]
+    
+            # Find values of the parametric variable on both sides of the isocurve but
+            # not too far from it.
+            param_val1 = sorted_edge_params[0] - eps
+            param_val2 = sorted_edge_params[0] + eps
+
+            # Find the xy-coordinates of these points on both sides of the isocurve.
+            xy_1 = get_param_xy(param_val1, iedge)
+            xy_2 = get_param_xy(param_val2, iedge)
+
+            val1 = eval_bilin(coeffs, xy_1)
+            val2 = eval_bilin(coeffs, xy_2)
+
+            if (val1 < isovalue) and (val2 > isovalue):
+                integration_subcase = "inside"
+
+            elif (val1 > isovalue) and (val2 < isovalue):
+                integration_subcase = "outside"
+
+            else:
+                msg = "Can't determine the subcase for integration case 0."
+                raise ValueError(msg)        
+
+        else:
+            msg = "Invalid integration case."
+            raise ValueError(msg)
+
+        integration_subcase_list.append(integration_subcase)
+    return integration_case_list, integration_subcase_list
+
+
+def group_bilinear_intersections(coeffs, pts, param_edge, param_isocurve,
+                                 edge_indices, intersecting_edges, atol=1e-8,
+                                 rtol=1e-5):
+    """Group the intersections, parameters, and edges so that each
+    is associated with one isocontour.
+    
+    Args:
+        coeffs (list): a list of coefficients for the bilinear interpolation.    
+        pts (list): a list of points in 2D Cartesian space.        
+        param_edge (list): a list of parametric variables for the edges.
+        param_isocurve (list): a list of parametric variables for the curve.
+        edge_indices (list): a list of edge indices where the curve intersects the 
+            parallelogram.
+        intersecting_edges (list): a list of edges given by two points at the ends of the
+            edge.
+        
+    Returns:
+        grouped_pts (numpy.array): a list of groups of points.
+        grouped_param_edge (numpy.array): a list of grouped edge parameters.
+        grouped_param_isocurve (numpy.array): a list of grouped curve parameters.
+        grouped_edge_indices (numpy.array): a list of grouped edge indices.
+        grouped_intersecting_edges (numpy.array): a list of grouped edges that intersect 
+            the isocurve
+    """
+    
+    # Make all inputs numpy arrays.
+    pts = np.array(pts)
+    param_edge = np.array(param_edge)
+    param_isocurve = np.array(param_isocurve)
+    edge_indices = np.array(edge_indices)
+    intersecting_edges = np.array(intersecting_edges)
+    
+    # What matters is the point's position relative to the isocontour cross since
+    # isocontours never cross over it.
+    c0, c1, c2, c3 = coeffs
+
+    if np.isclose(c3, 0, atol=atol, rtol=rtol):
+        # Technically x_cross and y_cross go to +/- infinity when c3 = 0, but we don't
+        # have to worry too much about it because we're guaranteed to have only one set of
+        # intersections in this case. This is just to avoid infinities.
+        x_cross = 0
+        y_cross = 0
+    else:
+        x_cross = -c2/c3
+        y_cross = -c1/c3
+    
+    # Get the x- and y-coordinates relative to the cross.
+    xs = pts[:,0] - x_cross
+    ys = pts[:,1] - y_cross
+    
+    # Find the coordinates that are greater than zero and less than zero relative
+    # to the cross.
+    x_positive = xs > 0
+    x_negative = xs < 0
+
+    y_positive = ys > 0
+    y_negative = ys < 0    
+    
+    # Find the points in each quadrant.
+    q1 = pts[x_positive*y_positive]
+    q2 = pts[x_negative*y_positive]
+    q3 = pts[x_negative*y_negative]
+    q4 = pts[x_positive*y_negative]
+    
+    grouped_pts = np.array([q1, q2, q3, q4])
+    
+    # Remove quadrants that don't contain any points.    
     grouped_pts = grouped_pts[[len(g) > 1 for g in grouped_pts]]
 
     if len(grouped_pts) == 0:
         
         return (np.array([pts]), np.array([param_edge]), np.array([param_isocurve]),
-                np.array([intersecting_edges]))
+                np.array(edge_indices), np.array([intersecting_edges]))
     
     else:
 
@@ -1576,6 +1727,17 @@ def group_by_quad(pts, param_edge, param_isocurve, intersecting_edges):
         grouped_param_isocurve = grouped_param_isocurve[[len(g) > 1 for g in
                                                          grouped_param_isocurve]]
 
+        q1 = edge_indices[x_positive*y_positive]
+        q2 = edge_indices[x_negative*y_positive]
+        q3 = edge_indices[x_negative*y_negative]
+        q4 = edge_indices[x_positive*y_negative]
+        
+        grouped_edge_indices = np.array([q1, q2, q3, q4])
+        
+        # Remove quadrants that don't contain any points.    
+        grouped_edge_indices = grouped_edge_indices[[len(g) > 1 for g in
+                                                         grouped_edge_indices]]
+        
         q1 = intersecting_edges[x_positive*y_positive]
         q2 = intersecting_edges[x_negative*y_positive]
         q3 = intersecting_edges[x_negative*y_negative]
@@ -1588,42 +1750,6 @@ def group_by_quad(pts, param_edge, param_isocurve, intersecting_edges):
                                                             grouped_intersecting_edges]]
         
     return (grouped_pts, grouped_param_edge, grouped_param_isocurve,
-            grouped_intersecting_edges)
+            grouped_edge_indices, grouped_intersecting_edges)
+    
 
-
-# def group_by_quad(pts):
-#     """Group a list of points by quadrant, starting with the
-#     first and ending with the fourth.
-    
-#     Args:
-#         pts (list): a list of points in 2D Cartesian space.
-        
-#     Returns:
-#         grouped_pts (list): a list of groups of points.
-#     """
-    
-#     pts = np.array(pts)
-    
-#     # Get the x- and y-coordinates.
-#     xs = pts[:,0]
-#     ys = pts[:,1]    
-    
-#     # Find the coordinates that are greater than zero and less than zero.
-#     x_positive = xs > 0
-#     x_negative = xs < 0
-
-#     y_positive = ys > 0
-#     y_negative = ys < 0    
-    
-#     # Find the points in each quadrant.
-#     q1 = pts[x_positive*y_positive]
-#     q2 = pts[x_negative*y_positive]
-#     q3 = pts[x_negative*y_negative]
-#     q4 = pts[x_positive*y_negative]
-    
-#     grouped_pts = np.array([q1, q2, q3, q4])
-    
-#     # Remove quadrants that don't contain any points.    
-#     grouped_pts = grouped_pts[[len(g) > 1 for g in grouped_pts]]    
-    
-#     return grouped_pts

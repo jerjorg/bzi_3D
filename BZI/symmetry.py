@@ -2156,7 +2156,7 @@ def UpperHermiteNormalForm(S):
     return H, B
 
 
-def find_kpt_index(kpt, invK, L, D, eps=9):
+def find_kpt_index(kpt, invK, L, D, eps=4):
     """This function takes a k-point in Cartesian coordinates and "hashes" it 
     into a single number, corresponding to its place in the k-point list.
 
@@ -2177,11 +2177,11 @@ def find_kpt_index(kpt, invK, L, D, eps=9):
     gpt = np.round(np.dot(invK, kpt), eps)
     
     gpt = np.dot(L, gpt).astype(int)%D
-    
+        
     # Convert from group coordinates to a single, base-10 number between 1 and
     # the number of k-points in the unreduced grid.
+    # return gpt[0]*D[1]*D[2] + gpt[1]*D[2] + gpt[2]
     return gpt[0]*D[1]*D[2] + gpt[1]*D[2] + gpt[2]
-
 
 def bring_into_cell(points, rlat_vecs, rtol=1e-5, atol=1e-8, coords="Cart",
                     centered=False):
@@ -2339,7 +2339,7 @@ def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
 
 def find_orbits(kpoint_list, lattice_vectors, rlattice_vectors, grid_vectors, shift,
                 atom_labels, atom_positions, full_orbit=False, kpt_coords="cart",
-                atom_coords="lat", eps=1e-10, rounding_eps=10, rtol=1e-4, atol=1e-6):
+                atom_coords="lat", eps=1e-10, rounding_eps=4, rtol=1e-4, atol=1e-6):
     """Use the point group symmetry of the lattice vectors to reduce a list of
     k-points.
     
@@ -2404,7 +2404,7 @@ def find_orbits(kpoint_list, lattice_vectors, rlattice_vectors, grid_vectors, sh
         msg = """The k-point generating vectors define a grid with a unit cell 
         larger than the reciprocal lattice unit cell."""
         raise ValueError(msg.format(grid_vectors))
-
+    
     # Put the shift in Cartesian coordinates.
     shift = np.dot(grid_vectors, shift)
     
@@ -2435,7 +2435,7 @@ def find_orbits(kpoint_list, lattice_vectors, rlattice_vectors, grid_vectors, sh
     
     # The number of symmetry operations
     nSymOps = len(pointgroup)
-
+    
     # The number of unreduced k-points
     nUR = len(kpoint_list)
     
@@ -2462,15 +2462,15 @@ def find_orbits(kpoint_list, lattice_vectors, rlattice_vectors, grid_vectors, sh
 
     # Loop over unreduced k-points.
     for i in range(nUR):
-
+        
         # Grab an unreduced k-point.
         ur_kpt = kpoint_list[i]
-
+        
         # Find the unreduced k-point's index.
         kpt_hash = find_kpt_index(ur_kpt - shift, invK, L, D, rounding_eps)
 
         kpt_index_conv[kpt_hash] = i
-
+        
         # If it has already been looked at because it was part of the orbit of a
         # previous k-point, skip it.
         if hashtable[kpt_hash] != None:
@@ -2496,7 +2496,7 @@ def find_orbits(kpoint_list, lattice_vectors, rlattice_vectors, grid_vectors, sh
             
             # Bring it back into the first unit cell.
             rot_kpt = bring_into_cell(rot_kpt, rlattice_vectors)
-
+            
             # Verify that this point is part of the grid. If not, discard it.
             if not np.allclose(np.dot(invK, rot_kpt-shift),
                                np.round(np.dot(invK, rot_kpt-shift)), rtol=rtol):
@@ -2510,10 +2510,10 @@ def find_orbits(kpoint_list, lattice_vectors, rlattice_vectors, grid_vectors, sh
             if hashtable[kpt_hash] == None:
                 hashtable[kpt_hash] = cOrbit
                 iWt[cOrbit] += 1
-
+    
     # Remove empty entries from hashtable.
     hashtable = dict((k, v) for k, v in hashtable.items() if v)
-
+    
     # Find the reduced k-points from the indices of the representative k-points in
     # iFirst.
     kpoint_list = np.array(kpoint_list)

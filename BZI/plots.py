@@ -1047,9 +1047,11 @@ def plot_states(EPM, grid, tetrahedra, weights, method, energy_list, quantity, n
         if quantity == "dos":
             plt.scatter(dos_energies, dos, label=labels[0], c="blue")
             plt.ylabel("Density of States")
+            
         elif quantity == "nos":
             plt.scatter(dos_energies, nos, label=labels[0], c="blue")
             plt.ylabel("Number of States")
+            
         else:
             msg = "The supported quantities are dos and nos."
             raise ValueError(msg.format(quantity))

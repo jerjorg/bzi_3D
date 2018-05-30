@@ -104,3 +104,19 @@ def test_check_contained():
         points = point_list[pos]        
 
         assert check_contained(points, point_list)
+
+@pytest.mark.skipif("test_inside" not in tests, reason="different tests")
+def test_check_inside():
+
+
+    a = 1e-8
+    assert check_inside(a) == a
+
+    a = 1 + 1e-8
+    assert check_inside(a) == a
+
+    a = 1.2
+    assert check_inside(a) is None
+
+    a = -1.001
+    assert check_inside(a) is None    

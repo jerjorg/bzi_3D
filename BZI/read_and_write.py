@@ -1,6 +1,6 @@
 import os
 import matplotlib
-matplotlib.use("Agg")
+# matplotlib.use("Agg")
 import subprocess
 import numpy as np
 from numpy.linalg import inv, det
@@ -840,8 +840,6 @@ def read_vasp(location, vasp6=True):
                 niters += 1
 
         VASP_data["number of electronic iterations"] = niters
-<<<<<<< HEAD
-=======
     
     # Read the eigenvalues, number of reduced k-points, and the
     # k-points weights from the EIGENVAL file.
@@ -896,8 +894,6 @@ def read_vasp(location, vasp6=True):
         VASP_data["integrated density of states data"] = idos_list
         VASP_data["density of states energies"] = energy_list
     
->>>>>>> c332771306f463ee3c8352827339ccd729e9e1cd
-
     with open(outcar_file, "r") as file:
         f = file.readlines()
         sym_group = []
@@ -967,7 +963,6 @@ def read_vasp(location, vasp6=True):
                     VASP_data[eigval_line[0]] = float(eigval_line[-1])
                 except:
                     print("Band energy isn't convergerging for this job:")
-<<<<<<< HEAD
                     print(location, "\n")
                     return None
 
@@ -1030,24 +1025,7 @@ def read_vasp(location, vasp6=True):
                 VASP_data[atomic_name] = float(atomic_line[-1])
 
                 VASP_data[free_name] = float(free_line[-2])
-                                
-=======
-                    VASP_data[eigval_line[0]] = np.nan
-                
-                atomic_line = f[i+10].split()
-                atomic_name = atomic_line[0] + " " + atomic_line[1]
-                VASP_data[atomic_name] = float(atomic_line[-1])
-                
-                free_line = f[i+12].split()
-                free_name = free_line[0] + " " + free_line[1]
-                try:
-                    VASP_data[free_name] = float(free_line[-2])
-                except:
-                    VASP_data[free_name] = np.nan
-                no_entropy_line = f[i+14].split()
-                no_entropy_name = (no_entropy_line[0] + " " + no_entropy_line[1] + " " +
-                                   no_entropy_line[2])
->>>>>>> c332771306f463ee3c8352827339ccd729e9e1cd
+                                                
                 # For some reason splitting the lines isn't always consistent, and the "=" gets
                 # attached to the value occasionally.
 
@@ -2672,14 +2650,10 @@ def pickle_QE_data(home_dir, system_name, parameters):
                         kpoint_list = [np.prod(k) for k in parameters["k-point list"]]                        
                         # Find the number of reduced and unreduced k-points.
                         nkpoints_list = []
-<<<<<<< HEAD
-                        for n,kpoints in enumerate(parameters["k-point list"]):
-                            # nkpoints = np.prod(kpoints)
-=======
+                        
                         failed = False
                         for n,kpoints in enumerate(parameters["k-point list"]):
                             nkpoints = np.prod(kpoints)
->>>>>>> c332771306f463ee3c8352827339ccd729e9e1cd
                             kpoint_dir = os.path.join(smearing_value_dir, str(nkpoints))
                             try:
                                 qe_data = read_QE(kpoint_dir, system_name)

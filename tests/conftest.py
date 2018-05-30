@@ -112,8 +112,10 @@ def run(tests):
                  "test_integrate_bilinear",
                  "test_find_param_intersect",
                  "test_eval_bilin",
-                 "test_group_by_quad",
-                 "test_bilin_density_of_states"]
+                 "test_group_bilinear_intersections",
+                 "test_bilin_density_of_states",
+                 "test_get_integration_case",
+                 "test_get_integration_cases"]
     else:
         tests = []
     

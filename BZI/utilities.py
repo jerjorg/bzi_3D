@@ -180,24 +180,31 @@ def print_fortran_grid(lat_vecs, rlat_vecs, atom_labels, atom_positions, grid_ve
 
     # Fortran needs memory allocated for the atom labels and positions.
     print("allocate(atom_labels(1:{}))".format(len(atom_labels)))
-    print("allocate(atom_positions(1:{}, 1:3))".format(len(atom_labels)))    
+    print("allocate(atom_positions(1:3, 1:{}))".format(len(atom_labels)))    
     
     # Print the species labels.
     print("atom_labels = (/ " + ", ".join(map(str, atom_labels)) + " /)")
 
     # Print the atom positions.
     natoms = len(atom_labels)
-    for i, r in enumerate(atom_positions):
-        if i == 0:
-            print("atom_positions = transpose(reshape((/ " +
-                  ", ".join(map(str, np.round(r, 15))) + ", &")
-        elif i == (natoms-1):
-            print("                          " + 
-                  ", ".join(map(str, np.round(r, 15))) + " /)," +
-                  "(/{},3/)))".format(natoms))
-        else:
-            print("                          " +
-                  ", ".join(map(str, np.round(r, 15))) + ", &")
+
+    if natoms == 1:
+        r = atom_positions[0]
+        print("atom_positions = transpose(reshape((/ " +
+              ", ".join(map(str, np.round(r, 15))) + " /)" +
+              ", (/{},3/)))".format(natoms))
+    else:    
+        for i, r in enumerate(atom_positions):
+            if i == 0:
+                print("atom_positions = transpose(reshape((/ " +
+                      ", ".join(map(str, np.round(r, 15))) + ", &")
+            elif i == (natoms-1):
+                print("                          " + 
+                      ", ".join(map(str, np.round(r, 15))) + " /)," +
+                      "(/{},3/)))".format(natoms))
+            else:
+                print("                          " +
+                      ", ".join(map(str, np.round(r, 15))) + ", &")
 
     # Print the grid vectors.
     for i, r in enumerate(grid_vecs):
@@ -233,10 +240,10 @@ def make_unique(array, rtol=1e-5, atol=1e-8):
     unique_array = []
 
     while len(array_copy) > 0:
-        # Grap and remove a point from the grid array.
+        # Grab and remove a point from the grid array.
         pt = array_copy[-1]
         array_copy = array_copy[:-1]
-
+        
         if not check_contained([pt], unique_array, atol=atol, rtol=rtol):
             unique_array.append(pt)        
     
@@ -262,8 +269,8 @@ def check_inside(t, lb=0, ub=1, rtol=1e-8, atol=1e-5):
         _ (float): if the number lies in the given range, return the number. 
             Otherwise, return "None".
     """
-    if (np.isclose(t, lb, rtol=rtol, atol=atol) or 
-        np.isclose(t, ub, rtol=rtol, atol=atol) or 
+    if (np.isclose(t, lb, rtol=rtol, atol=atol) or
+        np.isclose(t, ub, rtol=rtol, atol=atol) or
         (lb < t and t < ub)):
         return t
     else:
