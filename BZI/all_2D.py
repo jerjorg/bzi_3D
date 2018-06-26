@@ -15,13 +15,19 @@ plt.style.use('seaborn-colorblind')
 def make2D_lattice_basis(lattice_constants, lattice_angle):
     """Create the basis vectors that generate a lattice in 2D.
     
-    Args;
-        lattice_constants (numpy.ndarray): the lengths of the basis vectors.
+    Args:
+        lattice_constants ((2,) list or numpy.ndarray): the lengths of the basis vectors.
         lattice_angle (float): the angle between the lattice vectors in radians.
         
     Returns:
-        basis (numpy.ndarray): the basis vectors of the lattice as columns of a 
-            2x2 array.
+        basis ((2,2) numpy.ndarray): the basis vectors of the lattice as columns of a 
+            array.
+    
+    Example:
+        >>> lat_consts = [1, 1]
+        >>> lat_angle = np.pi/2
+        >>> make2D_lattice_basis(lat_consts, lat_angle)
+        np.array([[1, 0], [0, 1]])
     """
     
     v1 = lattice_constants[0]*np.array([1, 0])
@@ -35,12 +41,18 @@ def get_2Dlattice_type(basis, rtol=1e-5, atol=1e-8):
     """Find the lattice type from the lattice generating vectors in 2D.
     
     Args:
-        basis (numpy.ndarray): the lattice generating vectors as columns of a
+        basis ((2,2) numpy.ndarray): the lattice generating vectors as columns of a
             2D array.
-        rtol (float): relative tolerance
-        atol (float): absolute tolerance
-    Returns
-        (str): the lattice type
+        rtol (float): relative tolerance.
+        atol (float): absolute tolerance.
+
+    Returns:
+        (str): the lattice type.
+
+    Example:
+        >>> lat_basis = numpy.array([[1, 0], [0, 1]])
+        >>> get_2Dlattice_type(lat_basis)
+        "square"
     """
     
     v1 = basis[:,0]
@@ -84,24 +96,29 @@ def HermiteNormalForm2D(S, rtol=1e-5, atol=1e-6):
     matrix that mediates the transform.
     
     Args:
-        S (numpy.ndarray): a 2x2 array of integers
-        eps (int): finite precision parameter
-        rtol (float): relative tolerance
-        atol (float): absolute tolerance
+        S ((2,2) numpy.ndarray): a array of integers
+        eps (int): finite precision parameter.
+        rtol (float): relative tolerance.
+        atol (float): absolute tolerance.
         
     Returns:
-        B (numpy.ndarray): the unimodular transformation matrix
-        H (numpy.ndarray): the Hermite normal form of the integer matrix
+        B ((2,2) numpy.ndarray): the unimodular transformation matrix.
+        H ((2,2) numpy.ndarray): the Hermite normal form of the integer matrix.
+
+    Example:
+        >>> int_mat = numpy.array([[2, 5], [4, 7]])
+        >>> HermiteNormalForm2D(int_mat)
+        ( array( [[1, 0], [5, 6]] ), array( [[3, 5], [-1, -2]] ) )
     """
         
     # Make sure the input is integer.
     if not (np.allclose(np.max(S%1), 0, rtol=rtol, atol=atol) or
             np.allclose(np.min(S%1), 0, rtol=rotl, atol=atol)):
         msg = "Please provide an integer 2x2 array."
-        raise ValueError(msg.format(S))
+        raise ValueError(msg)
     
     H = deepcopy(S)
-    B = np.eye(2,2)
+    B = np.eye(2,2).astype(int)
     
     # Make sure the elements in the first row are positive.
     if H[0,1] < 0:
@@ -160,14 +177,14 @@ def HermiteNormalForm2D(S, rtol=1e-5, atol=1e-6):
 
 def make_cell_points2D(lat_vecs, grid_vecs, offset=[0,0], coords="Cart",
                        grid_type="open", rtol=1e-5, atol=1e-8):
-    """Sample within a parallelogram using any regular grid.
+    """Sample within a parallelogram with a regular grid.
 
     Args:
-        lat_vecs (numpy.ndarray): the vectors defining the area in which 
-            to sample. The vectors are the columns of the matrix.
-        grid_vecs (numpy.ndarray): the vectors that generate the grid as 
-            columns of a matrix..
-        offset (numpy.ndarray): the offset of the coordinate system in grid coordinates.
+        lat_vecs ((2,2) numpy.ndarray): the vectors defining the area in which 
+            to sample. The vectors are the columns of the array.
+        grid_vecs ((2,2) numpy.ndarray): the vectors that generate the grid as 
+            columns of an array.
+        offset ((2,) numpy.ndarray): the offset of the coordinate system in grid coordinates.
         coords (str): a string that determines the coordinate of the returen k-points.
             Options include "Cart" for Cartesian and "lat" for lattice coordinates.
         grid_type (str): if "closed" the grid will include points along both 
@@ -175,9 +192,14 @@ def make_cell_points2D(lat_vecs, grid_vecs, offset=[0,0], coords="Cart",
         rtol (float): relative tolerance
         atol (float): absolute tolerance
 
-
     Returns:
-        grid (list): an array of sampling-point coordinates.
+        grid ((N,2) numpy.ndarray): an array of sampling-point coordinates.
+
+    Example:
+        >>> lat_vecs = np.array([[1, 0], [0, 1]])
+        >>> grid_vecs = np.array([[.5, 0], [0, .5]])
+        >>> make_cell_points2D(lat_vecs, grid_vecs)
+        array([[0. , 0.], [0., 0.5], [0.5, 0. ], [0.5, 0.5]])
     """
 
     # Offset in Cartesian coordinates
@@ -213,7 +235,7 @@ def make_cell_points2D(lat_vecs, grid_vecs, offset=[0,0], coords="Cart",
             # pt = bring_into_cell(pt, lat_vecs, rtol=rtol, atol=atol) + car_offset
             
             grid.append(pt)
-        return grid
+        return np.array(grid)
     elif coords == "lat":
         for i,j in it.product(range(D[0]), range(D[1])):
             # Find the point in cartesian coordinates.
@@ -226,7 +248,7 @@ def make_cell_points2D(lat_vecs, grid_vecs, offset=[0,0], coords="Cart",
             # pt = np.round(np.dot(inv(lat_vecs), pt) + offset, 12)%1
             pt = np.dot(inv(lat_vecs, pt)) + lat_offset
             grid.append(pt)
-        return grid            
+        return np.array(grid)
     else:
         msg = "Coordinate options include 'Cart' and 'lat'."
         raise ValueError(msg)
@@ -236,11 +258,19 @@ def plot_mesh2D(grid, lattice_basis, offset = np.array([0,0]), ax=None, color="b
     """Plot points and the unit cell of a lattice in 2D.
 
     Args:
-        grid (numpy.ndarray): a list of points two plot in 2D.
-        lattice_basis (numpy.ndarray): the generating vectors of the lattice as columns
-            of a 2x2 array.
-        offset (list or numpy.ndarray): the offset of the unit cell in Cartesian 
-            coordinates. 
+        grid ((N,2) numpy.ndarray): a list of points two plot in 2D.
+        lattice_basis ((2,2) numpy.ndarray): the generating vectors of the lattice as columns
+            of anarray.
+        offset ((2,) list or numpy.ndarray): the offset of the unit cell in Cartesian 
+            coordinates.
+    Returns:
+        None
+
+    Example:
+        >>> lat_vecs = np.array([[1, 0], [0, 1]])
+        >>> grid = array([[0. , 0.], [0., 0.5], [0.5, 0. ], [0.5, 0.5]])
+        >>> plot_mesh(grid, lat_vecs)
+        None
     """
     ngpts = len(grid)
     kxlist = [grid[i][0] for i in range(ngpts)]
@@ -264,6 +294,7 @@ def plot_mesh2D(grid, lattice_basis, offset = np.array([0,0]), ax=None, color="b
     for l in ls:
         ax.plot(*l, c="blue")    
 
+    return None
 
 def get_circle_pts(A, r2, offset=[0.,0.], eps=1e-12):
     """ Calculate all the points within a circle that are
@@ -271,14 +302,21 @@ def get_circle_pts(A, r2, offset=[0.,0.], eps=1e-12):
     A.
     
     Args:
-        A (numpy.ndarray): the columns representing basis vectors.
+        A ((2,2) numpy.ndarray): the columns representing basis vectors.
         r2 (float): the squared radius of the circle.
-        offset(list or numpy.ndarray): a vector that points to the center
+        offset((2,) list or numpy.ndarray): a vector that points to the center
             of the circle in Cartesian coordinates.
-        offset (numpy.ndarray): the center of the circle.
+        offset ((2,) numpy.ndarray): the center of the circle.
+
     Returns:
         grid (list): an array of grid coordinates in cartesian
             coordinates.
+    
+    Example:
+        >>> lat_vecs = np.array([[.5, 0], [0, .5]])
+        >>> r2 = 0.4
+        >>> get_circle_pts(grid_vecs, .4)
+        array([[-0.5, 0.], [0., -0.5], [0.,  0. ], [0.,  0.5],[0.5,  0. ]])
     """
     
     offset = np.asarray(offset)
@@ -304,9 +342,18 @@ def plot_circle_mesh(mesh_points, r2, offset = np.asarray([0.,0.])):
     """Create a scatter plot of a set of points inside a circle.
     
     Args:
-        mesh_points (list or np.ndarray): a list of mesh points.
+        mesh_points ((N,2) list or np.ndarray): a list of mesh points.
         r2 (float): the squared radius of the circle
-        cell_vecs (list or np.ndarray): a list of vectors that define a cell.
+        offset ((2,) list or np.ndarray): the offset of the circle.
+    
+    Returns:
+        None
+    
+    Example:
+        >>> mesh = np.array([[-0.5, 0.], [0., -0.5], [0.,  0. ], [0.,  0.5],[0.5,  0. ]])
+        >>> r2 = 0.4
+        >>> plot_circle_mesh(mesh, r2)
+        None
     """
     
     fig = plt.figure()
@@ -315,8 +362,8 @@ def plot_circle_mesh(mesh_points, r2, offset = np.asarray([0.,0.])):
     # Plot the sphere
     u = np.linspace(0, 2 * np.pi, 1000)
     r = np.sqrt(r2)
-    x = r*np.cos(u)
-    y = r*np.sin(u)
+    x = r*np.cos(u) + offset[0]
+    y = r*np.sin(u) + offset[0]
     ax.scatter(x,y,s=0.01)
     
     # Plot the points within the sphere.
@@ -331,18 +378,23 @@ def plot_circle_mesh(mesh_points, r2, offset = np.asarray([0.,0.])):
     ax.set_xlim(-lim, lim)
     ax.set_ylim(-lim, lim)
 
+    return None
 
 def get_perpendicular_vector2D(vector, atol=1e-8, rtol=1e-5):
     """Find a unit vector perpendicular to the input vector in 2D.
     
     Args:
-        vector (list or numpy.ndarray): a vector in 2D.
-        rtol (float): relative tolerance
-        atol (float): absolute tolerance        
+        vector ((2,) list or numpy.ndarray): a vector in 2D.
+        rtol (float): relative tolerance.
+        atol (float): absolute tolerance.       
         
     Returns:
         perp_vector (numpy.ndarray): a vector perpendicular to the input
             vector.
+
+    Example:
+        >>> get_perpendicular_vector2D([1, 0])
+        np.array([0, 1])
     """
     
     # If the vector is the origin, return a unit vector in the x-direction.
@@ -370,13 +422,19 @@ def get_line_equation2D(pt1, pt2):
     that lie one line.
     
     Args:
-        pt1 (list or numpy.ndarray): a point in 2D
-        pt2 (list or numpy.ndarray): a point in 2D
+        pt1 ((2,) list or numpy.ndarray): a point in 2D
+        pt2 ((2,) list or numpy.ndarray): a point in 2D
         
     Returns:
-        _ (list): the equation of a line. The first element is a 
+        _ ((2,) list): the equation of a line. The first element is a 
             vector normal to the line. The second is the closest distance from the
             origin to the line along the direction of the normal vector.
+
+    Example:
+        >>> pt1 = [2, 1]
+        >>> pt2 = [3, 1]
+        >>> get_line_equation2D(pt1, pt2)
+        [array([0., 1.]), 1.0]
     """
     
     # Find the vector that points from the first point to the second.
@@ -396,8 +454,8 @@ def point_line_location(point, line, rtol=1e-5, atol=1e-8):
     line points.
 
     Args:
-        point (numpy.ndarray): a point in Cartesian coordinates.
-        line (numpy.ndarray): an array with two elements. The first provides
+        point ((2,) numpy.ndarray): a point in Cartesian coordinates.
+        line ((2,) list): an array with two elements. The first provides
             a vector normal to the line. The second element is the distance of the
             line from the origin in the direction of the vector normal to the line.
         rtol (float): relative tolerance
@@ -406,6 +464,12 @@ def point_line_location(point, line, rtol=1e-5, atol=1e-8):
     Returns:
         (str): a string that indicates where the point is located. Options include
             "inside", "outside", and "on".
+
+    Example:
+        >>> line = [np.array([0., 1.]), 1.0]
+        >>> pt = [1, 0]
+        >>> point_line_location(pt, line)
+        "inside"
     """
     
     n = np.array(line[0])
@@ -424,11 +488,15 @@ def find_2Dbz(reciprocal_lattice_basis):
     """Find the Brillouin zone of a 2D lattice
 
     Args:
-        reciprocal_lattice_basis (numpy.ndarray): the lattice generating vectors as
+        reciprocal_lattice_basis ((2,2) numpy.ndarray): the lattice generating vectors as
             columns of a 2x2 array.
 
     Returns:
         convex_hull (scipy.spatial.ConvexHull): the Brillouin zone
+
+    Example:
+        >>> lat_basis = np.array([[1, 0], [0, 1]])
+        >>> find_2Dbz(lat_basis)
     """
     
     # Find all the lattice points near the origin within a circle of 
@@ -493,8 +561,17 @@ def plot_all2D_bz(mesh_points, bz):
     """Plot the Brillouin zone and lattice points.
     
     Args:
-        mesh_points (numpy.ndarray): a list of lattice points
-        bz (scipy.spatial.ConvexHull): the Brillouin zone
+        mesh_points ((N,2) list or numpy.ndarray): a list of lattice points.
+        bz (scipy.spatial.ConvexHull): the Brillouin zone.
+
+    Return:
+        None
+    
+    Example:
+        >>> lat_basis = np.array([[1, 0], [0, 1]])
+        >>> bz = find_2Dbz(lat_basis)
+        >>> mesh = [[0, 0], [0, .5], [.5, 0], [.5, .5]]
+        >>> plot_all2D_bz(mesh, bz)
     """
 
     fig = plt.figure()
@@ -519,14 +596,16 @@ def plot_all2D_bz(mesh_points, bz):
         ys = np.linspace(ystart, yfinish, 100)
         ax.plot(xs, ys, c="blue")
 
+    return None
+        
         
 class FreeElectron2D():
     """This is the popular free electron model. In this model the potential is
     zero everywhere. It is useful for testing.
     
     Args:
-        lattice_basis (numpy.ndarray): the lattice basis vectors as columns of
-            a 2x2 array.
+        lattice_basis ((2,2) numpy.ndarray): the lattice basis vectors as columns of
+            an array.
         nvalence_electrons (int): the number of valence electrons.
         degree (int): the degree of the radial dispersion relation.
         energy_shift (float): an energy shift typically used to place the Fermi
@@ -538,8 +617,8 @@ class FreeElectron2D():
         nsheets (int): the number of bands included when evaluating the EPM.
     
     Attributes:
-        lattice_basis (numpy.ndarray): the lattice basis vectors as columns of
-            a 2x2 array.
+        lattice_basis ((2,2) numpy.ndarray): the lattice basis vectors as columns of
+            an array.
         nvalence_electrons (int): the number of valence electrons is 1.
         degree (int): the degree of the radial dispersion relation.
         energy_shift (float): an energy shift typically used to place the Fermi
@@ -554,6 +633,15 @@ class FreeElectron2D():
         prefactor (float): the prefactor to the dispersion relation. It takes the
             form E(k) = Ak**n where A is the prefactor and n is the degree.
         nsheets (int): the number of bands included when evaluating the EPM.
+
+    Example:
+        >>> lattice_basis = make2D_lattice_basis([1,1], np.pi/2)
+        >>> args = {"lattice_basis": lattice_basis,
+                    "degree": 2,
+                    "prefactor":1,
+                    "nvalence_electrons": 6,
+                    "nsheets": 10}
+        >>> free_2D = FreeElectron2D(**args)
     """
     
     def __init__(self, lattice_basis, degree, nvalence_electrons, energy_shift=None,
@@ -661,10 +749,23 @@ class FreeElectron2D():
         
         
 def plot_2Dbands(EPM, sigma=False):
-    """Plot the bands of a 2D empirical pseudopotential
+    """Plot the band structure of a 2D empirical pseudopotential.
     
     Args:
         EPM (class): an empirical pseudopotential object.
+
+    Returns:
+        None
+
+    Example:
+        >>> lattice_basis = make2D_lattice_basis([1,1], np.pi/2)
+        >>> args = {"lattice_basis": lattice_basis,
+                    "degree": 2,
+                    "prefactor":1,
+                    "nvalence_electrons": 6,
+                    "nsheets": 10}
+        >>> free_2D = FreeElectron2D(**args)
+        >>> plot_2Dbands(free_2D)
     """
     
     fig = plt.figure()
@@ -700,35 +801,7 @@ def plot_2Dbands(EPM, sigma=False):
             kz[np.where(kz > EPM.fermi_level_ans)] = np.nan
             ax.scatter(kx, ky, kz, s=0.5)
 
-
-def plot_sigma_band2D(EPM, neigvals):
-    """Plot the bands of a 2D empirical pseudopotential
-    
-    Args:
-        EPM (class): an empirical pseudopotential object.
-        neigvals (int): the number of eigenvalues to plot.
-    """
-    
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.set_aspect("equal")
-    
-    grid_basis = EPM.reciprocal_lattice_basis/100
-    offset = np.dot(inv(grid_basis),
-                    np.dot(EPM.reciprocal_lattice_basis, [-.5]*2)) + [.5]*2
-    # offset = [0, 0]
-    
-    grid = make_cell_points2D(EPM.reciprocal_lattice_basis, grid_basis, offset)
-    
-    kx = [grid[i][0] for i in range(len(grid))]
-    ky = [grid[i][1] for i in range(len(grid))]        
-    ax = plt.subplot(1,1,1,projection="3d")
-    fig = plt.gca()
-    
-    all_states = [np.sum(EPM.eval(pt,neigvals)) for pt in grid]
-    
-    ax.scatter(kx, ky, all_states, s=0.5)
-                
+    return None
         
 def plot_2Dfermi_curve(EPM, neigvals, ndivs, atol=1e-2, ax=None):
     """Plot the bands of a 2D empirical pseudopotential
@@ -738,6 +811,20 @@ def plot_2Dfermi_curve(EPM, neigvals, ndivs, atol=1e-2, ax=None):
         neigvals (int): the number of eigenvalues to plot.
         ndivs (int): the number of divisions for the grid.
         atol (float): the tolerance for the Fermi level.
+        ax (matplotlib.axes): an axes object.
+
+    Return:
+        None
+
+    Example:
+        >>> lattice_basis = make2D_lattice_basis([1,1], np.pi/2)
+        >>> args = {"lattice_basis": lattice_basis,
+                    "degree": 2,
+                    "prefactor":1,
+                    "nvalence_electrons": 6,
+                    "nsheets": 10}
+        >>> free_2D = FreeElectron2D(**args)
+        >>> plot_2Dfermi_curve(free_2D, 5, 100, 1e-3)
     """
 
     if ax is None:
@@ -779,6 +866,8 @@ def plot_2Dfermi_curve(EPM, neigvals, ndivs, atol=1e-2, ax=None):
     for l in ls:
         ax.plot(*l, c="blue")
 
+    return None
+        
         
 def rectangular_integration2D(EPM, grid, weights, areas=None):
     """Integrate an empirical pseudopotential in 2D using the rectangular method to
@@ -885,8 +974,8 @@ def square_tesselation(grid, atol=1e-5, rtol=1e-8):
         if len(subsquare) < 4:
             continue                
         else:
-            # Sort the points in the tesselation in clockwise order starting with the lower
-            # left point.            
+            # Sort the points in the tesselation in counter-clockwise order starting with
+            # the lower left point.
             subsquare = np.array(subsquare)
 
             # The indices of the points that need to be sorted.
@@ -1311,9 +1400,9 @@ def find_param_intersect(square_pts, coeffs, isovalue, atol=1e-8, rtol=1e-5):
         
         # General case with x0 != x1 and y0 != y1
         else:
-
             with np.errstate(invalid='raise'):
-                try:
+                try:                    
+                    
                     te1 = -(-(c1*x0) + c1*x1 - c2*y0 - 2*c3*x0*y0 + c3*x1*y0 + c2*y1 +
                             c3*x0*y1 + np.sqrt(-4*c3*(x0 - x1)*(c0 - Ec + c1*x0 + c2*y0 +
                             c3*x0*y0)*(y0 - y1) + (-(c1*x0) + c1*x1 - c2*y0 - 2*c3*x0*y0 +
@@ -1346,7 +1435,7 @@ def find_param_intersect(square_pts, coeffs, isovalue, atol=1e-8, rtol=1e-5):
                     
                 except:
                     tc2 = np.nan
-                                
+
             te1 = check_inside(te1, rtol=rtol, atol=atol)
             te2 = check_inside(te2, rtol=rtol, atol=atol)
             
@@ -1585,10 +1674,11 @@ def get_integration_cases(square_pts, coeffs, isovalue,
         
         elif integration_case == 0:
             
-            # This case is different because the isocurve splits the parallelogram and it isn't
-            # very clear what is considered inside or outside the isocurve. If the isocurve
-            # splits the parallelogram vertically (horizontally), what is considered "inside"
-            # the isocurve will be the area to the left (below) the isocurve.
+            # This case is different because the isocurve splits the parallelogram and it
+            # isn't very clear what is considered inside or outside the isocurve. If the
+            # isocurve splits the parallelogram vertically (horizontally), what is
+            # considered "inside" the isocurve will be the area to the left (below) the
+            # isocurve.
             
             # Sort the edges where the isocurve intersects the parallelogram to guarantee
             # we select the correct edge.
@@ -1609,6 +1699,7 @@ def get_integration_cases(square_pts, coeffs, isovalue,
             xy_1 = get_param_xy(param_val1, iedge)
             xy_2 = get_param_xy(param_val2, iedge)
 
+            # Evaluate the bilinear on both sides of the isocurve.
             val1 = eval_bilin(coeffs, xy_1)
             val2 = eval_bilin(coeffs, xy_2)
 
@@ -1696,7 +1787,7 @@ def group_bilinear_intersections(coeffs, pts, param_edge, param_isocurve,
     
     grouped_pts = np.array([q1, q2, q3, q4])
     
-    # Remove quadrants that don't contain any points.    
+    # Remove quadrants that don't contain any points.
     grouped_pts = grouped_pts[[len(g) > 1 for g in grouped_pts]]
 
     if len(grouped_pts) == 0:
@@ -1751,5 +1842,61 @@ def group_bilinear_intersections(coeffs, pts, param_edge, param_isocurve,
         
     return (grouped_pts, grouped_param_edge, grouped_param_isocurve,
             grouped_edge_indices, grouped_intersecting_edges)
-    
 
+
+# def calc_bilinear_area(case, subcase, edge_or_corner):
+#     """Calculate the between a bilinear iso-curve and a parallelogram.
+
+#     Args:
+#         case (int): the integration case. Options include 0, 1, and 2. The case number
+#             is the same as the number of unique integration limits.
+#         subcase (float): the integration subcase. This determines whether the calculated
+#             is the area inside or outside the iso-contour.
+#         edge_or corner (int): the edge or corner that the iso-contour surrounds.
+#     """
+
+#     # Consider the case where the iso-contour intersects the same edge twice.
+#     if case == 2:
+
+
+# -(2*c1*u*x3 + c3*u**2*x3*y1 + 2*c2*u*y3 + c3*u**2*x1*y3 + 
+# ((c1*x3 + c3*u*x3*y1 - (c2 + c3*u*x1)*y3)*
+# Sqrt(x3**2*(c1 + c3*u*y1)**2 2*x3*(c1*(c2 - c3*u*x1) + c3*(2*C - 2*c0 - u*(c2 + c3*u*x1)*y1))*y3 + 
+# (c2 + c3*u*x1)**2*y3**2))/(c3*(x3*y1 - x1*y3)) + 
+# (4*(c1*c2 + (C - c0)*c3)*x3*y3*
+# Log(c1*x3 - c2*y3 + c3*u*(x3*y1 - x1*y3) + 
+# Sqrt(x3**2*(c1 + c3*u*y1)**2 + 
+# 2*x3*(c1*c2 + 2*C*c3 - 2*c0*c3 - c1*c3*u*x1 - c3*u*(c2 + c3*u*x1)*y1)*y3 + 
+#      -            (c2 + c3*u*x1)**2*y3**2)))/(c3*(x3*y1 - x1*y3)))/(4.*c3*x3*y3)
+
+
+#         # Each edge has different integration limits and needs to be treated separately.
+#         if edge_or_corner == 0:
+            
+            
+#         elif edge_or_corner == 1:
+            
+#         elif edge_or_corner == 2:
+            
+#         elif edge_or_corner == 3:
+            
+#         else:
+#             msg = "Invalid edge or corner"
+#             raise ValueError(msg)
+        
+#     else:
+#         msg = "Invalid integration case provided. Options include 0, 1, 2, and 3."
+#         rais ValueError(msg)
+    
+    
+    
+#     if subcase == "inside":
+
+            
+#     elif subcase == "outside":
+        
+#     else:
+#         msg = ("Invalid subcase provided. Options include 'inside' or "
+#                "'outside'."
+#         raise ValueError(msg)
+            

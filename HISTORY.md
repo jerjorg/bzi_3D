@@ -1,5 +1,8 @@
 # Revision History
 
+## Revision 0.3.7
+- Clarified documentation and added examples to `all_2D.py`.
+
 ## Revision 0.3.6
 - Removed density of states for bilinear functions and tests.
 - Started methods that will area within a biliean isocontour as 

@@ -654,14 +654,55 @@ def test_group_bilinear_intersections():
     p, pe, pi, ei, ie = group_bilinear_intersections(coeffs, intersecting_pts, param_edge,
                                                      param_isocurve, edge_indices,
                                                      intersecting_edges)
-
+    
     assert np.allclose(p[0], intersecting_pts)
     assert np.allclose(pe[0], param_edge)
     assert np.allclose(pi[0], param_isocurve)
     assert np.allclose(ei[0], edge_indices)
     assert np.allclose(ie[0], intersecting_edges)
+    
+
+    # Two sets of intersections on adjacent sides.    
+    square_pts = [[0, 0], [8/5, 4/5], [12/5, 16/5], [4/5, 12/5]];
+    coeffs = [1, -4, -2.5, 2]
+    isovalue = -3.5
+    
+    (param_edge, param_isocurve, edge_indices,
+     intersecting_edges, intersecting_pts) = find_param_intersect(square_pts, coeffs,
+                                                                  isovalue)
+
+    ip, pe, pi, ei, ie = group_bilinear_intersections(coeffs, intersecting_pts, param_edge,
+                                                     param_isocurve, edge_indices,
+                                                     intersecting_edges)
+
+    intersect_pts = [[[2.09824236, 2.29472709], [1.5687293 , 2.78436465]],
+                     [[1.07883539, 0.5394177 ], [0.54796426, 1.64389277]]]
+
+    assert np.allclose(ip[0], intersect_pts[0])
+    assert np.allclose(ip[1], intersect_pts[1])
 
 
+    # Two sets of intersections, one on adjacent sides, one on opposite.
+    square_pts = np.array([[0, 0], [8/5, 4/5], [12/5, 16/5], [4/5, 12/5]]) - [.5, .5]
+    coeffs = [1, 1, -3.5, 5]
+    isovalue = 2
+    
+    (param_edge, param_isocurve, edge_indices,
+     intersecting_edges, intersecting_pts) = find_param_intersect(square_pts, coeffs,
+                                                                  isovalue)
+
+    ip, pe, pi, ei, ie = group_bilinear_intersections(coeffs, intersecting_pts, param_edge,
+                                                     param_isocurve, edge_indices,
+                                                     intersecting_edges)
+
+
+    intersect_pts = [[[0.85825757, 0.17912878], [0.72594067, 2.11297033]],
+                     [[-0.05825757, -0.27912878], [-0.41789083, -0.2536725 ]]]
+    
+    assert np.allclose(ip[0], intersect_pts[0])
+    assert np.allclose(ip[1], intersect_pts[1])
+    
+    
 @pytest.mark.skipif("test_get_integration_case" not in tests,
                     reason="different tests")
 def test_get_integration_case():
@@ -758,3 +799,5 @@ def test_get_integration_cases():
     cases = get_integration_cases(square_pts, coeffs, isovalue)
     assert np.array(cases == np.array([[1, 1], ["outside", "outside"]]),
                     dtype="bool").all()
+
+    

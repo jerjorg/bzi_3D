@@ -289,8 +289,8 @@ def plot_mesh(mesh_points, cell_vecs, offset = np.asarray([0.,0.,0.]),
     return None
 
 
-def plot_bz_mesh(mesh_points, rlat_vecs, ax=None, BZ=None, color="red"):
-    """Plot the irreducible k-points inside the Wigner-Seitz construction of the first
+def plot_bz_mesh(mesh_points, rlat_vecs, ax=None, BZ=None, color="red", limits=None):
+    """Plot the k-points inside the Wigner-Seitz construction of the first
     Brillouin zone.
 
     Args:
@@ -310,14 +310,14 @@ def plot_bz_mesh(mesh_points, rlat_vecs, ax=None, BZ=None, color="red"):
     if ax is None:
         ax = plt.subplot(1,1,1,projection="3d")
         
-    ax.set_aspect('equal')
+    # ax.set_aspect('equal')
 
-    ax.auto_scale_xyz([-.2, .2], [-.2, .2], [-.2, .2])    
+    # ax.auto_scale_xyz([-1, 1], [-1, 1], [-1, 1])    
     ax.scatter(kxlist, kylist, kzlist, c=color)
 
     if BZ is None:
         BZ = find_bz(rlat_vecs)
-    plot_bz(BZ, ax=ax)
+    plot_bz(BZ, ax=ax, limits=limits)
     # for simplex in BZ.simplices:
     #     # We're going to plot lines between the vertices of the simplex.
     #     # To make sure we make it all the way around, append the first element
@@ -1343,8 +1343,8 @@ def plot_simplex_edges(vertices, axes, color="blue"):
         axes.plot(xs, ys, zs, c=color)
 
 
-def plot_bz(bz, symmetry_points=None, remove=True, ax=None, color="blue"):
-    """Plot a Brillouin zone
+def plot_bz(bz, symmetry_points=None, remove=True, ax=None, color="blue", limits=None):
+    """Plot a Brillouin zone.
     
     Args:
         BZ (scipy.spatial.ConvexHull): a convex hull object.
@@ -1352,6 +1352,7 @@ def plot_bz(bz, symmetry_points=None, remove=True, ax=None, color="blue"):
         remove (bool): if True, plot the facets instead of the simplices that make up the
             boundary of the Brillouin zone or irreducible Brilloun zone.
         ax (matplotlib.axes): an axes object.
+        limits (list): the axis limits on the plot.
     """
     
     fig = plt.figure()
@@ -1412,6 +1413,11 @@ def plot_bz(bz, symmetry_points=None, remove=True, ax=None, color="blue"):
             simplex = np.append(simplex, simplex[0])
             simplex_pts = [bz.points[i] for i in simplex]
             plot_simplex_edges(simplex_pts, ax, color=color)
+
+    if limits is not None:
+        ax.set_xlim(limits[0])
+        ax.set_ylim(limits[1])
+        ax.set_zlim(limits[2])
     # plt.close()
 
 
