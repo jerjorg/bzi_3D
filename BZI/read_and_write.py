@@ -159,20 +159,20 @@ def run_QE(home_dir, system_name, parameters):
                                 filedata = file.read()
                                 
                             if nkpoints <= 8000:    
-                                filedata = filedata.replace("12:00:00", "12:00:00")
-                                filedata = filedata.replace("4096", "8GB")
+                                filedata = filedata.replace("12:00:00", "48:00:00")
+                                filedata = filedata.replace("4096", "24GB")
                                 
                             elif nkpoints > 8000 and nkpoints < 27000:                                    
-                                filedata = filedata.replace("12:00:00", "48:00:00")
-                                filedata = filedata.replace("4096", "16GB")                                
+                                filedata = filedata.replace("12:00:00", "72:00:00")
+                                filedata = filedata.replace("4096", "48GB")                                
                                 
                             elif nkpoints >= 27000 and nkpoints < 64000:
-                                filedata = filedata.replace("12:00:00", "48:00:00")
-                                filedata = filedata.replace("4096", "32GB")
+                                filedata = filedata.replace("12:00:00", "96:00:00")
+                                filedata = filedata.replace("4096", "96GB")
                                 
                             elif nkpoints >= 64000:
-                                filedata = filedata.replace("12:00:00", "96:00:00")
-                                filedata = filedata.replace("4096", "64GB")
+                                filedata = filedata.replace("12:00:00", "168:00:00")
+                                filedata = filedata.replace("4096", "128GB")
 
                             with open("run.sh", "w") as file:
                                 file.write(filedata)
@@ -932,13 +932,13 @@ def read_vasp(location):
                 atomic_name = atomic_line[0] + " " + atomic_line[1]
                 VASP_data[atomic_name] = float(atomic_line[-1])
                 
-                free_line = f[i+12].split()
+                free_line = f[i+13].split()
                 free_name = free_line[0] + " " + free_line[1]
                 try:
                     VASP_data[free_name] = float(free_line[-2])
                 except:
                     VASP_data[free_name] = np.nan
-                no_entropy_line = f[i+14].split()
+                no_entropy_line = f[i+15].split()
                 no_entropy_name = (no_entropy_line[0] + " " + no_entropy_line[1] + " " +
                                    no_entropy_line[2])
                 # For some reason splitting the lines isn't always consistent, and the "=" gets
@@ -1505,40 +1505,57 @@ def run_VASP(home_dir, element, parameters):
                         
                         with open(vkpts_dir, "w") as file:
                             file.write(filedata)
-                        
+
                         if grid_type == "Generalized Monkhorst-Pack":
-                            precalc_dir = os.path.join(kpoints_dir, "PRECALC")
-                            with open(precalc_dir, "r") as file:
+                            kpgen_dir = os.path.join(kpoints_dir, "KPGEN")
+
+                            with open(kpgen_dir, "r") as file:
                                 filedata = file.read()
 
-                            kpoint = np.sum(kpoints)/3
-                            rn = int(2.8074*kpoint - 3.4008)
-                            filedata = filedata.replace("rn", str(rn))
+                            kpoint = int(np.product(kpoints))
+                            filedata = filedata.replace("kpoints", str(kpoint))
 
-                            with open(precalc_dir, "w") as file:
+                            for j,off in enumerate(offset):
+                                off_name = "offset" + str(j + 1)
+                                filedata = filedata.replace(off_name, str(off))
+
+                            with open(kpgen_dir, "w") as file:
                                 file.write(filedata)
+                            subprocess.call('kpoints.x', shell=True)
+                       
+#                        if grid_type == "Generalized Monkhorst-Pack":
+#                            precalc_dir = os.path.join(kpoints_dir, "PRECALC")
+#                            with open(precalc_dir, "r") as file:
+#                                filedata = file.read()
 
-                            subprocess.call('./getKPOINTS', shell=True)
+#                            kpoint = np.sum(kpoints)/3
+#                            rn = int(2.8074*kpoint - 3.4008)
+#                            filedata = filedata.replace("rn", str(rn))
+
+#                            with open(precalc_dir, "w") as file:
+#                                file.write(filedata)
+
+#                            subprocess.call('./getKPOINTS', shell=True)
                         
                         # Adjust time to run and memory
                         with open(run_file, "r") as file:
                             filedata = file.read()
 
                         if nkpoints <= 8000:
-                            filedata = filedata.replace("12:00:00", "12:00:00")
-                            filedata = filedata.replace("4096", "8GB")
-
-                        elif nkpoints > 8000 and nkpoints < 27000:
-                            filedata = filedata.replace("12:00:00", "36:00:00")
-                            filedata = filedata.replace("4096", "32GB")                                
-
-                        elif nkpoints >= 27000 and nkpoints < 64000:
                             filedata = filedata.replace("12:00:00", "48:00:00")
                             filedata = filedata.replace("4096", "32GB")
 
-                        elif nkpoints >= 64000:
+                        elif nkpoints > 8000 and nkpoints < 27000:
+                            filedata = filedata.replace("12:00:00", "72:00:00")
+                            filedata = filedata.replace("4096", "64GB")                                
+
+                        elif nkpoints >= 27000 and nkpoints < 64000:
                             filedata = filedata.replace("12:00:00", "96:00:00")
-                            filedata = filedata.replace("4096", "64GB")
+                            filedata = filedata.replace("4096", "96GB")
+
+                        elif nkpoints >= 64000:
+                            filedata = filedata.replace("12:00:00", "168:00:00")
+                            filedata = filedata.replace("4096", "128GB")
 
                         with open(run_file, "w") as file:
                             file.write(filedata)
