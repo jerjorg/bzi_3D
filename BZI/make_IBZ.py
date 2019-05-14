@@ -193,7 +193,7 @@ def find_bz(lat_vecs):
     return BZ
 
 
-def get_unique_planes(BZ):
+def get_unique_planes(BZ, rtol=1e-5, atol=1e-8):
     """Find the unique planes that form the boundaries of a Brillouin zone.
     
     Args:
@@ -205,7 +205,7 @@ def get_unique_planes(BZ):
     
     unique_planes = []
     for plane in BZ.equations:
-        if not check_contained(plane, unique_planes):
+        if not check_contained([plane], unique_planes, rtol=rtol, atol=atol):
             unique_planes.append(plane)
     
     return np.array(unique_planes)

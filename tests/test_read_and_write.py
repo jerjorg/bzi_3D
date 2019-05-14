@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 from BZI.read_and_write import read_QE, read_vasp, read_vasp_input
+from BZI.utilities import check_contained
 from conftest import run
 import os
 
@@ -312,7 +313,6 @@ def test_read_vasp():
     location = os.path.join(os.getcwd(), "tests", "Al_VASP")
     vasp_input_data = read_vasp_input(location)
     vasp_data = read_vasp(location)
-
 
     assert np.allclose(vasp_input_data["ZVAL list"], [11.0])
     assert np.allclose(vasp_input_data["EAUG list"], [586.98])
@@ -643,4 +643,8 @@ def test_read_vasp():
                      [0,   1,   0],
                      [1,   0,   0]])]
 
-    assert np.allclose(vasp_data['symmetry operators'], ops)
+    assert check_contained(ops, vasp_data["symmetry operators"])    
+
+    # for op in vasp_data["symmetry operators"]:
+    #     assert check_contained(op, ops)
+    

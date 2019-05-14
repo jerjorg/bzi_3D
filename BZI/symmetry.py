@@ -1,6 +1,6 @@
 """Generate quantities reated to the symmetry of the lattice. This module
-draws heavily from Setyawan, Wahyu, and Stefano Curtarolo. "High-throughput 
-electronic band structure calculations: Challenges and tools." Computational 
+draws heavily from Setyawan, Wahyu, and Stefano Curtarolo. "High-throughput
+electronic band structure calculations: Challenges and tools." Computational
 Materials Science 49.2 (2010): 299-312.
 """
 
@@ -10,11 +10,11 @@ import math, itertools
 from copy import deepcopy
 import itertools as it
 from itertools import islice, product
-from BZI.msg import err
 
 from phenum.grouptheory import SmithNormalForm
 from phenum.vector_utils import _minkowski_reduce_basis
-from BZI.utilities import check_contained
+from phenum.symmetry import get_lattice_pointGroup, get_spaceGroup
+from BZI.utilities import check_contained, find_point_indices, swap_rows_columns
 
 class Lattice(object):
     """Create a lattice.
@@ -63,7 +63,10 @@ class Lattice(object):
     """
     
     def __init__(self, centering_type, lattice_constants, lattice_angles,
-                 convention="ordinary"):
+                 convention="ordinary", rtol=1e-5, atol=1e-8, eps=1e-10):
+        self.rtol = rtol
+        self.atol = atol
+        self.eps = eps
         self.centering = centering_type
         self.constants = lattice_constants
         self.angles = lattice_angles
@@ -72,7 +75,9 @@ class Lattice(object):
         self.vectors = make_lattice_vectors(self.type, lattice_constants,
                                             lattice_angles)
         self.reciprocal_vectors = make_rptvecs(self.vectors, convention)
-        self.symmetry_group = get_point_group(self.vectors)
+        self.symmetry_group = get_point_group(self.vectors, rtol=self.rtol,
+                                              atol=self.atol, eps=self.eps)
+        # self.symmetry_group = find_point_group(self.vectors)
         self.symmetry_points = get_sympts(centering_type, lattice_constants,
                                           lattice_angles, convention=convention)
                                           
@@ -843,9 +848,9 @@ def get_sympaths(centering_type, lattice_constants, lattice_angles,
         raise ValueError(msg.format())
     
 def make_ptvecs(center_type, lat_consts, lat_angles):
-    """Provided the center type, lattice constants and angles, return the primitive
-    translation vectors.
-
+    """Provided the center type, lattice constants and angles of the conventional unit
+    cell, return the primitive translation vectors.
+    
     Args:
         center_type (str): identifies the location of the atoms in the cell.
         lat_consts (float or int): the characteristic spacing of atoms in the
@@ -1005,7 +1010,7 @@ def make_rptvecs(A, convention="ordinary"):
     elif convention == "angular":
         return np.transpose(np.linalg.inv(A))*2*np.pi
     else:
-        msg = "The two allowed conventions are ordinary and angular."
+        msg = "The two allowed conventions are 'ordinary' and 'angular'."
         raise ValueError(msg.format(convention))
 
 
@@ -1386,7 +1391,8 @@ def sym_path(lattice, npts, cart=False):
     else:
         return paths    
 
-def get_point_group1(lat_vecs):
+
+def find_point_group(lat_vecs, eps=1e-9):
     """Return the point group of a lattice.
 
     Args:
@@ -1397,22 +1403,52 @@ def get_point_group1(lat_vecs):
     """
     # _get_lattice_pointGroup has the vectors as rows instead of columns.
     lat_vecs = np.transpose(lat_vecs)
-    return get_lattice_pointGroup(lat_vecs, 1e-12)
+    return get_lattice_pointGroup(lat_vecs, eps)
+
+
+def find_space_group(lattice_vectors, atom_labels, atomic_basis, coords="Cart", eps=1e-6):
+    """Get the point group and fractional translations of a crystal using phonon-
+    enumeration's `get_spaceGroup`.
+
+    Args:
+        lattice_vectors (list or numpy.ndarray): the lattice vectors, in Cartesian 
+            coordinates, as columns of a 3x3 array.
+        atom_labels (list): a list of atoms labels. Each label should be distince for each
+            atomic species. The labels must start at zero and should be in the same order 
+            as atomic basis.
+        atomic_basis (list or numpy.ndarray): a list of atomic positions in Cartesian 
+            (default) or lattice coordinates.
+        coords (bool): specifies the coordinate system of the atomic basis.
+        eps (float): finite precision parameter.
+
+    Returns:
+        point_group (list): a list of point group operations.
+        translations (list): a list of translations
+    """
+
+    if coords == "Cart":
+        point_group, translations = get_spaceGroup(np.transpose(lattice_vectors),
+                                                   atom_labels, atomic_basis,
+                                                   lattcoords=False, eps=1e-6)
+    else:
+        point_group, translations = get_spaceGroup(np.transpose(lattice_vectors),
+                                                   atom_labels, atomic_basis,
+                                                   lattcoords=True, eps=1e-6)
+    return point_group, translations
+
 
 def shells(vector, lat_vecs):
-    """Find the vectors that are equivalent to another vector by
-    symmetry
+    """Find the vectors that are equivalent to another vector by symmetry
     
     Args:
         vector (list or numpy.ndarray): a vector in cartesian coordinates.
-        lat_vecs (numpy.ndarray or list): a matrix with the lattice vectors as
-            columns.
+        lat_vecs (numpy.ndarray or list): a matrix with the lattice vectors as columns.
     
     Returns:
         unique_shells (list): a list of vectors expressed as numpy arrays.    
     """
 
-    pointgroup = get_point_group(lat_vecs)
+    pointgroup = find_point_group(lat_vecs)
     all_shells = (np.dot(pointgroup, vector)).tolist()
     unique_shells = []
     for sh in all_shells:  
@@ -1421,7 +1457,7 @@ def shells(vector, lat_vecs):
         else:
             unique_shells.append(np.array(sh))
                 
-    tol = 1.e-15
+    tol = 1.e-10
     for (i,us) in enumerate(unique_shells):
         for (j,elem) in enumerate(us):
             if np.abs(elem) < tol:
@@ -1429,8 +1465,7 @@ def shells(vector, lat_vecs):
     return unique_shells
 
 def shells_list(vectors, lat_vecs):
-    """Returns a list of several shells useful for constructing 
-    pseudo-potentials.
+    """Returns a list of several shells useful for constructing pseudopotentials.
 
     Args:
         vector (list or numpy.ndarray): a vector in cartesian coordinates.
@@ -1446,159 +1481,205 @@ def shells_list(vectors, lat_vecs):
     nested_shells = [shells(i, lat_vecs) for i in vectors]
     return np.array(list(itertools.chain(*nested_shells)))
             
-def get_orbits(grid_car, lat_vecs, coord = "cart", duplicates=False,
-                  eps=10):
-    """ Find the partial orbitals of the points in a grid, including only the
+def get_orbits(grid_car, lat_vecs, rlat_vecs, atom_labels, atom_positions,
+               kpt_coords = "Cart", atom_coords="lat", duplicates=False, pointgroup=None,
+               complete_orbit=False, unit_cell=True, pg_coords="lat", eps=1e-10, rtol=1e-4,
+               atol=1e-6):
+    """Find the partial orbitals of the points in a grid, including only the
     points that are in the grid. This symmetry reduction routine doesn't scale
     linearly. It is highly recommended that you use find_orbits instead.
-
+    
     Args:
-        grid_car (numpy.ndarray): a list of grid point positions in Cartesian 
+        grid_car (numpy.ndarray): a list of grid point positions in Cartesian
             coordinates.
-        lat_vecs (numpy.ndarray): the vectors that define the integration cell.
-        coord (str): a string that indicatese coordinate system of the points.
+        lat_vecs (numpy.ndarray): the lattice vectors as the columns of a 3x3 array
+            in Cartesian coordinates.
+        rlat_vecs (numpy.ndarray): the reciprocal lattice vectors as the columns of a 3x3
+            array in Cartesian coordinates.
+        atom_labels (list): a list of atoms labels. Each label should be distince for each
+            atomic species. The labels must start at zero and should be in the same order 
+            as atomic basis.
+        atom_positions (list or numpy.ndarray): a list of atom positions in Cartesian 
+            (default) or lattice coordinates.
+        kpt_coords (str): a string that indicates coordinate system of the returned
+            k-points. It can be in Cartesian ("cart") or lattice ("lat").
+        atom_coords (str): a string that indicates coordinate system of the atom positions
             It can be in Cartesian ("cart") or lattice ("lat").
         duplicates (bool): if there are points in the grid outside the first
             unit cell, duplicates should be true.
-        eps (int): a finite precision parameter that determines the number of
-            decimals kepts when rounding.
+        pointgroup (list): a list of point group symmetry operators in lattice
+            coordinates.
+        complete_orbit (bool): if true, the complete orbit of each k-point is returned.
+        unit_cell (bool): if true, return the points of the orbits in the first unit cell.
+            Has no effect unless complete_orbit = True.
+        pg_coords (string): the coordinates of the point group: "lat" stands for lattice
+            and "Cart" for Cartesian.
+        eps (float): finite precision parameter used when finding points within a sphere.
+        rtol (float): a relative tolerance used when finding if two k-points are 
+            equivalent.
+        atol (float): an absolute tolerance used when finding if two k-points are 
+            equivalent.
 
     Returns:
-        gp_orbitals (dict): the orbitals of the grid points in a dictionary. 
-            The keys of the dictionary are integer labels and the values are the
-            grid points in the orbital.
+        gp_orbits (dict): the orbits of the grid points in a nested list. 
+        orbit_wts (list): the number of k-points in each orbit.
     """
-        
-    # Put the grid in lattice coordinates and move it into the first unit cell.
-    # grid_cell = list(np.round([np.dot(inv(lat_vecs), g) for g in grid_car], 15)%1)
-    # I removed the mod 1, put it back in on monday (maybe)
-    # Remove duplicates if necessary.
+    
     if type(grid_car) == list:
-        if type(grid_car[1]) == list:
+        if type(grid_car[0]) == list:
             grid_car = np.array(grid_car)
         else:
             grid_car = np.array([g.tolist() for g in grid_car])
     else:
-        if type(grid_car[1]) == list:
+        if type(grid_car[0]) == list:
             grid_car = np.array([g.tolist() for g in grid_car])
         else:
             pass
-            
         
-    # grid_car = np.array([g.tolist() for g in grid_car])
-    grid_lat = (np.round(np.dot(inv(lat_vecs), grid_car.T).T, eps)%1).tolist()
+    # Put the grid in lattice coordinates and move it into the first unit cell.
+    grid_lat = bring_into_cell(grid_car, rlat_vecs, atol=atol, rtol=rtol, coords="lat")
     
+    # Remove duplicates if necessary.    
     if duplicates:
         grid_copy = list(deepcopy(grid_lat))
         grid_lat = []
         while len(grid_copy) != 0:
             gp = grid_copy.pop()
-            if any([np.allclose(gp, gc) for gc in grid_copy]):
+            if any([np.allclose(gp, gc, rtol=rtol, atol=atol) for gc in grid_copy]):
                 continue
             else:
                 grid_lat.append(gp)
-
-
-    gp_orbitals = {}
-    nirr_kpts = 0
+    
+    gp_orbits = []
     grid_copy = list(deepcopy(grid_lat))
-    pointgroup = get_point_group(lat_vecs)
-    pointgroup = np.matmul(np.matmul(inv(lat_vecs), pointgroup), lat_vecs)
+    
+    if pointgroup is None:
+        pointgroup, translations = get_space_group(lat_vecs, atom_labels, atom_positions,
+                                                   coords=atom_coords, rtol=rtol,
+                                                   atol=atol, eps=eps)
+    else:
+        if pg_coords != "lat":
+            pointgroup = np.matmul(np.matmul(inv(lat_vecs), pointgroup), lat_vecs)
 
     while len(grid_copy) != 0:
-        # Grab a point and build its orbit but only include points from the grid.
         g = grid_copy.pop()
-        nirr_kpts += 1
-        gp_orbitals[nirr_kpts] = [g]
-        for pg in pointgroup:
-            # If the group operation moves the point outside the cell, mod moves
-            # it back in.
-            # I ran into floating point precision problems the last time I ran
-            # mod, rounding fixed these.
-            new_gps = [np.round(np.dot(pg, g), 15)%1, np.round(np.dot(pg, g), 15)]
-                  
-            # If the new grid point is in the grid, remove it and add it to the
-            # orbital of grid point (g).
-            for new_gp in new_gps:
-                if any([np.allclose(new_gp, gc) for gc in grid_copy]):
-                    ind = np.where(np.array([np.allclose(new_gp, gc)
-                                             for gc in grid_copy]))[0][0]
-                    gp_orbitals[nirr_kpts].append(new_gp)
-                    del grid_copy[ind]
-                else:
-                    continue
         
-    if coord == "cart":
-        for i in range(1, len(gp_orbitals.keys()) + 1):
-            for j in range(len(gp_orbitals[i])):
-                gp_orbitals[i][j] = np.dot(lat_vecs, gp_orbitals[i][j])
-        return gp_orbitals# , pointgroup
-    elif coord == "lat":
-        return gp_orbitals
-    else:
-        raise ValueError("Coordinate options are 'cell' and 'lat'.")
-
-def find_full_orbitals(grid_car, lat_vecs, coord = "cart", unitcell=False):
-    """ Find the complete orbitals of the points in a grid, including points
-    not contained in the grid.
-
-    Args:
-        grid_car (list): a list of grid point positions in cartesian coordinates.
-        lat_vecs (numpy.ndarray): the vectors that define the integration cell
-        coord (string): tell it to return the orbits in Cartesian ("cart",
-            default) or lattice ("lat") coordinates.
-        unitcell (string): return the points in the orbits in the first unit
-            cell when true.
-
-    Returns:
-        gp_orbitals (dict): the orbitals of the grid points in a dictionary. 
-            The keys of the dictionary are integer labels and the values are the
-            grid points in the orbital.
-    """
-
-    grid_car = np.array(grid_car)
-    grid_lat = (np.dot(inv(lat_vecs), grid_car.T).T).tolist()
-    gp_orbitals = {}
-    nirr_kpts = 0
-    grid_copy = deepcopy(grid_lat)
-    pointgroup = get_point_group(lat_vecs)
-
-    # To move an operator into lattice coordinates you have to take the product
-    # L^(-1) O L where L is the lattice vectors and O is the operator.
-    pointgroup = np.matmul(np.matmul(inv(lat_vecs), pointgroup), lat_vecs)
-    while grid_copy != []:
-        # Grap a point and build its orbit but only include points from the grid.
-        gp = grid_copy.pop()
-        nirr_kpts += 1
-        gp_orbitals[nirr_kpts] = []
+        # Start a new orbit.
+        gp_orbits.append([g])
+        
         for pg in pointgroup:
-            # If the group operation moves the point outside the cell, %1 moves
-            # it back in.
-            # I ran into floating point precision problems the last time I ran
-            # %1. Just to be safe it's included here.
-            # Move the k-point into the first unit cell is requested.
-            if unitcell:
-                new_gp = np.round(np.dot(pg, gp), 15)%1
-            else:
-                new_gp = np.round(np.dot(pg, gp), 15)
-                
-            if any([np.allclose(new_gp, gc) for gc in grid_copy]):
-                ind = np.where(np.array([np.allclose(new_gp, gc) for gc in grid_copy]) == True)[0][0]
-                del grid_copy[ind]
-                gp_orbitals[nirr_kpts].append(new_gp)
-            else:
-                gp_orbitals[nirr_kpts].append(new_gp)                
-                continue
+            
+            # Check both the k-point that is moved back into the unit cell and one that
+            # isn't.
+            new_grid_point = np.dot(pg, g)
+            new_grid_point_car = np.dot(rlat_vecs, new_grid_point)
+            new_grid_point_cell = bring_into_cell(new_grid_point, rlat_vecs, rtol=rtol,
+                                                  atol=atol, coords="lat")
+            new_gps = [new_grid_point_cell, new_grid_point]            
 
-    if coord == "cart":
-        for i in range(1, len(gp_orbitals.keys()) + 1):
-            for j in range(len(gp_orbitals[i])):
-                gp_orbitals[i][j] = np.dot(lat_vecs, gp_orbitals[i][j])
-        return gp_orbitals
-    elif coord == "lat":
-        return gp_orbitals
+            # Add all unique k-points traversed by the orbit regardless of them
+            # belonging to the k-point grid.
+            if complete_orbit:
+                if unit_cell:
+                    # Only include this point in the orbit if it is unique.
+                    if not check_contained(new_kps[0], gp_orbits[-1], rtol=rtol,
+                                           atol=atol):
+                        gp_orbits[-1].append(new_gps[0])
+                else:
+                    # Add points to the orbit without translating them back into the first
+                    # unit cell
+                    if not check_contained(new_kps[1], gp_orbits[-1], rtol=rtol,
+                                           atol=atol):
+                        gp_orbits[-1].append(new_gps[1])
+            else:                
+                # If the new grid point is in the grid, remove it and add it to the
+                # orbit of grid point (g).
+                for new_gp in new_gps:
+                    indices = find_point_indices(new_gp, grid_copy, rtol=rtol, atol=atol)
+                    if len(indices) > 1:
+                        msg = "There are duplicate points in the grid."
+                        raise ValueError(msg)
+                    elif len(indices) == 0:
+                        continue
+                    else:
+                        
+                        gp_orbits[-1].append(new_gp)
+                        del grid_copy[indices[0]]
+
+
+    orbit_wts = [len(orb) for orb in gp_orbits]
+
+    if kpt_coords == "Cart":
+        for i in range(len(gp_orbits)):
+            gp_orbits[i] = np.dot(rlat_vecs, np.array(gp_orbits[i]).T).T        
+        return gp_orbits, orbit_wts
+    
+    elif kpt_coords == "lat":
+        return gp_orbits, orbit_wts
     else:
-        raise ValueError("Coordinate options are 'cell' and 'lat'.")
+        raise ValueError("Coordinate options are 'Cart' and 'lat'.")
+
+# def find_full_orbitals(grid_car, lat_vecs, coord = "Cart", unitcell=False):
+#     """ Find the complete orbitals of the points in a grid, including points
+#     not contained in the grid.
+
+#     Args:
+#         grid_car (list): a list of grid point positions in cartesian coordinates.
+#         lat_vecs (numpy.ndarray): the vectors that define the integration cell
+#         coord (string): tell it to return the orbits in Cartesian ("cart",
+#             default) or lattice ("lat") coordinates.
+#         unitcell (string): return the points in the orbits in the first unit
+#             cell when true.
+
+#     Returns:
+#         gp_orbits (dict): the orbitals of the grid points in a dictionary. 
+#             The keys of the dictionary are integer labels and the values are the
+#             grid points in the orbital.
+#     """
+
+#     grid_car = np.array(grid_car)
+#     grid_lat = (np.dot(inv(lat_vecs), grid_car.T).T).tolist()
+#     gp_orbits = {}
+#     nirr_kpts = 0
+#     grid_copy = deepcopy(grid_lat)
+#     pointgroup = find_point_group(lat_vecs)
+
+#     # To move an operator into lattice coordinates you have to take the product
+#     # L^(-1) O L where L is the lattice vectors and O is the operator.
+#     pointgroup = np.matmul(np.matmul(inv(lat_vecs), pointgroup), lat_vecs)
+#     while grid_copy != []:
+#         # Grap a point and build its orbit but only include points from the grid.
+#         gp = grid_copy.pop()
+#         nirr_kpts += 1
+#         gp_orbits[nirr_kpts] = []
+#         for pg in pointgroup:
+#             # If the group operation moves the point outside the cell, %1 moves
+#             # it back in.
+#             # I ran into floating point precision problems the last time I ran
+#             # %1. Just to be safe it's included here.
+#             # Move the k-point into the first unit cell is requested.
+#             if unitcell:
+#                 new_gp = np.round(np.dot(pg, gp), 15)%1
+#             else:
+#                 new_gp = np.round(np.dot(pg, gp), 15)
+                
+#             if any([np.allclose(new_gp, gc) for gc in grid_copy]):
+#                 ind = np.where(np.array([np.allclose(new_gp, gc) for gc in grid_copy]) == True)[0][0]
+#                 del grid_copy[ind]
+#                 gp_orbits[nirr_kpts].append(new_gp)
+#             else:
+#                 gp_orbits[nirr_kpts].append(new_gp)                
+#                 continue
+
+#     if coord == "cart":
+#         for i in range(1, len(gp_orbits.keys()) + 1):
+#             for j in range(len(gp_orbits[i])):
+#                 gp_orbits[i][j] = np.dot(lat_vecs, gp_orbits[i][j])
+#         return gp_orbits
+#     elif coord == "lat":
+#         return gp_orbits
+#     else:
+#         raise ValueError("Coordinate options are 'cell' and 'lat'.")
 
 def find_lattice_type(centering_type, lattice_constants, lattice_angles):
     """Find the Bravais lattice type of the lattice.
@@ -1844,9 +1925,11 @@ def HermiteNormalForm(S, eps=10):
     # Keep doing column operations until all elements in the first row are zero
     # except for the one on the diagonal.
     while np.count_nonzero(H[0,:]) > 1:
+        
         # Divide the column with the smallest value into the largest.
         minidx, maxidx = get_minmax_indices(H[0,:])
         minm = H[0,minidx]
+        
         # Subtract a multiple of the column containing the smallest element from
         # the column containing the largest element.
         multiple = int(H[0, maxidx]/minm)
@@ -1864,6 +1947,7 @@ def HermiteNormalForm(S, eps=10):
         raise ValueError("Didn't zero out the rest of the row.")
     if np.allclose(np.dot(S, B), H) == False:
         raise ValueError("COLSWAP: Transformation matrices didn't work.")
+    
     # Now work on element H[1,2].
     while H[1,2] != 0:
         if H[1,1] == 0:
@@ -1875,7 +1959,8 @@ def HermiteNormalForm(S, eps=10):
             B[:,1] = B[:,2]
             B[:,2] = tempcol
             if H[1,2] == 0:
-                break            
+                break
+            
         if np.abs(H[1,2]) < np.abs(H[1,1]):
             maxidx = 1
             minidx = 2
@@ -1894,19 +1979,26 @@ def HermiteNormalForm(S, eps=10):
         tempcol = deepcopy(H[:,1])
         H[:,1] = H[:,2]
         H[:,2] = tempcol
+        
     if H[1,1] < 0: # change signs
         H[:,1] = -H[:,1]
         B[:,1] = -B[:,1]
+        
     if H[1,2] != 0:
         raise ValueError("Didn't zero out last element.")
+    
     if np.allclose(np.dot(S,B), H) == False:
         raise ValueError("COLSWAP: Transformation matrices didn't work.")
+    
     if H[2,2] < 0: # change signs
         H[:,2] = -H[:,2]
         B[:,2] = -B[:,2]
+        
     check1 = (np.array([0,0,1]), np.array([1,2,2]))
+    
     if np.count_nonzero(H[check1]) != 0:
         raise ValueError("Not lower triangular")
+    
     if np.allclose(np.dot(S, B), H) == False:
         raise ValueError("End Part1: Transformation matrices didn't work.")
     
@@ -1918,27 +2010,34 @@ def HermiteNormalForm(S, eps=10):
             multiple = 1
         else:
             multiple = -1
+            
         H[:,0] = H[:,0] - multiple*H[:,1]
         B[:,0] = B[:,0] - multiple*B[:,1]
+        
     for j in [0,1]:
         while H[2,2] <= H[2,j] or H[2,j] < 0:
+            
             if H[2,2] <= H[2,j]:
                 multiple = 1
             else:
                 multiple = -1
+                
             H[:,j] = H[:,j] - multiple*H[:,2]
             B[:,j] = B[:,j] - multiple*B[:,2]
 
     if np.allclose(np.dot(S, B), H) == False:
         raise ValueError("End Part1: Transformation matrices didn't work.")
+    
     if np.count_nonzero(H[check1]) != 0:
         raise ValueError("Not lower triangular")
+    
     check2 = (np.asarray([0, 1, 1, 2, 2, 2]), np.asarray([0, 0, 1, 0, 1, 2]))
     if any(H[check2] < 0) == True:
         raise ValueError("Negative elements in lower triangle.")
 
     if H[1,0] > H[1,1] or H[2,0] > H[2,2] or H[2,1] > H[2,2]:
         raise ValueError("Lower triangular elements bigger than diagonal.")
+    
     H = np.round(H, eps).astype(int)
     return H, B
 
@@ -2057,7 +2156,7 @@ def UpperHermiteNormalForm(S):
     return H, B
 
 
-def find_kpt_index(kpt, invK, L, D, eps=9):
+def find_kpt_index(kpt, invK, L, D, eps=4):
     """This function takes a k-point in Cartesian coordinates and "hashes" it 
     into a single number, corresponding to its place in the k-point list.
 
@@ -2067,27 +2166,65 @@ def find_kpt_index(kpt, invK, L, D, eps=9):
         vectors
     L (list or numpy.ndarray): the left transform for the SNF conversion
     D (list or numpy.ndarray): the diagonal of the SNF
-    eps (float): a finite-precision parameter
+    eps (float): a finite-precision parameter that corresponds to the decimal
+        rounded when converting k-points from Cartesian to grid coordinates.
 
     Returns:
+        _ (int): the unique index of the k-point in the first unit cell
     """
 
-    gpt = np.dot(invK, kpt)
-    gpt = np.dot(L, np.round(gpt).astype(int))%D
+    # Put the k-point in grid coordinates.
+    gpt = np.round(np.dot(invK, kpt), eps)
     
-    # Convert from group coordinates to a singe base-10 number between 1 and
+    gpt = np.dot(L, gpt).astype(int)%D
+        
+    # Convert from group coordinates to a single, base-10 number between 1 and
     # the number of k-points in the unreduced grid.
+    # return gpt[0]*D[1]*D[2] + gpt[1]*D[2] + gpt[2]
     return gpt[0]*D[1]*D[2] + gpt[1]*D[2] + gpt[2]
 
+def bring_into_cell(points, rlat_vecs, rtol=1e-5, atol=1e-8, coords="Cart",
+                    centered=False):
+    """Bring a point or list of points into the first unit cell.
 
-def bring_into_cell(kpt, lat_vecs, eps=10):
-    """Bring a k-point into the first unit cell.
-    """    
-    k = np.round(np.dot(inv(lat_vecs), kpt), eps)%1
-    return np.dot(lat_vecs, k)
+    Args:
+        point (list or numpy.ndarray): a point or list of points in three space in
+            Cartesian coordinates.
+        rlat_vecs (numpy.ndarray): the lattice generating vectors as columns of a 3x3
+            array.
 
+    Returns:
+        _ (numpy.ndarray): a point or list of points in three space inside the first
+            unit cell in Cartesian (default) or lattice coordinates.
+    """
+
+    # Convert to lattice coordinates and move points into the first unit cell.
+    points = np.array(points)
+    lat_points = np.dot(inv(rlat_vecs), points.T).T%1
+    
+    # Special care has to be taken for points near 1.
+    lat_points[np.isclose(lat_points, 1, rtol=rtol, atol=atol)] = 0
+
+    # Shift points again if the unit cell is centered at the origin.
+    if centered:
+        lat_points[lat_points > 0.5] = lat_points[lat_points > 0.5] - 1
+
+        # Special care has to be taken for points near 1/2.
+        lat_points[np.isclose(lat_points, 0.5, rtol=rtol, atol=atol)] = -0.5
+
+    
+    # Convert back to Cartesian coordinates.
+    if coords == "Cart":
+        return np.dot(rlat_vecs, lat_points.T).T
+    elif coords == "lat":
+        return lat_points
+    else:
+        msg = "Coordinate options include 'Cart' and 'lat'."
+        raise ValueError(msg)
+
+    
 def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
-                       eps=9):
+                       eps=9, rtol=1e-5, atol=1e-8):
     """Use the point group symmetry of the lattice vectors to reduce a list of
     k-points.
     
@@ -2101,6 +2238,7 @@ def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
             Cartesian coordinates.
         shift (list or numpy.ndarray): the offset of the k-point grid in grid
             coordinates.
+        
 
     Returns:
         reduced_kpoints (list): an ordered list of irreducible k-points
@@ -2127,21 +2265,16 @@ def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
     # Put the shift in Cartesian coordinates.
     shift = np.dot(grid_vectors, shift)
 
-    # Integer matrix
-    N = np.dot(inv(grid_vectors), lattice_vectors)
-    # Check that N is an integer matrix. In other words, verify that the grid
-    # and lattice are commensurate.
-    for i in range(len(N[:,0])):
-        for j in range(len(N[0,:])):
-            if np.isclose(N[i,j]%1, 0) or np.isclose(N[i,j]%1, 1):
-                N[i,j] = int(np.round(N[i,j]))
-            else:
-                msg = "The lattice and grid vectors are incommensurate."
-                raise ValueError(msg.format(grid_vectors))
-
+    # Check that the lattice and grid vectors are commensurate.
+    check, N = check_commensurate(grid_vectors, lattice_vectors, rtol=rtol, atol=atol)
+    if not check:
+        msg = "The lattice and grid vectors are incommensurate."
+        raise ValueError(msg.format(grid_vectors))
+        
     # Find the HNF of N. B is the transformation matrix (BN = H).
     H,B = HermiteNormalForm(N)
     H = [list(H[i]) for i in range(3)]
+    
     # Find the SNF of H. L and R are the left and right transformation matrices
     # (LHR = S).
     S,L,R = SmithNormalForm(H)
@@ -2150,7 +2283,7 @@ def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
     D = np.round(np.diag(S), eps).astype(int)
     
     cOrbit = 0 # unique orbit counter
-    pointgroup = get_point_group(lattice_vectors) # a list of point group operators
+    pointgroup = find_point_group(lattice_vectors) # a list of point group operators
     nSymOps = len(pointgroup) # the number of symmetry operations
     nUR = len(kpoint_list) # the number of unreduced k-points
     
@@ -2170,6 +2303,7 @@ def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
     for i in range(nUR):
         ur_kpt = kpoint_list[i]
         idx = find_kpt_index(ur_kpt - shift, invK, L, D, eps)
+        
         if hashtable[idx] != None:
             continue
         cOrbit += 1        
@@ -2184,45 +2318,80 @@ def reduce_kpoint_list(kpoint_list, lattice_vectors, grid_vectors, shift,
             if not np.allclose(np.dot(invK, rot_kpt-shift),
                                np.round(np.dot(invK, rot_kpt-shift))):
                 continue
-            idx = find_kpt_index(rot_kpt - shift, invK, L, D, eps)
+            
+            idx = find_kpt_index(rot_kpt - shift, invK, L, D, eps)            
             if hashtable[idx] == None:
                 hashtable[idx] = cOrbit
                 iWt[cOrbit] += 1
     sum = 0
-    kpoint_weights = list(iWt.values())[:cOrbit]
-    reduced_kpoints = [[0,0,0] for _ in range(cOrbit)]
+    kpoint_weights = list(iWt.values())
+    reduced_kpoints = []
     for i in range(cOrbit):
         sum += kpoint_weights[i]
-        reduced_kpoints[i] = kpoint_list[iFirst[i+1]]
-
+        reduced_kpoints.append(kpoint_list[iFirst[i+1]])
+    
+    if sum != nUR:
+        msg = "There are more or less k-points after the symmetry reduction."
+        raise ValueError(msg)
+    
     return reduced_kpoints, kpoint_weights
 
 
-def find_orbits(kpoint_list, rlattice_vectors, grid_vectors, shift,
-                eps=9):
+def find_orbits(kpoint_list, lattice_vectors, rlattice_vectors, grid_vectors, shift,
+                atom_labels, atom_positions, full_orbit=False, kpt_coords="cart",
+                atom_coords="lat", eps=1e-10, rounding_eps=4, rtol=1e-4, atol=1e-6):
     """Use the point group symmetry of the lattice vectors to reduce a list of
     k-points.
     
     Args:
         kpoint_list (list or numpy.ndarray): a list of k-point positions in
             Cartesian coordinates.
+        lattice_vectors (list or numpy.ndarray): the vectors that generate the
+            lattice in a 3x3 array with the vectors as columns in Cartesian coordinates.
         rlattice_vectors (list or numpy.ndarray): the vectors that generate the
-            reciprocal lattice in a 3x3 array with the vectors as columns.
+            reciprocal lattice in a 3x3 array with the vectors as columns in Cartesian 
+            coordinates.
         grid_vectors (list or numpy.ndarray): the vectors that generate the
             k-point grid in a 3x3 array with the vectors as columns in 
             Cartesian coordinates.
         shift (list or numpy.ndarray): the offset of the k-point grid in grid
             coordinates.
+        atom_labels (list): a list of atoms labels. Each label should be distince for each
+            atomic species. The labels must start at zero and should be in the same order 
+            as atomic basis.
+        atom_positions (list or numpy.ndarray): a list of atomic positions in Cartesian 
+            (default) or lattice coordinates.
+        full_orbit (bool): if true, return the orbits with the list of k-points from
+            `kpoint_list`.
+        kpt_coords (str): a string that indicates coordinate system of the returned
+            k-points. It can be in Cartesian ("cart") or lattice ("lat").
+        atom_coords (str): a string that indicates coordinate system of the atom positions
+            It can be in Cartesian ("cart") or lattice ("lat").
+        eps (float): a finite precision parameter that is added to the norms of points in
+            `search_sphere`.
+        rounding_eps (int): a finite precision parameter that determines the number of
+            decimals kept when rounding.
+        rtol (float): a relative tolerance used when finding if two k-points are 
+            equivalent.
+        atol (float): an absolute tolerance used when finding if two k-points are 
+            equivalent.
 
     Returns:
-        reduced_kpoints (list): an ordered list of irreducible k-points
-        kpoint_weights (list): an ordered list of irreducible k-point weights.
+        reduced_kpoints (list): an ordered list of irreducible k-points. If full_orbit
+            is True, return `orbits_list`, a list of all k-points in each orbit.
+        orbit_weights (list): an ordered list of the number of k-points in each orbit.
     """
+
+    try:
+        inv(lattice_vectors)
+    except np.linalg.linalg.LinAlgError:
+        msg = "The lattice generating vectors are linearly dependent."
+        raise ValueError(msg.format(lattice_vectors))
     
     try:
         inv(rlattice_vectors)
     except np.linalg.linalg.LinAlgError:
-        msg = "The lattice generating vectors are linearly dependent."
+        msg = "The reciprocal lattice generating vectors are linearly dependent."
         raise ValueError(msg.format(rlattice_vectors))
     
     try:
@@ -2231,45 +2400,50 @@ def find_orbits(kpoint_list, rlattice_vectors, grid_vectors, shift,
         msg = "The grid generating vectors are linearly dependent."
         raise ValueError(msg.format(rlattice_vectors))
         
-    if abs(det(rlattice_vectors)) < abs(det(grid_vectors)):
+    if abs(det(rlattice_vectors) + atol) < abs(det(grid_vectors)):
         msg = """The k-point generating vectors define a grid with a unit cell 
         larger than the reciprocal lattice unit cell."""
         raise ValueError(msg.format(grid_vectors))
-
+    
     # Put the shift in Cartesian coordinates.
     shift = np.dot(grid_vectors, shift)
-
-    # Integer matrix
-    N = np.dot(inv(grid_vectors), rlattice_vectors)
-    # Check that N is an integer matrix. In other words, verify that the grid
-    # and lattice are commensurate.
-    for i in range(len(N[:,0])):
-        for j in range(len(N[0,:])):
-            if np.isclose(N[i,j]%1, 0) or np.isclose(N[i,j]%1, 1):
-                N[i,j] = int(np.round(N[i,j]))
-            else:
-                msg = "The lattice and grid vectors are incommensurate."
-                raise ValueError(msg.format(grid_vectors))
-
+    
+    # Verify the grid and lattice are commensurate.
+    check, N = check_commensurate(grid_vectors, rlattice_vectors, rtol=rtol, atol=atol)
+    if not check:
+        msg = "The lattice and grid vectors are incommensurate."
+        raise ValueError(msg.format(grid_vectors))
+    
     # Find the HNF of N. B is the transformation matrix (BN = H).
     H,B = HermiteNormalForm(N)
     H = [list(H[i]) for i in range(3)]
+    
     # Find the SNF of H. L and R are the left and right transformation matrices
     # (LHR = S).
     S,L,R = SmithNormalForm(H)
 
     # Get the diagonal of SNF.
-    D = np.round(np.diag(S), eps).astype(int)
-    
-    cOrbit = 0 # unique orbit counter
-    pointgroup = get_point_group(rlattice_vectors) # a list of point group operators
-    nSymOps = len(pointgroup) # the number of symmetry operations
-    nUR = len(kpoint_list) # the number of unreduced k-points
-    # A dictionary to keep track of the number of symmetrically-equivalent
-    # k-points. It goes from the k-point index in the grid to the label of that
-    # k-point's orbit.
-    hashtable = dict.fromkeys(range(nUR))
+    D = np.round(np.diag(S), rounding_eps).astype(int)
 
+    # Unique orbit counter
+    cOrbit = 0
+
+    # A list of point group operators
+    pointgroup, translations = get_space_group(lattice_vectors, atom_labels,
+                                               atom_positions, coords=atom_coords,
+                                               rtol=rtol, atol=atol, eps=eps)
+    
+    # The number of symmetry operations
+    nSymOps = len(pointgroup)
+    
+    # The number of unreduced k-points
+    nUR = len(kpoint_list)
+    
+    # A dictionary to keep track of the number of symmetrically-equivalent
+    # k-points. It goes from the k-point index (the one not associated with the k-point's
+    # position in `kpoint_list`) to the label of that k-point's orbit.
+    hashtable = dict.fromkeys(range(nUR))
+    
     # A dictionary to keep track of the k-points that represent each orbital.
     # It goes from orbit label to the index of the k-point that represents
     # the orbit.
@@ -2278,54 +2452,179 @@ def find_orbits(kpoint_list, rlattice_vectors, grid_vectors, shift,
     # A dictionary to keep track of the number of symmetrically-equivalent
     # k-points in each orbit.
     iWt = {}
+
+    # A dictionary for converting between k-point indices. The keys are the k-point
+    # indices associated with the k-point's components. The values are the k-point
+    # indices associated with the k-point's location in `kpoint_list`.
+    kpt_index_conv = {}
+    
     invK = inv(grid_vectors)
 
     # Loop over unreduced k-points.
     for i in range(nUR):
+        
+        # Grab an unreduced k-point.
         ur_kpt = kpoint_list[i]
-        idx = find_kpt_index(ur_kpt - shift, invK, L, D, eps)
-        if hashtable[idx] != None:
+        
+        # Find the unreduced k-point's index.
+        kpt_hash = find_kpt_index(ur_kpt - shift, invK, L, D, rounding_eps)
+
+        kpt_index_conv[kpt_hash] = i
+        
+        # If it has already been looked at because it was part of the orbit of a
+        # previous k-point, skip it.
+        if hashtable[kpt_hash] != None:
             continue
+        
+        # If this k-point hasn't already been looked at, increment the orbit counter.
         cOrbit += 1
-        hashtable[idx] = cOrbit
+        
+        # Add this k-point to the hashtable.
+        hashtable[kpt_hash] = cOrbit
+        
+        # Make it the representative k-point for this orbit.
         iFirst[cOrbit] = i
+        
+        # Initialize the weight of this orbit.
         iWt[cOrbit] = 1
+        
+        # Loop through the point group operators.
         for pg in pointgroup:
+            
             # Rotate the k-point.
             rot_kpt = np.dot(pg, ur_kpt)
+            
             # Bring it back into the first unit cell.
             rot_kpt = bring_into_cell(rot_kpt, rlattice_vectors)
+            
+            # Verify that this point is part of the grid. If not, discard it.
             if not np.allclose(np.dot(invK, rot_kpt-shift),
-                               np.round(np.dot(invK, rot_kpt-shift))):
+                               np.round(np.dot(invK, rot_kpt-shift)), rtol=rtol):
                 continue
-            idx = find_kpt_index(rot_kpt - shift, invK, L, D, eps)
-            if hashtable[idx] == None:
-                hashtable[idx] = cOrbit
+
+            # Find the index of the rotated k-point.
+            kpt_hash = find_kpt_index(rot_kpt - shift, invK, L, D, rounding_eps)
+
+            # If this k-point hasn't been hit during the traversal of the orbit,
+            # add the rotated k-point to this orbit and increment the orbit's weight.
+            if hashtable[kpt_hash] == None:
+                hashtable[kpt_hash] = cOrbit
                 iWt[cOrbit] += 1
-
-    hashtable = dict((k, v) for k, v in hashtable.items() if v)
-
-    kpoint_list = np.array(kpoint_list)
-    reduced_kpoints = kpoint_list[list(iFirst.values())]
-    return reduced_kpoints, iWt.values()
-    # return hashtable, iFirst
     
+    # Remove empty entries from hashtable.
+    hashtable = dict((k, v) for k, v in hashtable.items() if v)
+    
+    # Find the reduced k-points from the indices of the representative k-points in
+    # iFirst.
+    kpoint_list = np.array(kpoint_list)
 
-def minkowski_reduce_basis(basis, eps):
-    """Find the Minkowski representation of a basis.
+    # test_indices = [kpt_index_conv[i] for i in list(iFirst.values())]    
+    
+    # reduced_kpoints = kpoint_list[test_indices]
+    reduced_kpoints = kpoint_list[list(iFirst.values())]
+
+    orbit_weights = list(iWt.values())
+
+    if full_orbit:
+        # A nested list that will eventually contain the k-points in each orbit.
+        orbit_list = [[] for _ in range(max(list(hashtable.values())))]
+
+        kpoint_index_list = list(hashtable.keys())
+
+        # Put the index of the k-points in orbit_list.
+        for kpt_i in kpoint_index_list:
+            orbit_list[hashtable[kpt_i]-1].append(kpt_i)
+
+        # Replace the indices by the actual k-points.
+        for i,orbit in enumerate(orbit_list):
+            for j,kpt_index in enumerate(orbit):
+                
+                kpt = kpoint_list[kpt_index_conv[kpt_index]]
+                
+                # Put points in lattice coordinates if option provided.
+                if kpt_coords == "lat":
+                    kpt = np.dot(inv(rlattice_vectors), kpt)
+                orbit_list[i][j] = kpt
+
+        return orbit_list, orbit_weights
+    else:
+        if kpt_coords == "lat":
+            reduced_kpoints = np.dot(inv(rlattice_vectors), reduced_kpoints.T).T
+        return reduced_kpoints, orbit_weights
+
+
+# def minkowski_reduce_basis(basis, eps):
+#     """Find the Minkowski representation of a basis.
+
+#     Args:
+#         basis(numpy.ndarray): a matrix with the generating vectors as columns.
+#         eps (int): a finite precision parameter in 10**(-eps).
+#     """
+
+#     if type(eps) != int:
+#         msg = ("eps must be an integer, cooresponds to 10**-eps")
+#         raise ValueError(msg.format(eps))
+
+#     return _minkowski_reduce_basis(basis.T, 10**(-eps)).T
+
+
+def just_map_to_bz(grid, rlattice_vectors, coords="Cart", rtol=1e-4, atol=1e-6, eps=1e-10):
+    """Map a grid into the first Brillouin zone in the Minkowski basis.
 
     Args:
-        basis(numpy.ndarray): a matrix with the generating vectors as columns.
-        eps (int): a finite precision parameter in 10**(-eps).
+        grid (list): a list of k-points in Cartesian coordinates.
+        rlattice_vectors (numpy.ndarray): a matrix whose columes are the
+            reciprocal lattice generating vectors.
+        coords (string): the coordinates of the returned k-points. Options include
+            "Cart" for Cartesian and "lat" for lattice.
+        eps (int): finite precision parameter that determines decimal rounded.
+
+    Returns:
+        reduced_grid (numpy.ndarray): a numpy array of grid points in the first 
+            Brillouin zone in Minkowski space.
+        weights (numpy.ndarray): the k-point weights
     """
 
-    if type(eps) != int:
-        msg = ("eps must be an integer, cooresponds to 10**-eps")
-        raise ValueError(msg.format(eps))
+    # Find the Minkowski basis.
+    mink_basis = minkowski_reduce_basis(rlattice_vectors, rtol=rtol, atol=atol, eps=eps)
 
-    return _minkowski_reduce_basis(basis.T, 10**(-eps)).T
+    # Initialize the grid that will be mapped to the BZ.
+    new_grid = []
 
-def map_to_bz(grid, rlattice_vectors, grid_vectors, shift, eps=15):
+    # Loop over all points in the grid.
+    for i, pt in enumerate(grid):
+
+        # Move each point into the first unit cell.
+        pt = bring_into_cell(pt, mink_basis, rtol=rtol, atol=atol)
+
+        # Put the point in lattice coordinates.
+        pt_lat = np.dot(inv(rlattice_vectors), pt)
+
+        # Find the translationally equivalent points in the eight unit cells that
+        # share a vertex at the origin in lattice coordinates.
+        pts_lat = np.array([pt_lat + shift for shift in product([-1,0], repeat=3)])
+
+        # Put the translationally equivalent points in Cartesian coordinates.
+        pts = np.dot(rlattice_vectors, pts_lat.T).T
+        
+        # Keep the point that is the closest to the origin.
+        new_grid.append(pts[np.argmin(norm(pts, axis=1))])
+
+    new_grid = np.array(new_grid)
+    if coords == "lat":
+        new_grid = np.dot(inv(rlattice_vectors), new_grid.T).T
+        return new_grid
+    
+    elif coords == "Cart":
+        return new_grid
+    
+    else:
+        msg = "Coordinate options include 'Cart' and 'lat'."
+        raise ValueError(msg)
+
+
+def map_to_bz(grid, lattice_vectors, rlattice_vectors, grid_vectors, shift, atom_labels,
+              atom_positions, rtol=1e-5, atol=1e-8, eps=1e-10):
     """Map a grid into the first Brillouin zone in Minkowski space.
     
     Args:
@@ -2338,7 +2637,7 @@ def map_to_bz(grid, rlattice_vectors, grid_vectors, shift, eps=15):
         eps (int): finite precision parameter that is the integer exponent in
             10**(-eps).
     Returns:
-        mgrid (numpy.ndarray): a numpy array of grid points in the first 
+        reduced_grid (numpy.ndarray): a numpy array of grid points in the first 
             Brillouin zone in Minkowski space.
         weights (numpy.ndarray): the k-point weights
     """
@@ -2346,11 +2645,14 @@ def map_to_bz(grid, rlattice_vectors, grid_vectors, shift, eps=15):
     # Reduce the grid and move into the unit cell.
     # reduced_grid, weights = reduce_kpoint_list(grid, rlattice_vectors, grid_vectors,
     #                                   shift, eps)
-    reduced_grid, weights = find_orbits(grid, rlattice_vectors, grid_vectors, shift)
+
+    # Uncomment this when symmetry reduction is fixed.
+    reduced_grid, weights = find_orbits(grid, lattice_vectors, rlattice_vectors,
+                                        grid_vectors, shift, atom_labels, atom_positions)
     reduced_grid = np.array(reduced_grid)
     
     # Find the Minkowski basis.
-    mink_basis = minkowski_reduce_basis(rlattice_vectors, eps)
+    mink_basis = minkowski_reduce_basis(rlattice_vectors, rtol=rtol, atol=atol, eps=eps)
     
     reduced_grid_copy = deepcopy(reduced_grid)
     for i, pt1 in enumerate(reduced_grid_copy):
@@ -2360,7 +2662,7 @@ def map_to_bz(grid, rlattice_vectors, grid_vectors, shift, eps=15):
         for n in product([-1,0], repeat=3):
             pt2 = pt1 + np.dot(mink_basis, n)
             norm_pt2 = np.dot(pt2, pt2)
-            if (norm_pt2 + 10**(-eps)) < norm_pt1:
+            if (norm_pt2 + eps) < norm_pt1:
                 norm_pt1 = norm_pt2
                 reduced_grid[i] = pt2
 
@@ -2390,12 +2692,13 @@ def number_of_point_operators(lattice_type):
         raise ValueError(msg.format(lattice_type))
 
 
-def search_sphere(lat_vecs, eps=1e-12):
+def search_sphere(lat_vecs, eps=1e-9):
     """Find all the lattice points within a sphere whose radius is the same
     as the length of the longest lattice vector.
     
     Args:
         lat_vecs (numpy.ndarray): the lattice vectors as columns of a 3x3 array.
+        eps (float): finite precision tolerance used when comparing norms of points.
         
     Returns:
         sphere_points (numpy.ndarray): a 1D array of points within the sphere.
@@ -2433,40 +2736,535 @@ def search_sphere(lat_vecs, eps=1e-12):
     return np.array(sphere_pts)
 
 
-def get_point_group(lat_vecs):
+def get_point_group(lat_vecs, rtol = 1e-4, atol=1e-6, eps=1e-9):
     """Get the point group of a lattice.
 
     Args:
         lat_vecs (numpy.ndarray): a 3x3 array with the lattice vectors as columns.
+        rtol (float): relative tolerance for floating point comparisons.
+        atol (float): absolute tolerance for floating point comparisions.
+        eps (float): finite precision parameter for identifying points within a sphere.
 
     Returns:
         point_group (numpy.ndarray): a list of rotations, reflections and improper
             rotations.
     """
     
-    eps = 1e-10
-    pts = search_sphere(lat_vecs)
+
+    pts = search_sphere(lat_vecs, eps)
     a1 = lat_vecs[:,0]
     a2 = lat_vecs[:,1]
     a3 = lat_vecs[:,2]
 
     inv_lat_vecs = inv(lat_vecs)
     point_group = []
+    i = 0
     for p1,p2,p3 in it.permutations(pts, 3):
         # In a unitary transformation, the length of the vectors will be
         # preserved.
-        if (np.isclose(np.dot(p1,p1), np.dot(a1,a1)) and
-            np.isclose(np.dot(p2,p2), np.dot(a2,a2)) and
-            np.isclose(np.dot(p3,p3), np.dot(a3,a3))):
+        if (np.isclose(np.dot(p1,p1), np.dot(a1,a1), rtol=rtol, atol=atol) and
+            np.isclose(np.dot(p2,p2), np.dot(a2,a2), rtol=rtol, atol=atol) and
+            np.isclose(np.dot(p3,p3), np.dot(a3,a3), rtol=rtol, atol=atol)):
+            
             new_lat_vecs = np.transpose([p1,p2,p3])
+            
             # The volume of a parallelepiped given by the new basis should
             # be the same.
-            if np.isclose(abs(det(new_lat_vecs)), abs(det(lat_vecs))):
+            if np.isclose(abs(det(new_lat_vecs)), abs(det(lat_vecs)), rtol=rtol,
+                          atol=atol):
+                
                 op = np.dot(new_lat_vecs, inv_lat_vecs)
+                
                 # Check that the rotation, reflection, or improper rotation 
                 # is an orthogonal matrix.
-                if np.allclose(np.eye(3), np.dot(op, op.T)):
+                if np.allclose(np.eye(3), np.dot(op, op.T), rtol=rtol, atol=atol):
+                    
                     # Make sure this operator is unique.
-                    if not check_contained(op, point_group):
+                    if not check_contained([op], point_group, rtol=rtol, atol=atol):
                         point_group.append(op)
     return point_group
+
+
+def get_space_group(lattice_vectors, atom_labels, atom_positions, coords="lat",
+                    rtol=1e-4, atol=1e-6, eps=1e-10):
+    """Get the space group (point group and fractional translations) of a crystal.
+    
+    Args:
+        lattice_vectors (list or numpy.ndarray): the lattice vectors, in Cartesian
+            coordinates, as columns of a 3x3 array.
+        atom_labels (list): a list of atom labels. Each label should be distince for each
+            atomic species. The labels can be of type string or integer but must be in the
+            same order as atomic_basis.
+        atom_positions (list or numpy.ndarray): a list of atom positions in Cartesian
+            (default) or lattice coordinates.
+        coords (bool): specifies the coordinate system of the atomic basis. Anything other
+            than "lat", for lattice coordinates, will default to Cartesian.
+        rtol (float): relative tolerance for finding point group.
+        atol (float): absolute tolerance for finding point group.
+        eps (float): finite precision parameter used when finding points within a sphere.
+
+    Returns:
+        point_group (list): a list of point group operations.
+        translations (list): a list of translations.
+    """
+    
+    
+    def check_atom_equivalency(atom_label_i, atom_position_i, atom_labels, atom_positions):
+        """Check if an atom is equivalent to another atom in a list of atoms. Two atoms
+        are equivalent if they have the same label and are located at the same position.
+        
+        Args:
+            atom_label_i (int): the label of the atom being compared.
+            atom_position_i (list or numpy.ndarray): the position of the atom being
+                compared in 3-space.
+            atom_labels (list or numpy.ndarray): a list of atom labels.
+            atom_positions (list or numpy.ndarray): a list of atom positions in 3-space.
+        
+        Returns:
+            _ (bool): return `True` if the atom is equivalent to an atom in the list of
+                atoms.
+        """
+
+        # Check to see if this atom that was rotated, translated, and brought
+        # into the unit cell is equivalent to one of the other atoms in the atomic
+        # basis.
+
+        # Find the location of the atom 
+        label_index = find_point_indices([atom_label_i], atom_labels)
+        position_index = find_point_indices(atom_position_i, atom_positions)
+
+        if check_contained(position_index, label_index):    
+            return True
+        else:
+            return False
+                          
+    # Initialize the point group and fractional translations subgroup.
+    point_group = []
+    translations = []
+
+    atomic_basis = deepcopy(np.array(atom_positions))
+
+    # Put atomic positions in Cartesian coordinates if necessary.
+    if coords == "lat":
+        atomic_basis = np.dot(lattice_vectors, atomic_basis.T).T
+
+    # Bring the atom's positions into the first unit cell.
+    atomic_basis = np.array([bring_into_cell(ab, lattice_vectors, rtol=rtol, atol=atol)
+                             for ab in atomic_basis])
+
+    # Get the point group of the lattice.
+    lattice_pointgroup = get_point_group(lattice_vectors, rtol=rtol, atol=atol, eps=eps)
+    
+    # The possible translations are between atoms of the same type. The translations
+    # between atoms of *one* type will be, in every case, a *superset* of all translations
+    # that may be in the spacegroup. We'll generate this superset of translations and keep
+    # only those that are valid for all atom types.
+    
+    # Grab the type and position of the first atom.
+    first_atom_type = atom_labels[0]
+    first_atom_pos = atomic_basis[0]
+    
+    # Loop through the point group operators of the parent lattice.
+    for lpg in lattice_pointgroup:
+        
+        # Rotate the first atom.
+        rot_first_atom_pos = np.dot(lpg, first_atom_pos)
+        
+        # Loop over all the atoms.
+        for atom_type_i,atom_pos_i in zip(atom_labels, atomic_basis):
+            
+            # If the atoms are diffent types, move on to the next atom.
+            if first_atom_type != atom_type_i:
+                continue
+            
+            # Calculate the vector that points from the first atom's rotated position to
+            # this atom's position and then move it into the first unit cell. This is one
+            # of the translations in the superset of fractional translations for the first
+            # atom type.
+            frac_trans = bring_into_cell(atom_pos_i - rot_first_atom_pos, lattice_vectors,
+                                         rtol=rtol, atol=atol)
+
+            # Verify that this rotation and fractional translation map each atom onto
+            # another atom of its the same type.
+            for atom_type_j,atom_pos_j in zip(atom_labels, atomic_basis):
+                
+                # Rotate, translate, and then bring this atom into the unit cell in the
+                # first unit cell.
+                rot_atom_pos_j = bring_into_cell(np.dot(lpg, atom_pos_j) + frac_trans,
+                                                 lattice_vectors, rtol=rtol, atol=atol)
+                
+                # Check to see if this atom that was rotated, translated, and brought
+                # into the unit cell is equivalent to one of the other atoms in the atomic
+                # basis.
+                equivalent = check_atom_equivalency(atom_type_j, rot_atom_pos_j,
+                                                    atom_labels, atomic_basis)
+                                        
+                # If this atom isn't equivalent to one of the others, it isn't a valid
+                # rotation + translation.
+                if not equivalent:
+                    break
+                
+            # If all the atoms get mapped onto atoms of their same type, add this
+            # translation and rotation to the space group.
+            # print(equivalent)            
+            if equivalent:
+                point_group.append(lpg)
+                translations.append(frac_trans)
+                
+    return point_group, translations
+
+def equivalent_orbits(orbits_list0, orbits_list1, rtol=1e-4, atol=1e-6):
+    """Check that two orbits are equivalent.
+
+    Args:
+        orbit_list0 (list or numpy.ndarray): a list of k-points in orbits.
+        orbit_list1 (list or numpy.ndarray): a list of k-points in orbits.
+        rtol (float): the relative tolerance
+        atol (float): the absolute tolerance
+
+    Returns:
+        _ (bool): true if the two lists of orbits are equivalent
+
+    """
+
+    def check_orbits(orbits_list0, orbits_list1):
+        """Check that the orbits of one list of orbits are a subset of another
+        list of orbits.
+
+        Args:
+            orbit_list0 (list or numpy.ndarray): a list of k-points in orbits.
+            orbit_list1 (list or numpy.ndarray): a list of k-points in orbits.
+        """
+        
+        orbit_lists_equal = []
+
+        # Grab an orbit from the first list.
+        for orbit0 in orbits_list0:
+            orbit_equal = []
+
+            # Grab an orbit from the second list.
+            for orbit1 in orbits_list1:
+                orbit_equal.append([])
+
+                # See if all the k-points in the first orbit are in the second orbit.
+                for kpt in orbit0:
+                    orbit_equal[-1].append(check_contained([kpt], orbit1, rtol=rtol, atol=atol))
+                    
+                # An orbit is equivalent to another if all it's k-points are in another.
+                orbit_equal[-1] = all(orbit_equal[-1])
+                
+            orbit_lists_equal.append(any(orbit_equal))
+            
+        return all(orbit_lists_equal)
+
+    # If the two lists of orbits are subsets of each other, they are equivalent.
+    return all([check_orbits(orbits_list0, orbits_list1),
+                check_orbits(orbits_list1, orbits_list0)])
+
+
+def gaussian_reduction(v1, v2, eps=1e-10):
+    """Gaussian reduced two vectors by subtracting multiples of the shorter
+    vector from the longer. Repeat this process on both vectors until the 
+    shortest set is obtained.
+    
+    Args:
+        v1 (list or numpy.ndarray): a vector in three space in Cartesian
+            coordinates.
+        v2 (list or numpy.ndarray): a vector in three space in Cartesian
+            coordinates.            
+        eps (float): a finite precision tolerance used for comparing lengths
+            of of vectors.
+        
+    Returns:
+        v1 (list or numpy.ndarray): a Gaussian reduced vector in three 
+            space in Cartesian coordinates.
+        v2 (list or numpy.ndarray): a Gaussian reduced vector in three
+            space in Cartesian coordinates.
+    """
+
+    # Make sure the norm of v1 is smaller than v2.
+    vecs = np.array([v1, v2])
+    v1,v2 = vecs[np.argsort(norm(vecs, axis=1))]
+    
+    reduced = False    
+    it = 0
+    while not reduced:
+        it += 1
+        if it > 10:
+            msg = "Failed to Gaussian reduce the vectors after {} iterations".format(it-1)
+            raise ValueError(msg)
+            
+        # Subtract an integer multiple of v1 from v2.
+        v2 -= np.round(np.dot(v1, v2)/np.dot(v1, v1))*v1
+        
+        # If v2 is still longer than v1, the vectors have been reduced.
+        if (norm(v1) - eps) < norm(v2):
+            reduced = True
+        
+        # Make sure the norm of v1 is smaller than v2.
+        vecs = np.array([v1, v2])
+        v1,v2 = vecs[np.argsort(norm(vecs, axis=1))]
+        
+    return v1, v2
+
+
+def reduce_lattice_vector(lattice_vectors, rtol=1e-4, atol=1e-6, eps=1e-10):
+    """Make last lattice vector as short as possible while remaining in an
+    affine plane that passes through the end of the last lattice vector.
+    
+    Args:
+        lattice_vectors (numpy.ndarray): the lattice generating vectors as columns
+            of a 3x3 array. The first two columns define a plane which is parallel
+            to the affine plane the third vector passes through. The third column
+            is the lattice vector being reduced.        
+        rtol (float): a relative tolerance used when verifying the lattice vectors 
+            are linearly independent and when verifying the input lattice vectors
+            are lattice points of the reduced lattice vectors.
+        atol (float): an absolute tolerance used when verifying the lattice vectors
+            are linearly independent and when verifying the input lattice vectors
+            are lattice points of the reduced lattice vectors.
+        eps (int): a finite precision tolerance that is added to the norms of vectors
+            when comparing lengths and to a point converted into lattice coordinates
+            before finding a nearby lattice point.
+     
+    Returns:
+        reduced_lattice_vectors (numpy.ndarray): the generating vectors with the two in 
+            the first two columns unchanged and the third reduced.
+    """
+        
+    # Assign a variable for each of the lattice vectors.
+    v1,v2,v3 = lattice_vectors.T
+        
+    # Gaussian reduce the first two lattice vectors, v1 and v2.
+    # After reduction, the lattice point closest to the projection of v3
+    # in v1-v2 plane is guaranteed to be one of the corners of the unit
+    # cell enclosing the projection of v3.    
+    v1r,v2r = gaussian_reduction(v1, v2, eps)
+        
+    # Replace the first two lattice vectors with the Gaussian reduced ones.
+    temp_lattice_vectors = np.array([v1r, v2r, v3]).T
+        
+    # Verify the new basis is linearly independent.
+    if np.isclose(det(temp_lattice_vectors), 0, rtol=rtol, atol=atol):
+        msg = ("After Gaussian reduction of the first two lattice vectors, "
+               "the lattice generating vectors are linearly dependent.")
+        raise ValueError(msg)
+                
+    # Find the point in the v1-v2 affine plane that is closest
+    # to the origin
+    
+    # Find a vector orthogonal and normal to the v1-v2 plane
+    v_on = np.cross(v1r, v2r)/norm(np.cross(v1r, v2r))
+    
+    # Find the point on the plane closest to the origin
+    closest_pt = v3 - v_on*np.dot(v_on, v3)
+    
+    # Put this point in lattice coordinates and then round down to the nearest
+    # integer
+    closest_lat_pt = np.floor(np.dot(inv(temp_lattice_vectors), 
+                                     closest_pt) + eps).astype(int)    
+    
+    # Make sure this point isn't parallel to the v1-v2 plane.
+    if not np.isclose(np.dot(closest_pt, v_on), 0, rtol=rtol, atol=atol):
+        msg = ("After Gaussian reduction, the latttice vectors are "
+               "linearly dependent.")
+        raise ValueError(msg)
+
+    # Find the four lattice points that enclose this point in lattice and Cartesian 
+    # coordinates.
+    corners_lat = np.array([list(i) + [0] for i in itertools.product([0,1], repeat=2)]) + (
+                  closest_lat_pt)
+    
+    corners_cart = np.dot(temp_lattice_vectors, corners_lat.T).T
+    
+    # Calculate distances from the corners to `closest_pt`.
+    corner_distances = norm(corners_cart - closest_pt, axis=1)
+    
+    # Find corner with the shortest distance.
+    corner_index = np.argmin(corner_distances)
+        
+    # Calculate the reduced vector.
+    try:
+        v3r = v3 - corners_cart[corner_index]
+    except:
+        msg = "Failed to reduce the lattice vector."
+        raise ValueError(msg)
+        
+    reduced_lattice_vectors = np.array([v1r, v2r, v3r]).T
+    
+    # Verify that the old lattice vectors are an integer combination of the new
+    # lattice vectors.
+    check, N = check_commensurate(reduced_lattice_vectors, lattice_vectors,
+                                  rtol=rtol, atol=atol)
+    if not check:
+        msg = ("The reduced lattice generates a different lattice than the input"
+               " lattice.")        
+        raise ValueError(msg.format(grid_vectors))
+    else:
+        return reduced_lattice_vectors
+
+
+def check_minkowski_conditions(lattice_basis, eps=1e-10):
+    """Verify a lattice basis satisfies the Minkowski conditions. 
+    
+    Args:
+        lattice_basis (numpy.ndarray): the lattice generating vectors as columns
+            of a 3x3 array.
+        eps (int): a finite precision parameter that is added to the norm of vectors
+            when comparing lengths.
+            
+    Returns:
+        minkowski_check (bool): A boolean whose value is `True` if the Minkowski 
+            conditions are satisfied.
+    """
+        
+    minkowski_check = True
+    b1, b2, b3 = lattice_basis.T
+    
+    if (norm(b2) + eps) < norm(b1):
+        print("Minkowski condition |b1| < |b2| failed.")
+        minkowski_check = False
+    
+    if (norm(b3) + eps) < norm(b2):
+        print("Minkowski condition |b2| < |b3| failed.")
+        minkowski_check = False
+        
+    if (norm(b1 + b2) + eps) < norm(b2):
+        print("Minkowski condition |b2| < |b1 + b2| failed.")
+        minkowski_check = False
+        
+    if (norm(b1 - b2) + eps) < norm(b2):
+        print("Minkowski condition |b1 - b2| < |b2| failed.")
+        minkowski_check = False
+    
+    if (norm(b1 + b3) + eps) < norm(b3):
+        print("Minkowski condition |b3| < |b1 + b3| failed.")
+        minkowski_check = False
+        
+    if (norm(b3 - b1) + eps) < norm(b3):
+        print("Minkowski condition |b3 - b1| < |b3| failed. ")
+        minkowski_check = False        
+        
+    if (norm(b2 + b3) + eps) < norm(b3):
+        print("Minkowski condition |b3| < |b2 + b3| failed. ")
+        minkowski_check = False
+        
+    if (norm(b3 - b2) + eps) < norm(b3):
+        print("Minkowski condition |b3| < |b3 - b2| failed.")
+        minkowski_check = False
+    
+    if (norm(b1 + b2 + b3) + eps) < norm(b3):
+        print("Minkowski condition |b3| < |b1 + b2 + b3| failed.")
+        minkowski_check = False
+        
+    if (norm(b1 - b2 + b3) + eps) < norm(b3):
+        print("Minkowski condition |b3| < |b1 - b2 + b3| failed.")
+        minkowski_check = False
+        
+    if (norm(b1 + b2 - b3) + eps) < norm(b3):        
+        print("Minkowski condition |b3| < |b1 + b2 - b3| failed.")
+        minkowski_check = False
+        
+    if (norm(b1 - b2 - b3) + eps) < norm(b3):        
+        print("Minkowski condition |b3| < |b1 - b2 - b3| failed.")
+        minkowski_check = False
+
+    return minkowski_check        
+
+
+def minkowski_reduce_basis(lattice_basis, rtol=1e-4, atol=1e-6, eps=1e-10):
+    """Minkowski reduce the basis of a lattice.
+    
+    Args:
+        lattice_basis (numpy.ndarray): the lattice generating vectors as columns
+            of a 3x3 array.
+        rtol (float): a relative tolerance used when comparing determinates to zero, and
+            used as an input to `reduce_lattice_vector`.
+        atol (float): an absolute tolerance used when comparing determinates to zero, and
+            used as an input to `reduce_lattice_vector`.
+        eps (int): a finite precision tolerance that is added to the norms of vectors
+            when comparing lengths.
+            
+    Returns:
+        lat_vecs (numpy.ndarray): the Minkowski reduced lattice vectors as columns
+            of a 3x3 array.
+    """
+    
+    if np.isclose(det(lattice_basis), 0, rtol=rtol, atol=atol):
+        msg = "Lattice basis is linearly dependent."
+        raise ValueError(msg)
+
+    limit = 10
+    lat_vecs = deepcopy(lattice_basis)
+    
+    for _ in range(limit):
+        
+        # Sort the lattice vectors by their norms in ascending order.
+        lat_vecs = lat_vecs.T[np.argsort(norm(lat_vecs, axis=0))].T
+        
+        # Reduce the lattice vector in the last column.
+        lat_vecs = reduce_lattice_vector(lat_vecs, rtol=rtol, atol=atol, eps=eps)
+        
+        if norm( lat_vecs[:,2] ) >= (norm( lat_vecs[:,1] ) - eps):
+            break
+            
+    # Check that the Minkowski conditions are satisfied.
+    if not check_minkowski_conditions(lat_vecs, eps):
+        msg = "Failed to meet Minkowski reduction conditions after {} iterations".format(limit)
+        raise ValueError(msg)
+    
+    # Sort the lattice vectors by their norms in ascending order.
+    lat_vecs = lat_vecs.T[np.argsort(norm(lat_vecs, axis=0))].T
+    
+    # We want the determinant to be positive. Technically, this is no longer a
+    # Minkowski reduced basis but it shouldn't physically affect anything and the
+    # basis is still as orthogonal as possible.
+    if (det(lat_vecs) + eps) < 0:
+        lat_vecs = swap_rows_columns(lat_vecs, 1, 2, rows=False)
+        # lat_vecs[:, 1], lat_vecs[:, 2] = lat_vecs[:, 2], lat_vecs[:, 1].copy()
+                
+    return lat_vecs
+
+
+def check_commensurate(lattice, sublattice, rtol=1e-5, atol=1e-8):
+    """Check if a lattice is commensurate with a sublattice.
+
+    Args:
+        lattice (numpy.ndarray): lattice generating vectors as columns of a 3x3 array.
+        sublattice (numpy.ndarray): sublattice generating vectors as columns of a 3x3
+            array.
+    Returns:
+        _ (bool): if the lattice and sublattice are commensurate, return `True`.
+        N (numpy.ndarray): if the lattice and sublattice are commensurate, return an array
+            of ints. Otherwise, return an array of floats.
+    """
+
+    N = np.dot(inv(lattice), sublattice)
+    
+    if np.allclose(N, np.round(N), atol=atol, rtol=rtol):        
+        N = np.round(N).astype(int)
+        return True, N
+    else:
+        return False, N
+
+
+def get_space_group_size(file_loc, coords="lat", rtol=1e-4, atol=1e-6, eps=1e-10):
+    """Get the size of the point group.
+    
+    Args:
+        file_loc (str): the location of the VASP POSCAR file.
+        
+    Returns:
+        _ (int): the number of operations in the space group.
+    """
+    
+    data = read_poscar(file_loc)
+    lat_vecs = data["lattice vectors"]
+    atom_labels = data["atomic basis"]["atom labels"]
+    atom_positions = data["atomic basis"]["atom positions"]
+    translations, point_group = get_space_group(lat_vecs, atom_labels, atom_positions, coords=coords,
+                                                rtol=rtol, atol=atol, eps=eps)
+    
+    return len(point_group)
+            
+    
