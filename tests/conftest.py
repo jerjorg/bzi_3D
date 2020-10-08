@@ -1,6 +1,6 @@
 import pytest
 
-@pytest.fixture(scope="session")
+#@pytest.fixture(scope="session")
 def run(tests):
     # Tetrahedron method tests
     if tests == "all tetrahedra":
@@ -79,8 +79,6 @@ def run(tests):
                  "test_check_commensurate"]
 
     # Read and write tests
-    elif tests == "all read_and_write":
-        tests = ["test_read_qe", "test_read_vasp"]
     elif tests == "all make_IBZ":
         tests = ["test_get_bragg_planes",
                  "test_trim_small",
@@ -118,5 +116,5 @@ def run(tests):
                  "test_get_integration_cases"]
     else:
         tests = []
-    
+
     return tests

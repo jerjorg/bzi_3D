@@ -20,7 +20,7 @@ def get_bragg_planes(lat_vecs):
     Returns:
         bragg_planes (pandas.DataFrame): a dataframe of bragg planes, sorted by distance
             from the origin. Columns are labeled 'Direct' for the lattice points in direct
-            coordinates, "Cartesian" for lattice points in Cartesian coordinates, 
+            coordinates, "Cartesian" for lattice points in Cartesian coordinates,
             "Bragg plane" for the Bragg planes in general form, and "Distance" for
             the minimum distance from the origin to the Bragg plane.
     """
@@ -33,17 +33,17 @@ def get_bragg_planes(lat_vecs):
     # Lattice points in Cartesian coordinates.
     car_lat_pts = np.array([np.dot(lat_vecs, lpt) for lpt in dir_lat_pts])
     bragg_planes = np.array([[i, j, norm(j)/2, np.append(j/norm(j), norm(j)/2)] for i,j in
-                             zip(dir_lat_pts, car_lat_pts)])
+                             zip(dir_lat_pts, car_lat_pts)], dtype=object)
     indices = np.argsort(bragg_planes[:,2])
     columns = ["Direct", "Cartesian", "Distance", "Bragg plane"]
     bindices = range(len(bragg_planes))
     bragg_planes = pd.DataFrame(bragg_planes[indices], columns=columns,
                                 index=bindices)
     return bragg_planes
-        
-    
+
+
 def three_planes_intersect(planes):
-    """This routine finds the point of intersection of three planes. 
+    """This routine finds the point of intersection of three planes.
 
     Three planes, in general form with a single point in common, can be written as
 
@@ -61,7 +61,7 @@ def three_planes_intersect(planes):
     d = [d0, d1, d2]
 
     Mr = d  ==>  r = inv(M)d
-    
+
     As long as M has an inverse, we can find a point common to all three planes.
 
     Args:
@@ -84,18 +84,18 @@ def three_planes_intersect(planes):
 
 
 def get_bragg_shells(bragg_planes):
-    """Find the starting index of Bragg planes that have the same minimum distance from 
+    """Find the starting index of Bragg planes that have the same minimum distance from
     the origin.
-    
+
     Args:
         bragg_planes (pandas.DataFrame): an array of Bragg planes ordered by
             increasing distance from the origin.
-    
+
     Returns:
-        indices (list): a list of indices that indicate where in the list of 
+        indices (list): a list of indices that indicate where in the list of
             Bragg planes the minimum distance from the origin changes.
     """
-    
+
     indices = [0]
     old_dist = bragg_planes["Distance"][0]
     for i in range(len(bragg_planes)):
@@ -109,9 +109,9 @@ def get_bragg_shells(bragg_planes):
 
 
 def point_plane_location(point, plane):
-    """Determine if a point is inside the plane, outside the plane, or lies on the plane. 
+    """Determine if a point is inside the plane, outside the plane, or lies on the plane.
 
-    Inside is the side of the plane opposite that in which the vector normal to the 
+    Inside is the side of the plane opposite that in which the vector normal to the
     plane points.
 
     Args:
@@ -124,11 +124,11 @@ def point_plane_location(point, plane):
         (str): a string that indicates where the point is located. Options include
             "inside", "outside", and "on".
     """
-    
+
     n = np.array(plane[:3])
     d = plane[-1]
     loc = np.dot(point, n) - d
-    
+
     if np.isclose(loc, 0):
         return "on"
     elif loc > 0:
@@ -139,14 +139,14 @@ def point_plane_location(point, plane):
 
 def find_bz(lat_vecs):
     """Find the Brillouin zone.
-    
+
     Args:
         lat_vecs (numpy.ndarray): the lattice vectors as columns of a 3x3 numpy array.
-        
+
     Returns:
         BZ (scipy.spatial.ConvexHull): the Brillouin zone for the given lattice.
     """
-    
+
     eps = 1e-6
     # Get the Bragg planes.
     bragg_planes = get_bragg_planes(lat_vecs)
@@ -155,11 +155,11 @@ def find_bz(lat_vecs):
     bragg_shells = get_bragg_shells(bragg_planes)
     shell_index = 0
     BZvolume = 0
-    
-    
+
+
     while not np.isclose(BZvolume, det(lat_vecs)):
         shell_index += 1
-        stop_index = bragg_shells[shell_index]    
+        stop_index = bragg_shells[shell_index]
         this_shell = bragg_planes["Bragg plane"][:stop_index]
         ipintersects = []
         this_shell = bragg_planes["Bragg plane"][:stop_index]
@@ -169,7 +169,7 @@ def find_bz(lat_vecs):
             if not ipt is None:
                 if not any(map(lambda elem: np.allclose(ipt, elem), ipintersects)):
                     ipintersects.append(ipt)
-                
+
         inside_intersects = []
         # Make sure the intersections don't cross any of the planes that make up the
         # Brillouin zone.
@@ -180,11 +180,11 @@ def find_bz(lat_vecs):
                     crossed = True
             if not crossed:
                 inside_intersects.append(pt)
-        try: 
+        try:
             BZ = ConvexHull(inside_intersects)
             BZvolume = BZ.volume
             if np.isclose(BZvolume, det(lat_vecs)):
-                return BZ  
+                return BZ
         except:
             if shell_index > 9:
                 return None
@@ -195,19 +195,19 @@ def find_bz(lat_vecs):
 
 def get_unique_planes(BZ, rtol=1e-5, atol=1e-8):
     """Find the unique planes that form the boundaries of a Brillouin zone.
-    
+
     Args:
         BZ (scipy.spatial.ConvexHull): a convex hull object
-        
+
     Returns:
         unique_plane (numpy.ndarray): an array of unique planes in general form.
     """
-    
+
     unique_planes = []
     for plane in BZ.equations:
         if not check_contained([plane], unique_planes, rtol=rtol, atol=atol):
             unique_planes.append(plane)
-    
+
     return np.array(unique_planes)
 
 
@@ -223,32 +223,32 @@ def planar3dTo2d(points, eps=1e-6):
     Returns:
         coords (numpy.ndarray): a list of points in the coordinate system of the plane.
     """
-    
+
     coords = np.zeros((len(points), 2))
-    
+
     # Find the vector normal to the plane
     uvec = plane3pts(points,eps)[0]
-    
+
     # Find the point at the center of all the points. This is a point in the plane that
     # acts as the origin in a coordinate system in the plane. The sum function must not
     # be the one from numpy.
     rcenter = sum(points)/len(points)
-    
+
     # This is the x-axis in the new coordinate system. As long as it points to a point in
     # the plane, there is freedom in choosing the x-axis.
     xunitv =  (points[0] - rcenter)/norm(points[0] - rcenter)
-    
+
     # The y-axis in the new coordinate system.
     crss = np.cross(xunitv, uvec)
     yunitv = crss/norm(crss)
-    
+
     for i, vec in enumerate(points):
         # Find a vector that points from the new orign to the point in the plane.
         vc = vec - rcenter
         # Project this vector onto the new coordinate system.
         coords[i,0] = np.dot(vc, xunitv); coords[i,1] = np.dot(vc, yunitv)
     return coords
-        
+
 def orderAngle(facet, eps=1e-6):
     """Get the angle of each vector in the plane of the facet relative to a
     coordinate system in the plane of points. If there are only three points,
@@ -261,10 +261,10 @@ def orderAngle(facet, eps=1e-6):
     Returns:
         (list): a list of points.
     """
-    
+
     # if len(facet) == 3:
     #     return facet
-    xy = planar3dTo2d(facet, eps)    
+    xy = planar3dTo2d(facet, eps)
     angles = []
     for i, vec in enumerate(facet):
         angle = np.arctan2(xy[i,1], xy[i,0])
@@ -276,7 +276,7 @@ def orderAngle(facet, eps=1e-6):
 def plane3pts(points, eps=1e-3):
     """From a list of points in a plane, find the vector normal to the plane (pointing
     away from the origin) and the closest distance from the origin to the plane. If the
-    plane passes through the origin, no choice is made concerning the direction of the 
+    plane passes through the origin, no choice is made concerning the direction of the
     vector normal to the plane.
 
     Args:
@@ -287,15 +287,15 @@ def plane3pts(points, eps=1e-3):
         n (numpy.ndarray): a vector normal to the plane of points.
         dist (float): the distance from the origin to the plane.
     """
-    
+
     # """From the first 3 (noncollinear) points of a list of points,
     # returns a normal and closest distance to origin of the plane
     # The closest distance is d = dot(r0, u). The normal's direction
     # (degenerate vs multiplication by -1)
-    # is chosen to be that which points away from the side the origin is on.  If the 
+    # is chosen to be that which points away from the side the origin is on.  If the
     # plane goes through the origin, then all the r's are in the plane, and no choice is made
     # """
-    
+
     r0 = points[0]; r1 = points[1]; r2 = points[2];
     vec = np.cross(r1-r0, r2-r0)
     nv = norm(vec)
@@ -306,13 +306,12 @@ def plane3pts(points, eps=1e-3):
             r2 = points[3]
         else:
             r1 = points[3]
-            
+
         vec = np.cross(r1-r0, r2-r0)
         nv = norm(vec)
-        
+
     n = vec/nv
     if np.dot(n, r0) < -eps:
-        n = -n        
+        n = -n
     dist = np.dot(n, r0)
     return n, dist
-
