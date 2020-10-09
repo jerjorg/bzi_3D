@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# BZI documentation build configuration file, created by
+# bzi_3D documentation build configuration file, created by
 # sphinx-quickstart on Wed May 17 11:49:51 2017.
 #
 # This file is execfile()d with the current directory set to its
@@ -49,7 +49,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'BZI'
+project = u'bzi_3D'
 copyright = u'2017, Jeremy Jorgensen'
 author = u'Jeremy Jorgensen'
 
@@ -103,7 +103,7 @@ html_static_path = ['_static']
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'BZIdoc'
+htmlhelp_basename = 'bzi_3Ddoc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
@@ -130,7 +130,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'BZI.tex', u'BZI Documentation',
+    (master_doc, 'bzi_3D.tex', u'bzi_3D Documentation',
      u'Jeremy Jorgensen', 'manual'),
 ]
 
@@ -140,7 +140,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'bzi', u'BZI Documentation',
+    (master_doc, 'bzi_3D', u'bzi_3D Documentation',
      [author], 1)
 ]
 
@@ -151,8 +151,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'BZI', u'BZI Documentation',
-     author, 'BZI', 'One line description of project.',
+    (master_doc, 'bzi_3D', u'bzi_3D Documentation',
+     author, 'bzi_3D', 'One line description of project.',
      'Miscellaneous'),
 ]
 

@@ -4,7 +4,7 @@
 # You can set these variables from the command line.
 SPHINXOPTS    =
 SPHINXBUILD   = python -msphinx
-SPHINXPROJ    = BZI
+SPHINXPROJ    = bzi_3D
 SOURCEDIR     = source
 BUILDDIR      = build
 
