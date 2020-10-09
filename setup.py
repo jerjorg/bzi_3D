@@ -16,13 +16,13 @@ except ImportError:
     read_md = lambda f: open(f, 'r').read()
 
 from os import path
-setup(name='BZI',
+setup(name='bzi_3D',
       version='0.3.3',
       description='Brillouin zone integration.',
       long_description= "" if not path.isfile("README.md") else read_md('README.md'),
       author='Jeremy Jorgensen',
       author_email='jerjorg@gmail.com',
-      url='https://github.com/jerjorg/BZI',
+      url='https://github.com/jerjorg/bzi_3D',
       license='MIT',
       setup_requires=['pytest-runner',],
       tests_require=['pytest', 'python-coveralls'],
@@ -36,8 +36,8 @@ setup(name='BZI',
           "xarray",
           "scipy"
       ],
-      packages=['BZI'],
-      package_data={'BZI': []},
+      packages=['bzi_3D'],
+      package_data={'bzi_3D': []},
       include_package_data=True,
       classifiers=[
           'Development Status :: 2 - Pre-Alpha',
@@ -46,6 +46,6 @@ setup(name='BZI',
           'Operating System :: MacOS',
           'Programming Language :: Python',
           'Programming Language :: Python :: 3',
-          'Programming Language :: Python :: 3.6',
+          'Programming Language :: Python :: 3.7',
       ],
      )

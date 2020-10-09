@@ -583,34 +583,36 @@ def test_group_bilinear_intersections():
         group_bilinear_intersections(coeffs, test_pts, param_edge, param_isocurve,
                                      edge_indices, intersecting_edges))
 
-    assert np.allclose(grouped_edge_indices[0], [9, 13])
-    assert np.allclose(grouped_edge_indices[1], [10, 14])
-    assert np.allclose(grouped_edge_indices[2], [11, 15])
-    assert np.allclose(grouped_edge_indices[3], [12, 16])
+
+	
+    assert (grouped_edge_indices[0] == [9, 13]).all()
+    assert (grouped_edge_indices[1] == [10, 14]).all()
+    assert (grouped_edge_indices[2] == [11, 15]).all()
+    assert (grouped_edge_indices[3] == [12, 16]).all()
     assert len(grouped_edge_indices) == 4
 
-    assert np.allclose(grouped_pts[0], [[.1, .1], [.3, .5]])
-    assert np.allclose(grouped_pts[1], [[-.1, .2], [-.8, .2]])
-    assert np.allclose(grouped_pts[2], [[-.3, -.4], [-.9, -.7]])
-    assert np.allclose(grouped_pts[3], [[.3, -.5], [.6, -.7]])
+    assert (grouped_pts[0] == [[.1, .1], [.3, .5]]).all()
+    assert (grouped_pts[1] == [[-.1, .2], [-.8, .2]]).all()
+    assert (grouped_pts[2] == [[-.3, -.4], [-.9, -.7]]).all()
+    assert (grouped_pts[3] == [[.3, -.5], [.6, -.7]]).all()
     assert len(grouped_pts) == 4
 
-    assert np.allclose(grouped_param_edge[0], [1, 5])
-    assert np.allclose(grouped_param_edge[1], [2, 6])
-    assert np.allclose(grouped_param_edge[2], [3, 7])
-    assert np.allclose(grouped_param_edge[3], [4, 8])
+    assert (grouped_param_edge[0] == [1, 5]).all()
+    assert (grouped_param_edge[1] == [2, 6]).all()
+    assert (grouped_param_edge[2] == [3, 7]).all()
+    assert (grouped_param_edge[3] == [4, 8]).all()
     assert len(grouped_param_edge) == 4
 
-    assert np.allclose(grouped_param_isocurve[0], [8, 4])
-    assert np.allclose(grouped_param_isocurve[1], [7, 3])
-    assert np.allclose(grouped_param_isocurve[2], [6, 2])
-    assert np.allclose(grouped_param_isocurve[3], [5, 1])
+    assert (grouped_param_isocurve[0] == [8, 4]).all()
+    assert (grouped_param_isocurve[1] == [7, 3]).all()
+    assert (grouped_param_isocurve[2] == [6, 2]).all()
+    assert (grouped_param_isocurve[3] == [5, 1]).all()
     assert len(grouped_param_isocurve) == 4
 
-    assert np.allclose(grouped_intersecting_edges[0], [[[1]*2, [1]*2], [[5]*2,[5]*2]])
-    assert np.allclose(grouped_intersecting_edges[1], [[[2]*2, [2]*2], [[6]*2,[6]*2]])
-    assert np.allclose(grouped_intersecting_edges[2], [[[3]*2, [3]*2], [[7]*2,[7]*2]])
-    assert np.allclose(grouped_intersecting_edges[3], [[[4]*2, [4]*2], [[8]*2,[8]*2]])
+    assert (grouped_intersecting_edges[0] == [[[1]*2, [1]*2], [[5]*2,[5]*2]]).all()
+    assert (grouped_intersecting_edges[1] == [[[2]*2, [2]*2], [[6]*2,[6]*2]]).all()
+    assert (grouped_intersecting_edges[2] == [[[3]*2, [3]*2], [[7]*2,[7]*2]]).all()
+    assert (grouped_intersecting_edges[3] == [[[4]*2, [4]*2], [[8]*2,[8]*2]]).all()
     assert len(grouped_intersecting_edges) == 4
 
 
