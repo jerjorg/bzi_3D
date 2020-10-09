@@ -4,8 +4,8 @@
 import pytest
 import numpy as np
 from numpy.linalg import det
-from BZI.symmetry import *
-from BZI.make_IBZ import *
+from bzi_3D.symmetry import *
+from bzi_3D.make_IBZ import *
 
 from conftest import run
 

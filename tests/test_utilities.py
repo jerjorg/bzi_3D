@@ -5,7 +5,7 @@ import pytest
 import numpy as np
 from copy import deepcopy
 
-from BZI.utilities import *
+from bzi_3D.utilities import *
 from conftest import run
 
 tests = run("all utilities")

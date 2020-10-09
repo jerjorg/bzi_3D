@@ -6,9 +6,9 @@ import numpy as np
 from numpy.linalg import norm, inv
 import matplotlib.pyplot as plt
 
-from BZI.all_2D import *
+from bzi_3D.all_2D import *
 
-from BZI.utilities import check_contained, make_unique
+from bzi_3D.utilities import check_contained, make_unique
 
 from conftest import run
 

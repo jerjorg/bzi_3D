@@ -13,9 +13,9 @@ from phenum.vector_utils import (_minkowski_reduce_basis, _reduce_C_in_ABC,
                                  _gaussian_reduce_two_vectors)
 from phenum.symmetry import get_lattice_pointGroup
 
-from BZI.sampling import make_cell_points
+from bzi_3D.sampling import make_cell_points
 
-from BZI.symmetry import *
+from bzi_3D.symmetry import *
 from conftest import run
 
 tests = run("all symmetry")

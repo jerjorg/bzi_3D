@@ -6,15 +6,15 @@ import numpy as np
 from itertools import product
 import csv
 
-from BZI.symmetry import (get_minmax_indices, swap_column, swap_row,
+from bzi_3D.symmetry import (get_minmax_indices, swap_column, swap_row,
                           HermiteNormalForm, UpperHermiteNormalForm)
 
-from BZI.sampling import (make_grid, make_large_grid, sphere_pts,
+from bzi_3D.sampling import (make_grid, make_large_grid, sphere_pts,
                           large_sphere_pts, make_cell_points)
-from BZI.utilities import check_contained
+from bzi_3D.utilities import check_contained
 
 
-from BZI.symmetry import make_ptvecs, make_rptvecs
+from bzi_3D.symmetry import make_ptvecs, make_rptvecs
 from conftest import run
 
 tests = run("all sampling")

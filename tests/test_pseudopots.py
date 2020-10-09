@@ -4,8 +4,8 @@
 import pytest
 import numpy as np
 import matplotlib.pyplot as plt
-from BZI.plots import plot_band_structure, plot_paths
-from BZI.pseudopots import *
+from bzi_3D.plots import plot_band_structure, plot_paths
+from bzi_3D.pseudopots import *
 from numpy.linalg import norm, inv, det
 from conftest import run
 

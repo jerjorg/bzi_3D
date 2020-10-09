@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 import itertools
 
-from BZI.tetrahedron import *
-from BZI.pseudopots import FreeElectronModel, Al_EPM, free_EPM
-from BZI.symmetry import make_ptvecs, make_rptvecs, Lattice
+from bzi_3D.tetrahedron import *
+from bzi_3D.pseudopots import FreeElectronModel, Al_EPM, free_EPM
+from bzi_3D.symmetry import make_ptvecs, make_rptvecs, Lattice
 from conftest import run
 
 print(Al_EPM.energy_cutoff)

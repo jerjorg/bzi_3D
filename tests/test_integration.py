@@ -3,10 +3,10 @@
 import numpy as np
 from numpy.linalg import norm
 import pytest
-from BZI.pseudopots import FreeElectronModel
-from BZI.integration import *
-from BZI.symmetry import Lattice, make_ptvecs, make_rptvecs
-from BZI.sampling import make_grid, make_cell_points
+from bzi_3D.pseudopots import FreeElectronModel
+from bzi_3D.integration import *
+from bzi_3D.symmetry import Lattice, make_ptvecs, make_rptvecs
+from bzi_3D.sampling import make_grid, make_cell_points
 from conftest import run
 
 tests = run("all rectangle")
