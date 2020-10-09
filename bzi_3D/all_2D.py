@@ -8,8 +8,8 @@ import itertools as it
 from copy import deepcopy, copy
 from scipy.spatial import ConvexHull
 
-from BZI.symmetry import get_minmax_indices, bring_into_cell, make_rptvecs
-from BZI.utilities import remove_points, rprint, check_inside, check_contained
+from bzi_3D.symmetry import get_minmax_indices, bring_into_cell, make_rptvecs
+from bzi_3D.utilities import remove_points, rprint, check_inside, check_contained
 plt.style.use('seaborn-colorblind')
 
 def make2D_lattice_basis(lattice_constants, lattice_angle):
