@@ -1,6 +1,11 @@
-[![Build Status](https://travis-ci.com/jerjorg/bzi_3D.svg?branch=master)](https://travis-ci.com/jerjorg/bzi_3D)
-[![Coverage Status](https://coveralls.io/repos/github/jerjorg/bzi_3D/badge.svg?branch=master)](https://coveralls.io/github/jerjorg/bzi_3D?branch=master)
+> **Archived.** This package is no longer maintained. The Brillouin zone symmetry-reduction
+> work was rewritten in Julia and continues as
+> [SymmetryReduceBZ.jl](https://github.com/jerjorg/SymmetryReduceBZ.jl), which accompanies the
+> paper *A General Algorithm for Calculating Irreducible Brillouin Zones*,
+> [Commun. Comput. Phys. **31**(2), 495-515 (2022)](https://doi.org/10.4208/cicp.OA-2021-0094).
+> This repository is preserved for reference.
 
 # Brillouin Zone Integration
 
-BZI is a python package for testing the convergence of various Brillouin zone integration methods.
+BZI is a Python package for testing the convergence of various Brillouin zone integration
+methods.
